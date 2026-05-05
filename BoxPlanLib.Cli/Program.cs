@@ -2,7 +2,7 @@ using BoxPlanLib;
 
 var inputPath = args.Length > 0
     ? args[0]
-    : Path.Combine(AppContext.BaseDirectory, "sample-plans", "simple-cube.yml");
+    : Path.Combine(AppContext.BaseDirectory, "sample-plans", "divider-test.yml");
 
 var outputPath = args.Length > 1
     ? args[1]
@@ -19,10 +19,12 @@ var settings = new BoxPlanSettings
 {
     SheetWidth = 300,
     SheetHeight = 300,
+    Margin = 5.0,
     Kerf = 0.1,
     MaterialThickness = 3.0,
     FingerJointSize = 5.0,
-    Spacing = 5.0,
+    Spacing = 1.0,
+    Debug = true
 };
 
 var yaml = File.ReadAllText(inputPath);
@@ -35,8 +37,8 @@ if (!parsed.Success || parsed.Value is null)
 }
 
 var pieces = lib.GetCuttableShapes(parsed.Value, settings);
-var svg = lib.GenerateSimpleSVG(pieces, settings);
+var svg = lib.GeneratePagedSVG(pieces, settings);
 
 File.WriteAllText(outputPath, svg);
-Console.WriteLine($"Wrote {pieces.Length} pieces to {Path.GetFullPath(outputPath)}");
+Console.WriteLine($"Wrote paged SVG for {pieces.Length} pieces to {Path.GetFullPath(outputPath)}");
 return 0;

@@ -34,6 +34,36 @@ public class ClosedBoxTests
         return pts;
     }
 
+    private static bool HasImmediateBacktrack(IReadOnlyList<Vec2> pts)
+    {
+        for (var i = 0; i < pts.Count - 2; i++)
+        {
+            var a = pts[i];
+            var c = pts[i + 2];
+            if (Math.Abs(a.X - c.X) < 1e-6 && Math.Abs(a.Y - c.Y) < 1e-6)
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static bool HasLargeDiagonalSegment(IReadOnlyList<Vec2> pts, double maxMinorDelta)
+    {
+        for (var i = 0; i < pts.Count - 1; i++)
+        {
+            var a = pts[i];
+            var b = pts[i + 1];
+            var dx = Math.Abs(a.X - b.X);
+            var dy = Math.Abs(a.Y - b.Y);
+            if (dx > maxMinorDelta && dy > maxMinorDelta)
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+
     [Fact]
     public void Closed_cube_emits_six_pieces_one_per_face()
     {
@@ -189,5 +219,47 @@ public class ClosedBoxTests
         Assert.True(bottomCutCount + frontCutCount > 0,
             "Expected at least one face to have inward jogs along the shared edge.");
         Assert.NotEqual(bottomCutCount, frontCutCount);
+    }
+
+    [Fact]
+    public void Closed_cube_outlines_do_not_immediately_backtrack_at_omitted_corners()
+    {
+        var plan = ParseOk("""
+            shapes:
+              - id: "cube"
+                type: "box"
+                dimensions: [30.0, 30.0, 30.0]
+            """);
+
+        var lib = new BoxPlanLib();
+        var pieces = lib.GetCuttableShapes(plan, Settings(kerf: 0.0));
+
+        foreach (var piece in pieces)
+        {
+            var pts = Points(piece);
+            Assert.False(HasImmediateBacktrack(pts),
+                $"piece {piece.Id} contains an immediate backtrack in its outline");
+        }
+    }
+
+    [Fact]
+    public void Closed_cube_kerfed_outlines_remain_orthogonal_at_omitted_corners()
+    {
+        var plan = ParseOk("""
+            shapes:
+              - id: "cube"
+                type: "box"
+                dimensions: [30.0, 30.0, 30.0]
+            """);
+
+        var lib = new BoxPlanLib();
+        var pieces = lib.GetCuttableShapes(plan, Settings(kerf: 0.1));
+
+        foreach (var piece in pieces.Where(piece => piece.Id is "cube.left" or "cube.right" or "cube.front" or "cube.back"))
+        {
+            var pts = Points(piece);
+            Assert.False(HasLargeDiagonalSegment(pts, maxMinorDelta: 0.2),
+                $"piece {piece.Id} contains a large diagonal outline segment");
+        }
     }
 }

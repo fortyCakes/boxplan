@@ -13,6 +13,18 @@ public class SimpleSvgGeneratorTests
     {
         SheetWidth = 300,
         SheetHeight = 300,
+        Margin = 0,
+        Kerf = 0,
+        MaterialThickness = 3,
+        FingerJointSize = 5,
+        Spacing = spacing,
+    };
+
+    private static BoxPlanSettings Settings(double sheetWidth, double sheetHeight, double spacing, double margin = 0) => new()
+    {
+        SheetWidth = sheetWidth,
+        SheetHeight = sheetHeight,
+        Margin = margin,
         Kerf = 0,
         MaterialThickness = 3,
         FingerJointSize = 5,
@@ -34,12 +46,17 @@ public class SimpleSvgGeneratorTests
 
     private static BoxPlanCuttableShape Square(string id, double size,
         IReadOnlyList<CuttablePath>? interior = null,
+        IReadOnlyList<CuttablePath>? engravings = null)
+        => Rectangle(id, size, size, interior, engravings);
+
+    private static BoxPlanCuttableShape Rectangle(string id, double width, double height,
+        IReadOnlyList<CuttablePath>? interior = null,
         IReadOnlyList<CuttablePath>? engravings = null) => new()
     {
         Id = id,
         BoundingBoxMin = new Vec2(0, 0),
-        BoundingBoxMax = new Vec2(size, size),
-        Outline = ClosedRect(new Vec2(0, 0), size, size),
+        BoundingBoxMax = new Vec2(width, height),
+        Outline = ClosedRect(new Vec2(0, 0), width, height),
         InteriorCuts = interior ?? Array.Empty<CuttablePath>(),
         Engravings = engravings ?? Array.Empty<CuttablePath>(),
     };
@@ -236,5 +253,105 @@ public class SimpleSvgGeneratorTests
             .Where(g => g.Attribute("id") != null)
             .ToArray();
         Assert.Equal(6, shapeGroups.Length);
+    }
+
+    [Fact]
+    public void Paged_svg_outlines_each_sheet_in_green()
+    {
+        var lib = new BoxPlanLib();
+        var shapes = new[] { Square("a", 10), Square("b", 10), Square("c", 10) };
+        var svg = lib.GeneratePagedSVG(shapes, Settings(sheetWidth: 25, sheetHeight: 15, spacing: 5));
+
+        var doc = XDocument.Parse(svg);
+        var rects = doc.Descendants(Svg + "rect").ToArray();
+
+        Assert.Equal(2, rects.Length);
+        Assert.All(rects, rect =>
+        {
+            Assert.Equal("green", rect.Attribute("stroke")!.Value);
+            Assert.Equal("25.000", rect.Attribute("width")!.Value);
+            Assert.Equal("15.000", rect.Attribute("height")!.Value);
+        });
+    }
+
+    [Fact]
+    public void Paged_svg_packs_shapes_tightly_within_each_page()
+    {
+        var lib = new BoxPlanLib();
+        var shapes = new[] { Square("small", 10), Square("large", 20), Square("third", 10) };
+        var svg = lib.GeneratePagedSVG(shapes, Settings(sheetWidth: 40, sheetHeight: 25, spacing: 5));
+
+        var doc = XDocument.Parse(svg);
+        var pageGroups = doc.Descendants(Svg + "g")
+            .Where(g => g.Attribute("id") is not null && g.Attribute("id")!.Value.StartsWith("page-"))
+            .ToDictionary(g => g.Attribute("id")!.Value, g => g.Attribute("transform")!.Value);
+        var shapeGroups = doc.Descendants(Svg + "g")
+            .Where(g => g.Attribute("id") is not null && !g.Attribute("id")!.Value.StartsWith("page-"))
+            .ToDictionary(g => g.Attribute("id")!.Value, g => g.Attribute("transform")!.Value);
+
+        Assert.Equal("translate(0.000 0)", pageGroups["page-0"]);
+        Assert.Equal("translate(45.000 0)", pageGroups["page-1"]);
+        Assert.Equal("translate(0.000 0.000)", shapeGroups["large"]);
+        Assert.Equal("translate(25.000 0.000)", shapeGroups["small"]);
+        Assert.Equal("translate(0.000 0.000)", shapeGroups["third"]);
+    }
+
+    [Fact]
+    public void Paged_svg_offsets_shapes_by_margin_within_page()
+    {
+        var lib = new BoxPlanLib();
+        var svg = lib.GeneratePagedSVG(
+            new[] { Square("a", 10), Square("b", 10) },
+            Settings(sheetWidth: 30, sheetHeight: 20, spacing: 5, margin: 2));
+
+        var doc = XDocument.Parse(svg);
+        var shapeGroups = doc.Descendants(Svg + "g")
+            .Where(g => g.Attribute("id") is not null && !g.Attribute("id")!.Value.StartsWith("page-"))
+            .ToDictionary(g => g.Attribute("id")!.Value, g => g.Attribute("transform")!.Value);
+
+        Assert.Equal("translate(2.000 2.000)", shapeGroups["a"]);
+        Assert.Equal("translate(17.000 2.000)", shapeGroups["b"]);
+    }
+
+    [Fact]
+    public void Paged_svg_rotates_piece_when_rotation_is_required_to_fit_page()
+    {
+        var lib = new BoxPlanLib();
+        var svg = lib.GeneratePagedSVG(
+            new[] { Rectangle("rotated", 25, 10) },
+            Settings(sheetWidth: 14, sheetHeight: 30, spacing: 5, margin: 2));
+
+        var doc = XDocument.Parse(svg);
+        var pageGroups = doc.Descendants(Svg + "g")
+            .Where(g => g.Attribute("id") is not null && g.Attribute("id")!.Value.StartsWith("page-"))
+            .ToArray();
+        var rotatedTransform = doc.Descendants(Svg + "g")
+            .Single(g => g.Attribute("id")?.Value == "rotated")
+            .Attribute("transform")!
+            .Value;
+
+        Assert.Single(pageGroups);
+        Assert.Equal("translate(2.000 2.000) translate(10.000 0) rotate(90)", rotatedTransform);
+    }
+
+    [Fact]
+    public void Paged_svg_rotates_piece_to_fit_existing_shelf()
+    {
+        var lib = new BoxPlanLib();
+        var svg = lib.GeneratePagedSVG(
+            new[] { Rectangle("wide", 20, 15), Rectangle("tall", 15, 20) },
+            Settings(sheetWidth: 35, sheetHeight: 30, spacing: 5));
+
+        var doc = XDocument.Parse(svg);
+        var pageGroups = doc.Descendants(Svg + "g")
+            .Where(g => g.Attribute("id") is not null && g.Attribute("id")!.Value.StartsWith("page-"))
+            .ToArray();
+        var shapeGroups = doc.Descendants(Svg + "g")
+            .Where(g => g.Attribute("id") is not null && !g.Attribute("id")!.Value.StartsWith("page-"))
+            .ToDictionary(g => g.Attribute("id")!.Value, g => g.Attribute("transform")!.Value);
+
+        Assert.Single(pageGroups);
+        Assert.Equal("translate(0.000 0.000)", shapeGroups["tall"]);
+        Assert.Equal("translate(20.000 0.000) translate(15.000 0) rotate(90)", shapeGroups["wide"]);
     }
 }

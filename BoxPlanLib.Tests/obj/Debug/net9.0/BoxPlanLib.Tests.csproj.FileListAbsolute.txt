@@ -209,3 +209,5 @@ C:\Users\Alex.Stuart\source\repos\boxplan\BoxPlanLib.Tests\obj\Debug\net9.0\refi
 C:\Users\Alex.Stuart\source\repos\boxplan\BoxPlanLib.Tests\obj\Debug\net9.0\BoxPlanLib.Tests.pdb
 C:\Users\Alex.Stuart\source\repos\boxplan\BoxPlanLib.Tests\obj\Debug\net9.0\BoxPlanLib.Tests.genruntimeconfig.cache
 C:\Users\Alex.Stuart\source\repos\boxplan\BoxPlanLib.Tests\obj\Debug\net9.0\ref\BoxPlanLib.Tests.dll
+C:\Users\Lex\source\repos\boxplan\BoxPlanLib.Tests\obj\Debug\net9.0\BoxPlanLib.Tests.sourcelink.json
+C:\Users\Lex\source\repos\boxplan\BoxPlanLib.Tests\bin\Debug\net9.0\sample-plans\divider-test.yml

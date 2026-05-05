@@ -1,4 +1,4 @@
-using BoxPlanLib.Cutting;
+﻿using BoxPlanLib.Cutting;
 using BoxPlanLib.Model;
 using BoxPlanLib.Parsing;
 using BoxPlanLib.Svg;
@@ -11,7 +11,7 @@ public class BoxPlanLib
     private readonly PlanResolver _resolver = new();
     private readonly FitResolver _fitResolver = new();
     private readonly CuttingPipeline _cuttingPipeline = new();
-    private readonly SimpleSvgGenerator _simpleSvgGenerator = new();
+    private readonly SvgGenerator _svgGenerator = new();
 
     public ParseResult<BoxPlan> ParsePlan(string yaml)
     {
@@ -36,13 +36,11 @@ public class BoxPlanLib
     }
 
     public string GenerateSimpleSVG(BoxPlanCuttableShape[] shapes, BoxPlanSettings settings)
-        => _simpleSvgGenerator.Generate(shapes, settings);
+        => _svgGenerator.GenerateSimpleSvg(shapes, settings);
 
-    //
-    // public string GeneratePagedSVG(BoxPlanCuttableShape[] cuttableShapes, BoxPlanMaterialSettings materialSettings)
-    // {
-    //     return "<svg></svg>";
-    // }
+    public string GeneratePagedSVG(BoxPlanCuttableShape[] cuttableShapes, BoxPlanSettings materialSettings)
+        => _svgGenerator.GeneratePagedSvg(cuttableShapes, materialSettings);
+
     //
     // public string GenerateFullPagedSvg(string plan, BoxPlanMaterialSettings materialSettings)
     // {

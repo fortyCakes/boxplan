@@ -2,9 +2,23 @@ using BoxPlanLib.Model;
 
 namespace BoxPlanLib.Cutting;
 
+internal sealed record JointBlock(double Length, bool PrimaryOwns);
+
+internal enum DividerJointSpanKind
+{
+    Smooth,
+    EndInset,
+    DividerTab,
+    FaceSlot,
+}
+
 internal sealed record FingerBlock(double Length, FaceName Owner);
 
 internal sealed record SlotSpec(double U, double V, double Width, double Height);
+
+internal sealed record DividerEdgeSpec(FaceName Face, bool Joined, bool DividerOwnsPrimary);
+
+internal sealed record DividerJointSpan(double Length, DividerJointSpanKind Kind);
 
 internal sealed class SharedEdge
 {
@@ -74,37 +88,52 @@ internal static class SharedEdgeTable
 
     private static IReadOnlyList<FingerBlock> BuildBlocks(double length, double s, FaceName lower, FaceName higher)
     {
-        var blocks = new List<FingerBlock>();
+        var blocks = FingerJointPattern.Build(length, s);
+        return blocks
+            .Select(block => new FingerBlock(block.Length, block.PrimaryOwns ? lower : higher))
+            .ToList();
+    }
+}
+
+internal static class FingerJointPattern
+{
+    public static IReadOnlyList<JointBlock> Build(double length, double s)
+    {
+        var blocks = new List<JointBlock>();
         if (length <= 0)
         {
             return blocks;
         }
         if (length < 3 * s)
         {
-            blocks.Add(new FingerBlock(length, lower));
+            blocks.Add(new JointBlock(length, true));
             return blocks;
         }
 
-        blocks.Add(new FingerBlock(s, lower));
-        var remaining = length - s;
-        var nextIsHigher = true;
-
-        while (remaining >= 0.75 * s)
+        var minEndLength = 0.75 * s;
+        var interiorCount = (int)Math.Floor(length / s);
+        if (interiorCount % 2 == 0)
         {
-            var owner = nextIsHigher ? higher : lower;
-            blocks.Add(new FingerBlock(s, owner));
-            remaining -= s;
-            nextIsHigher = !nextIsHigher;
+            interiorCount--;
         }
 
-        if (blocks[^1].Owner == lower)
+        while (interiorCount > 1)
         {
-            blocks[^1] = new FingerBlock(blocks[^1].Length + remaining, lower);
+            var endLength = (length - interiorCount * s) / 2.0;
+            if (endLength >= minEndLength)
+            {
+                break;
+            }
+            interiorCount -= 2;
         }
-        else
+
+        var balancedEndLength = (length - interiorCount * s) / 2.0;
+        blocks.Add(new JointBlock(balancedEndLength, true));
+        for (var index = 0; index < interiorCount; index++)
         {
-            blocks.Add(new FingerBlock(remaining, lower));
+            blocks.Add(new JointBlock(s, index % 2 != 0));
         }
+        blocks.Add(new JointBlock(balancedEndLength, true));
 
         return blocks;
     }
@@ -177,12 +206,30 @@ internal static class JointGeometry
 
     public static Vec2 Move(Vec2 p, Vec2 dir, double scale) => Add(p, dir, scale);
 
+    public static bool StartsWithNeighborBlock(FaceEdgeMap edge, SharedEdge shared)
+    {
+        var ordered = edge.ForwardAlongShared
+            ? shared.Blocks
+            : shared.Blocks.Reverse().ToList();
+        return ordered.Count > 0 && ordered[0].Owner != edge.Face;
+    }
+
+    public static bool EndsWithNeighborBlock(FaceEdgeMap edge, SharedEdge shared)
+    {
+        var ordered = edge.ForwardAlongShared
+            ? shared.Blocks
+            : shared.Blocks.Reverse().ToList();
+        return ordered.Count > 0 && ordered[^1].Owner != edge.Face;
+    }
+
     public static List<LineSegment> EmitEdge(
         FaceEdgeMap edge,
         SharedEdge shared,
         int edgeIndex,
         double t,
-        Vec2 startPos)
+        Vec2 startPos,
+        bool omitLeadingInset,
+        bool omitTrailingReturn)
     {
         var along = AlongCcw[edgeIndex];
         var inward = InwardCcw[edgeIndex];
@@ -193,8 +240,9 @@ internal static class JointGeometry
             : shared.Blocks.Reverse().ToList();
 
         var p = startPos;
-        foreach (var block in ordered)
+        for (var blockIndex = 0; blockIndex < ordered.Count; blockIndex++)
         {
+            var block = ordered[blockIndex];
             var L = block.Length;
             if (block.Owner == edge.Face)
             {
@@ -203,12 +251,20 @@ internal static class JointGeometry
             }
             else
             {
-                p = Add(p, inward, t);
-                segments.Add(new LineSegment(p));
+                var isFirstBlock = blockIndex == 0;
+                if (!(omitLeadingInset && isFirstBlock))
+                {
+                    p = Add(p, inward, t);
+                    segments.Add(new LineSegment(p));
+                }
                 p = Add(p, along, L);
                 segments.Add(new LineSegment(p));
-                p = Add(p, inward, -t);
-                segments.Add(new LineSegment(p));
+                var isLastBlock = blockIndex == ordered.Count - 1;
+                if (!(omitTrailingReturn && isLastBlock))
+                {
+                    p = Add(p, inward, -t);
+                    segments.Add(new LineSegment(p));
+                }
             }
         }
         return segments;
@@ -402,6 +458,7 @@ public sealed class CuttingPipeline
         string parentId,
         BoxShape parent,
         Vec3 dims,
+        IReadOnlySet<FaceName> openFaces,
         List<BoxPlanCuttableShape> output,
         BoxPlanSettings settings)
     {
@@ -413,7 +470,15 @@ public sealed class CuttingPipeline
             {
                 var pos = dset.Positions[pi];
                 var (panelU, panelV) = DividerPanelSize(dset.Axis, dims, dset.Facing, t);
-                output.Add(BuildDividerPanel($"{parentId}.divider-{dset.Axis.ToString().ToLowerInvariant()}@{pos}", panelU, panelV, settings.Kerf));
+                var edges = BuildDividerEdges(dset.Axis, dset.Facing, openFaces);
+                var dividerSlots = BuildDividerAssemblySlots(dset.Axis, parent.Dividers, panelV, t, settings.Kerf);
+                output.Add(BuildDividerPanel(
+                    $"{parentId}.divider-{dset.Axis.ToString().ToLowerInvariant()}@{pos}",
+                    panelU,
+                    panelV,
+                    edges,
+                    dividerSlots,
+                    settings));
             }
         }
     }
@@ -442,34 +507,278 @@ public sealed class CuttingPipeline
         return (uExt, vExt);
     }
 
-    private static BoxPlanCuttableShape BuildDividerPanel(string id, double u, double v, double kerf)
+    private static DividerEdgeSpec[] BuildDividerEdges(Axis axis, FaceName? facing, IReadOnlySet<FaceName> openFaces)
     {
-        var k = kerf / 2.0;
-        var x0 = -k;
-        var y0 = -k;
-        var x1 = u + k;
-        var y1 = v + k;
-        var path = new CuttablePath
+        var faces = axis switch
         {
-            Start = new Vec2(0, 0),
-            Segments = new List<PathSegment>
-            {
-                new LineSegment(new Vec2(x1 - x0, 0)),
-                new LineSegment(new Vec2(x1 - x0, y1 - y0)),
-                new LineSegment(new Vec2(0, y1 - y0)),
-                new LineSegment(new Vec2(0, 0)),
-            },
-            Closed = true,
+            Axis.X => new[] { FaceName.Front, FaceName.Top, FaceName.Back, FaceName.Bottom },
+            Axis.Y => new[] { FaceName.Front, FaceName.Right, FaceName.Back, FaceName.Left },
+            Axis.Z => new[] { FaceName.Bottom, FaceName.Right, FaceName.Top, FaceName.Left },
+            _ => throw new InvalidOperationException(),
         };
+
+        return faces
+            .Select((face, index) => new DividerEdgeSpec(face, face != facing && !openFaces.Contains(face), index % 2 == 0))
+            .ToArray();
+    }
+
+    private static BoxPlanCuttableShape BuildDividerPanel(
+        string id,
+        double u,
+        double v,
+        IReadOnlyList<DividerEdgeSpec> edges,
+        IReadOnlyList<SlotSpec> dividerSlots,
+        BoxPlanSettings settings)
+    {
+        var t = settings.MaterialThickness;
+        var spans = new[]
+        {
+            BuildDividerJointSpans(u, t, settings.FingerJointSize, edges[0].Joined, edges[0].DividerOwnsPrimary),
+            BuildDividerJointSpans(v, t, settings.FingerJointSize, edges[1].Joined, edges[1].DividerOwnsPrimary),
+            BuildDividerJointSpans(u, t, settings.FingerJointSize, edges[2].Joined, edges[2].DividerOwnsPrimary),
+            BuildDividerJointSpans(v, t, settings.FingerJointSize, edges[3].Joined, edges[3].DividerOwnsPrimary),
+        };
+
+        if (settings.Debug)
+        {
+            LogDividerTabSizes(id, edges, spans);
+        }
+
+        var corners = new[]
+        {
+            new Vec2(0, 0),
+            new Vec2(u, 0),
+            new Vec2(u, v),
+            new Vec2(0, v),
+        };
+
+        // When edge 3 ends with a trailing EndInset whose outward return is
+        // skipped (because edge 0 is smooth), the path closes at the L-cut's
+        // post-corner point — `t` along edge 0 from the panel's origin corner —
+        // rather than the corner itself.
+        var start = corners[0];
+        if (spans[0].Count > 0 && spans[0][0].Kind == DividerJointSpanKind.Smooth
+            && spans[3].Count > 0 && spans[3][^1].Kind == DividerJointSpanKind.EndInset)
+        {
+            start = JointGeometry.Move(corners[0], JointGeometry.AlongCcw[0], t);
+        }
+        var segments = new List<LineSegment>();
+        var p = start;
+        var skipLeadingInset = false;
+        for (var edgeIndex = 0; edgeIndex < 4; edgeIndex++)
+        {
+            var along = JointGeometry.AlongCcw[edgeIndex];
+            var inward = JointGeometry.InwardCcw[edgeIndex];
+            var prevEdgeIndex = (edgeIndex + 3) % spans.Length;
+            var nextEdgeIndex = (edgeIndex + 1) % spans.Length;
+            var prevEndsEndInset = spans[prevEdgeIndex].Count > 0
+                && spans[prevEdgeIndex][^1].Kind == DividerJointSpanKind.EndInset;
+            var nextStartsEndInset = spans[nextEdgeIndex].Count > 0
+                && spans[nextEdgeIndex][0].Kind == DividerJointSpanKind.EndInset;
+            var prevEndsSmooth = spans[prevEdgeIndex].Count > 0
+                && spans[prevEdgeIndex][^1].Kind == DividerJointSpanKind.Smooth;
+            var nextStartsSmooth = spans[nextEdgeIndex].Count > 0
+                && spans[nextEdgeIndex][0].Kind == DividerJointSpanKind.Smooth;
+
+            for (var spanIndex = 0; spanIndex < spans[edgeIndex].Count; spanIndex++)
+            {
+                var span = spans[edgeIndex][spanIndex];
+                var isFirstSpan = spanIndex == 0;
+                var isLastSpan = spanIndex == spans[edgeIndex].Count - 1;
+
+                if (span.Kind == DividerJointSpanKind.Smooth)
+                {
+                    // When the corner at either end is shared with an EndInset on
+                    // the neighboring tabbed edge, shorten this smooth walk by t
+                    // so the EndInset's lateral leg lands on a clean L-cut instead
+                    // of doubling back along this edge (which would leave a kerf
+                    // sliver — the visible "spike").
+                    var len = span.Length;
+                    if (isFirstSpan && prevEndsEndInset) len -= t;
+                    if (isLastSpan && nextStartsEndInset) len -= t;
+                    if (len > 0)
+                    {
+                        p = JointGeometry.Move(p, along, len);
+                        segments.Add(new LineSegment(p));
+                    }
+                    continue;
+                }
+
+                if (span.Kind is DividerJointSpanKind.DividerTab or DividerJointSpanKind.EndInset)
+                {
+                    var skipInwardDip = span.Kind == DividerJointSpanKind.EndInset
+                        && isFirstSpan && prevEndsSmooth;
+                    var skipOutwardReturn = span.Kind == DividerJointSpanKind.EndInset
+                        && isLastSpan && nextStartsSmooth;
+                    var nextStartsWithEndInset = isLastSpan
+                        && span.Kind == DividerJointSpanKind.EndInset
+                        && spans[nextEdgeIndex].Count > 0
+                        && spans[nextEdgeIndex][0].Kind == DividerJointSpanKind.EndInset;
+
+                    if (!skipLeadingInset && !skipInwardDip)
+                    {
+                        p = JointGeometry.Move(p, inward, t);
+                        segments.Add(new LineSegment(p));
+                    }
+                    else if (skipLeadingInset)
+                    {
+                        skipLeadingInset = false;
+                    }
+
+                    var spanLength = span.Length;
+                    if (spanLength > 0)
+                    {
+                        p = JointGeometry.Move(p, along, spanLength);
+                        segments.Add(new LineSegment(p));
+                    }
+
+                    if (nextStartsWithEndInset)
+                    {
+                        var nextInward = JointGeometry.InwardCcw[nextEdgeIndex];
+                        p = JointGeometry.Move(p, nextInward, t);
+                        segments.Add(new LineSegment(p));
+                        p = JointGeometry.Move(p, inward, -t);
+                        segments.Add(new LineSegment(p));
+                        skipLeadingInset = true;
+                    }
+                    else if (!skipOutwardReturn)
+                    {
+                        p = JointGeometry.Move(p, inward, -t);
+                        segments.Add(new LineSegment(p));
+                    }
+
+                    continue;
+                }
+
+                p = JointGeometry.Move(p, along, span.Length);
+                segments.Add(new LineSegment(p));
+            }
+        }
+
+        var (path, bbMin, bbMax, translation) = KerfOffset.OffsetOutwardAndTranslate(start, segments, settings.Kerf);
+        var interiorCuts = dividerSlots
+            .Select(slot => CutoutBuilder.BuildSlotRectangle(slot, settings.Kerf, translation))
+            .ToArray();
         return new BoxPlanCuttableShape
         {
             Id = id,
-            BoundingBoxMin = new Vec2(0, 0),
-            BoundingBoxMax = new Vec2(x1 - x0, y1 - y0),
+            BoundingBoxMin = bbMin,
+            BoundingBoxMax = bbMax,
             Outline = path,
-            InteriorCuts = Array.Empty<CuttablePath>(),
+            InteriorCuts = interiorCuts,
             Engravings = Array.Empty<CuttablePath>(),
         };
+    }
+
+    private static void LogDividerTabSizes(
+        string id,
+        IReadOnlyList<DividerEdgeSpec> edges,
+        IReadOnlyList<DividerJointSpan>[] spans)
+    {
+        for (var index = 0; index < spans.Length; index++)
+        {
+            var tabSizes = spans[index]
+                .Where(span => span.Kind == DividerJointSpanKind.DividerTab)
+                .Select(span => span.Length.ToString("0.###"))
+                .ToArray();
+            var slotSizes = spans[index]
+                .Where(span => span.Kind == DividerJointSpanKind.FaceSlot)
+                .Select(span => span.Length.ToString("0.###"))
+                .ToArray();
+
+            if (tabSizes.Length == 0 && slotSizes.Length == 0)
+            {
+                continue;
+            }
+
+            Console.WriteLine(
+                $"[divider-joint] {id} edge={edges[index].Face} tabs=[{string.Join(", ", tabSizes)}] slots=[{string.Join(", ", slotSizes)}]");
+        }
+    }
+
+    private static IReadOnlyList<SlotSpec> BuildDividerAssemblySlots(
+        Axis axis,
+        IReadOnlyList<DividerSet> dividers,
+        double panelV,
+        double t,
+        double kerf)
+    {
+        if (panelV <= 0)
+        {
+            return Array.Empty<SlotSpec>();
+        }
+
+        var finalSlotDepth = panelV / 2.0 + kerf;
+        var slotHeight = finalSlotDepth + kerf;
+        var slots = new List<SlotSpec>();
+
+        switch (axis)
+        {
+            case Axis.X:
+                foreach (var ds in dividers.Where(ds => ds.Axis == Axis.Y))
+                {
+                    foreach (var pos in ds.Positions)
+                    {
+                        slots.Add(new SlotSpec(pos, panelV - finalSlotDepth / 2.0, t, slotHeight));
+                    }
+                }
+                break;
+            case Axis.Y:
+                foreach (var ds in dividers.Where(ds => ds.Axis == Axis.X))
+                {
+                    foreach (var pos in ds.Positions)
+                    {
+                        slots.Add(new SlotSpec(pos, finalSlotDepth / 2.0, t, slotHeight));
+                    }
+                }
+                break;
+        }
+
+        return slots;
+    }
+
+    private static IReadOnlyList<DividerJointSpan> BuildDividerJointSpans(double length, double t, double s, bool joined, bool dividerOwnsPrimary)
+    {
+        if (!joined || length <= 0)
+        {
+            return new[] { new DividerJointSpan(length, DividerJointSpanKind.Smooth) };
+        }
+
+        var edgeInset = t * 1.5;
+        var innerLength = Math.Max(0, length - 2 * edgeInset);
+        var blocks = FingerJointPattern.Build(innerLength, s);
+        if (!blocks.Any(block => !block.PrimaryOwns))
+        {
+            return new[] { new DividerJointSpan(length, DividerJointSpanKind.Smooth) };
+        }
+
+        var spans = new List<DividerJointSpan>();
+
+        void Add(double spanLength, DividerJointSpanKind kind)
+        {
+            if (spanLength <= 0)
+            {
+                return;
+            }
+
+            if (spans.Count > 0 && spans[^1].Kind == kind)
+            {
+                spans[^1] = spans[^1] with { Length = spans[^1].Length + spanLength };
+                return;
+            }
+
+            spans.Add(new DividerJointSpan(spanLength, kind));
+        }
+
+        Add(edgeInset, DividerJointSpanKind.EndInset);
+        foreach (var block in blocks)
+        {
+            var dividerOwnsBlock = block.PrimaryOwns == dividerOwnsPrimary;
+            Add(block.Length, dividerOwnsBlock ? DividerJointSpanKind.FaceSlot : DividerJointSpanKind.DividerTab);
+        }
+        Add(edgeInset, DividerJointSpanKind.EndInset);
+
+        return spans;
     }
 
     private static void EmitInserts(
@@ -496,7 +805,7 @@ public sealed class CuttingPipeline
     {
         var edges = SharedEdgeTable.Build(dims, settings);
         var openFaces = box.Faces.Where(f => f.Type == FaceType.Open).Select(f => f.Name).ToHashSet();
-        var slotsByFace = BuildSlotsByFace(box.Dividers, dims, settings.MaterialThickness);
+        var slotsByFace = BuildSlotsByFace(box.Dividers, dims, settings.MaterialThickness, settings.FingerJointSize);
 
         foreach (var face in box.Faces)
         {
@@ -506,18 +815,18 @@ public sealed class CuttingPipeline
             output.Add(BuildFacePiece(idPrefix, face.Name, dims, edges, openFaces, faceFeatures, faceSlots, settings));
         }
 
-        EmitDividerPanels(idPrefix, box, dims, output, settings);
+        EmitDividerPanels(idPrefix, box, dims, openFaces, output, settings);
     }
 
     private static IReadOnlyDictionary<FaceName, IReadOnlyList<SlotSpec>> BuildSlotsByFace(
-        IReadOnlyList<DividerSet> dividers, Vec3 dims, double t)
+        IReadOnlyList<DividerSet> dividers, Vec3 dims, double t, double s)
     {
         var slots = Enum.GetValues<FaceName>().ToDictionary(f => f, f => new List<SlotSpec>());
         foreach (var ds in dividers)
         {
             foreach (var p in ds.Positions)
             {
-                AddSlots(slots, ds.Axis, p, ds.Facing, dims, t);
+                AddSlots(slots, ds.Axis, p, ds.Facing, dims, t, s);
             }
         }
         return slots.ToDictionary(kv => kv.Key, kv => (IReadOnlyList<SlotSpec>)kv.Value);
@@ -529,35 +838,87 @@ public sealed class CuttingPipeline
         double pos,
         FaceName? facing,
         Vec3 dims,
-        double t)
+        double t,
+        double s)
     {
-        void Add(FaceName face, double u, double v, double w, double h)
+        void Add(FaceName face, double u, double v, double w, double h, bool dividerOwnsPrimary)
         {
             if (face == facing) return;
-            slots[face].Add(new SlotSpec(u, v, w, h));
+            foreach (var slot in BuildFingerSlots(u, v, w, h, t, s, dividerOwnsPrimary))
+            {
+                slots[face].Add(slot);
+            }
+        }
+
+        static (double Center, double Length) Span(double fullLength, FaceName? facingFace, FaceName lowFace, FaceName highFace, double thickness)
+        {
+            if (facingFace == lowFace)
+            {
+                return ((fullLength - thickness) / 2.0, fullLength - thickness);
+            }
+
+            if (facingFace == highFace)
+            {
+                return ((fullLength + thickness) / 2.0, fullLength - thickness);
+            }
+
+            return (fullLength / 2.0, fullLength);
         }
 
         switch (axis)
         {
             case Axis.X:
-                Add(FaceName.Bottom, pos, dims.Z / 2, t, dims.Z);
-                Add(FaceName.Top,    pos, dims.Z / 2, t, dims.Z);
-                Add(FaceName.Front,  pos, dims.Y / 2, t, dims.Y);
-                Add(FaceName.Back,   pos, dims.Y / 2, t, dims.Y);
+                var xOnBottomTop = Span(dims.Z, facing, FaceName.Front, FaceName.Back, t);
+                var xOnFrontBack = Span(dims.Y, facing, FaceName.Bottom, FaceName.Top, t);
+                Add(FaceName.Bottom, pos, xOnBottomTop.Center, t, xOnBottomTop.Length, dividerOwnsPrimary: false);
+                Add(FaceName.Top,    pos, xOnBottomTop.Center, t, xOnBottomTop.Length, dividerOwnsPrimary: false);
+                Add(FaceName.Front,  pos, xOnFrontBack.Center, t, xOnFrontBack.Length, dividerOwnsPrimary: true);
+                Add(FaceName.Back,   pos, xOnFrontBack.Center, t, xOnFrontBack.Length, dividerOwnsPrimary: true);
                 break;
             case Axis.Y:
-                Add(FaceName.Front, dims.X / 2, pos, dims.X, t);
-                Add(FaceName.Back,  dims.X / 2, pos, dims.X, t);
-                Add(FaceName.Left,  dims.Z / 2, pos, dims.Z, t);
-                Add(FaceName.Right, dims.Z / 2, pos, dims.Z, t);
+                var yOnFrontBack = Span(dims.X, facing, FaceName.Left, FaceName.Right, t);
+                var yOnLeftRight = Span(dims.Z, facing, FaceName.Front, FaceName.Back, t);
+                Add(FaceName.Front, yOnFrontBack.Center, pos, yOnFrontBack.Length, t, dividerOwnsPrimary: true);
+                Add(FaceName.Back,  yOnFrontBack.Center, pos, yOnFrontBack.Length, t, dividerOwnsPrimary: true);
+                Add(FaceName.Left,  yOnLeftRight.Center, pos, yOnLeftRight.Length, t, dividerOwnsPrimary: false);
+                Add(FaceName.Right, yOnLeftRight.Center, pos, yOnLeftRight.Length, t, dividerOwnsPrimary: false);
                 break;
             case Axis.Z:
-                Add(FaceName.Bottom, dims.X / 2, pos, dims.X, t);
-                Add(FaceName.Top,    dims.X / 2, pos, dims.X, t);
-                Add(FaceName.Left,   pos, dims.Y / 2, t, dims.Y);
-                Add(FaceName.Right,  pos, dims.Y / 2, t, dims.Y);
+                var zOnBottomTop = Span(dims.X, facing, FaceName.Left, FaceName.Right, t);
+                var zOnLeftRight = Span(dims.Y, facing, FaceName.Bottom, FaceName.Top, t);
+                Add(FaceName.Bottom, zOnBottomTop.Center, pos, zOnBottomTop.Length, t, dividerOwnsPrimary: true);
+                Add(FaceName.Top,    zOnBottomTop.Center, pos, zOnBottomTop.Length, t, dividerOwnsPrimary: true);
+                Add(FaceName.Left,   pos, zOnLeftRight.Center, t, zOnLeftRight.Length, dividerOwnsPrimary: false);
+                Add(FaceName.Right,  pos, zOnLeftRight.Center, t, zOnLeftRight.Length, dividerOwnsPrimary: false);
                 break;
         }
+    }
+
+    private static IReadOnlyList<SlotSpec> BuildFingerSlots(double u, double v, double w, double h, double t, double s, bool dividerOwnsPrimary)
+    {
+        var slots = new List<SlotSpec>();
+        var vertical = h >= w;
+        var length = vertical ? h : w;
+        var spans = BuildDividerJointSpans(length, t, s, joined: true, dividerOwnsPrimary);
+        var cursor = -length / 2.0;
+        foreach (var span in spans)
+        {
+            if (span.Kind == DividerJointSpanKind.FaceSlot)
+            {
+                if (vertical)
+                {
+                    slots.Add(new SlotSpec(u, v + cursor + span.Length / 2.0, w, span.Length));
+                }
+                else
+                {
+                    slots.Add(new SlotSpec(u + cursor + span.Length / 2.0, v, span.Length, h));
+                }
+            }
+
+            cursor += span.Length;
+        }
+
+        return slots;
     }
 
     // True when `face` is the lowest-priority of the present faces meeting at this
@@ -607,8 +968,26 @@ public sealed class CuttingPipeline
 
         // Path starts at the inner-end of the last edge (= the point where the path
         // first arrives at corner 0 from edge 3, before the corner geometry is drawn).
+        bool EdgeStartsInset(FaceEdgeMap edgeMap, int cornerIndex)
+        {
+            if (openFaces.Contains(edgeMap.Neighbor) || cornerOwned[cornerIndex]) return false;
+            var shared = edges[SharedEdgeTable.Id(edgeMap.Face, edgeMap.Neighbor)];
+            return JointGeometry.StartsWithNeighborBlock(edgeMap, shared);
+        }
+
+        bool EdgeEndsInset(FaceEdgeMap edgeMap, int nextCornerIndex)
+        {
+            if (openFaces.Contains(edgeMap.Neighbor) || cornerOwned[nextCornerIndex]) return false;
+            var shared = edges[SharedEdgeTable.Id(edgeMap.Face, edgeMap.Neighbor)];
+            return JointGeometry.EndsWithNeighborBlock(edgeMap, shared);
+        }
+
         var startAlong = JointGeometry.AlongCcw[3];
         var startPath = JointGeometry.Move(corners[0], startAlong, -t);
+        if (EdgeEndsInset(ccw[3], 0))
+        {
+            startPath = JointGeometry.Move(startPath, JointGeometry.AlongCcw[0], t);
+        }
 
         var segments = new List<LineSegment>();
         for (var i = 0; i < 4; i++)
@@ -631,9 +1010,15 @@ public sealed class CuttingPipeline
             {
                 // t×t notch: path detours around the corner cut.
                 var notchInner = JointGeometry.Move(JointGeometry.Move(corner, prevAlong, -t), along, t);
-                segments.Add(new LineSegment(notchInner));
+                if (!EdgeEndsInset(ccw[(i + 3) % 4], i))
+                {
+                    segments.Add(new LineSegment(notchInner));
+                }
             }
-            segments.Add(new LineSegment(innerStart));
+            if (!EdgeStartsInset(ccw[i], i))
+            {
+                segments.Add(new LineSegment(innerStart));
+            }
 
             // Edge i emission (over the inner region).
             var edgeMap = ccw[i];
@@ -644,7 +1029,12 @@ public sealed class CuttingPipeline
             else
             {
                 var shared = edges[SharedEdgeTable.Id(edgeMap.Face, edgeMap.Neighbor)];
-                var emitted = JointGeometry.EmitEdge(edgeMap, shared, i, t, innerStart);
+                var omitLeadingInset = !cornerOwned[i] && JointGeometry.StartsWithNeighborBlock(edgeMap, shared);
+                var omitTrailingReturn = !cornerOwned[(i + 1) % 4];
+                var edgeStart = omitLeadingInset
+                    ? JointGeometry.Move(JointGeometry.Move(corner, prevAlong, -t), along, t)
+                    : innerStart;
+                var emitted = JointGeometry.EmitEdge(edgeMap, shared, i, t, edgeStart, omitLeadingInset, omitTrailingReturn);
                 segments.AddRange(emitted);
             }
         }

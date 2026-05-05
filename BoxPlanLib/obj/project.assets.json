@@ -48,24 +48,19 @@
     ]
   },
   "packageFolders": {
-    "C:\\Users\\Alex.Stuart\\.nuget\\packages\\": {},
-    "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages": {}
+    "C:\\Users\\Lex\\.nuget\\packages\\": {}
   },
   "project": {
     "version": "1.0.0",
     "restore": {
-      "projectUniqueName": "C:\\Users\\Alex.Stuart\\source\\repos\\boxplan\\BoxPlanLib\\BoxPlanLib.csproj",
+      "projectUniqueName": "C:\\Users\\Lex\\source\\repos\\boxplan\\BoxPlanLib\\BoxPlanLib.csproj",
       "projectName": "BoxPlanLib",
-      "projectPath": "C:\\Users\\Alex.Stuart\\source\\repos\\boxplan\\BoxPlanLib\\BoxPlanLib.csproj",
-      "packagesPath": "C:\\Users\\Alex.Stuart\\.nuget\\packages\\",
-      "outputPath": "C:\\Users\\Alex.Stuart\\source\\repos\\boxplan\\BoxPlanLib\\obj\\",
+      "projectPath": "C:\\Users\\Lex\\source\\repos\\boxplan\\BoxPlanLib\\BoxPlanLib.csproj",
+      "packagesPath": "C:\\Users\\Lex\\.nuget\\packages\\",
+      "outputPath": "C:\\Users\\Lex\\source\\repos\\boxplan\\BoxPlanLib\\obj\\",
       "projectStyle": "PackageReference",
-      "fallbackFolders": [
-        "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"
-      ],
       "configFilePaths": [
-        "C:\\Users\\Alex.Stuart\\AppData\\Roaming\\NuGet\\NuGet.Config",
-        "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.FallbackLocation.config",
+        "C:\\Users\\Lex\\AppData\\Roaming\\NuGet\\NuGet.Config",
         "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.Offline.config"
       ],
       "originalTargetFrameworks": [
@@ -91,7 +86,7 @@
         "auditLevel": "low",
         "auditMode": "direct"
       },
-      "SdkAnalysisLevel": "10.0.200"
+      "SdkAnalysisLevel": "9.0.300"
     },
     "frameworks": {
       "net9.0": {
@@ -113,26 +108,12 @@
         ],
         "assetTargetFallback": true,
         "warn": true,
-        "downloadDependencies": [
-          {
-            "name": "Microsoft.AspNetCore.App.Ref",
-            "version": "[9.0.15, 9.0.15]"
-          },
-          {
-            "name": "Microsoft.NETCore.App.Ref",
-            "version": "[9.0.15, 9.0.15]"
-          },
-          {
-            "name": "Microsoft.WindowsDesktop.App.Ref",
-            "version": "[9.0.15, 9.0.15]"
-          }
-        ],
         "frameworkReferences": {
           "Microsoft.NETCore.App": {
             "privateAssets": "all"
           }
         },
-        "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\10.0.203/PortableRuntimeIdentifierGraph.json"
+        "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\9.0.306/PortableRuntimeIdentifierGraph.json"
       }
     }
   }

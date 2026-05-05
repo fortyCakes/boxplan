@@ -23,3 +23,4 @@ C:\Users\Alex.Stuart\source\repos\boxplan\BoxPlanLib\obj\Debug\net9.0\BoxPlanLib
 C:\Users\Alex.Stuart\source\repos\boxplan\BoxPlanLib\obj\Debug\net9.0\refint\BoxPlanLib.dll
 C:\Users\Alex.Stuart\source\repos\boxplan\BoxPlanLib\obj\Debug\net9.0\BoxPlanLib.pdb
 C:\Users\Alex.Stuart\source\repos\boxplan\BoxPlanLib\obj\Debug\net9.0\ref\BoxPlanLib.dll
+c:\Users\Lex\source\repos\boxplan\BoxPlanLib\obj\Debug\net9.0\BoxPlanLib.sourcelink.json

@@ -6,7 +6,7 @@
 #   - `inserts` to place child shapes (the drawers) into those cells
 #   - `features` to add a finger-pull cutout to each drawer front
 #
-# Exterior frame: 300 wide x 200 tall x 150 deep (mm).
+# Exterior frame: 200 wide x 200 tall x 150 deep (mm).
 # Cells are ~100 x 100 x 150 minus material/clearance.
 
 shapes:
@@ -14,7 +14,7 @@ shapes:
   # ---- The outer frame ----------------------------------------------------
   - id: "frame"
     type: "box"
-    dimensions: [300.0, 200.0, 150.0]
+    dimensions: [200.0, 200.0, 150.0]
     origin: "bottom-left-front"
     location: [0.0, 0.0, 0.0]
 

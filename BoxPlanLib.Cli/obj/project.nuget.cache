@@ -1,14 +1,10 @@
 {
   "version": 2,
-  "dgSpecHash": "Sqq9EOG/LMA=",
+  "dgSpecHash": "ImFzlklntA8=",
   "success": true,
-  "projectFilePath": "c:\\Users\\Alex.Stuart\\source\\repos\\boxplan\\BoxPlanLib.Cli\\BoxPlanLib.Cli.csproj",
+  "projectFilePath": "c:\\Users\\Lex\\source\\repos\\boxplan\\BoxPlanLib.Cli\\BoxPlanLib.Cli.csproj",
   "expectedPackageFiles": [
-    "C:\\Users\\Alex.Stuart\\.nuget\\packages\\yamldotnet\\17.1.0\\yamldotnet.17.1.0.nupkg.sha512",
-    "C:\\Users\\Alex.Stuart\\.nuget\\packages\\microsoft.netcore.app.ref\\9.0.15\\microsoft.netcore.app.ref.9.0.15.nupkg.sha512",
-    "C:\\Users\\Alex.Stuart\\.nuget\\packages\\microsoft.windowsdesktop.app.ref\\9.0.15\\microsoft.windowsdesktop.app.ref.9.0.15.nupkg.sha512",
-    "C:\\Users\\Alex.Stuart\\.nuget\\packages\\microsoft.aspnetcore.app.ref\\9.0.15\\microsoft.aspnetcore.app.ref.9.0.15.nupkg.sha512",
-    "C:\\Users\\Alex.Stuart\\.nuget\\packages\\microsoft.netcore.app.host.win-x64\\9.0.15\\microsoft.netcore.app.host.win-x64.9.0.15.nupkg.sha512"
+    "C:\\Users\\Lex\\.nuget\\packages\\yamldotnet\\17.1.0\\yamldotnet.17.1.0.nupkg.sha512"
   ],
   "logs": []
 }
