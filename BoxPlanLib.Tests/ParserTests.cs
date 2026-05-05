@@ -153,7 +153,9 @@ public class ParserTests
         var result = new PlanParser().Parse(yaml);
         Assert.False(result.Success);
         var error = Assert.Single(result.Errors);
-        Assert.NotNull(error.Line);
+        Assert.Equal(4, error.Line);
+        Assert.NotNull(error.Column);
+        Assert.True(error.Column > 0);
     }
 
     [Fact]
@@ -168,5 +170,53 @@ public class ParserTests
 
         var result = new PlanParser().Parse(yaml);
         Assert.False(result.Success);
+        var error = Assert.Single(result.Errors);
+        Assert.NotNull(error.Line);
+    }
+
+    [Fact]
+    public void Reports_line_for_invalid_fit_dimension()
+    {
+        var yaml = """
+            shapes:
+              - id: "d"
+                type: "box"
+                fit:
+                  mode: "cell"
+                  depth: bogus
+            """;
+
+        var result = new PlanParser().Parse(yaml);
+        Assert.False(result.Success);
+        var error = Assert.Single(result.Errors);
+        Assert.Equal(6, error.Line);
+        Assert.NotNull(error.Column);
+    }
+
+    [Fact]
+    public void Reports_line_for_malformed_yaml()
+    {
+        var yaml = """
+            shapes:
+              - id: "a"
+                type: "box"
+                dimensions: [1.0, 2.0
+            """;
+
+        var result = new PlanParser().Parse(yaml);
+        Assert.False(result.Success);
+        var error = Assert.Single(result.Errors);
+        Assert.NotNull(error.Line);
+        Assert.True(error.Line >= 2);
+    }
+
+    [Fact]
+    public void Empty_document_reports_line_one()
+    {
+        var result = new PlanParser().Parse("");
+        Assert.False(result.Success);
+        var error = Assert.Single(result.Errors);
+        Assert.Equal(1, error.Line);
+        Assert.Equal(1, error.Column);
     }
 }

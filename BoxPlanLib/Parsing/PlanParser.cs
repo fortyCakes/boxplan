@@ -1,6 +1,7 @@
 using YamlDotNet.Core;
 using YamlDotNet.Serialization;
 using YamlDotNet.Serialization.NamingConventions;
+using YamlDotNet.Serialization.NodeDeserializers;
 
 namespace BoxPlanLib.Parsing;
 
@@ -28,6 +29,9 @@ public sealed class PlanParser
                         { "cutout", typeof(RawCutoutFeature) },
                     });
             })
+            .WithNodeDeserializer(
+                inner => new LocationCapturingNodeDeserializer(inner),
+                w => w.InsteadOf<ObjectNodeDeserializer>())
             .Build();
     }
 
@@ -40,7 +44,9 @@ public sealed class PlanParser
             {
                 return ParseResult<RawPlan>.Fail(new PlanError(
                     Severity.Error,
-                    "YAML document is empty."));
+                    "YAML document is empty.",
+                    Line: 1,
+                    Column: 1));
             }
             raw.Shapes ??= new List<RawShape>();
             return ParseResult<RawPlan>.Ok(raw);
