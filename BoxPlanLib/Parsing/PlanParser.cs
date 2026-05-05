@@ -1,5 +1,6 @@
 using YamlDotNet.Core;
 using YamlDotNet.Serialization;
+using YamlDotNet.Serialization.BufferedDeserialization;
 using YamlDotNet.Serialization.NamingConventions;
 using YamlDotNet.Serialization.NodeDeserializers;
 
@@ -29,6 +30,9 @@ public sealed class PlanParser
                         { "cutout", typeof(RawCutoutFeature) },
                     });
             })
+            .WithNodeDeserializer(
+                inner => new LocationCapturingDiscriminatingDeserializer(inner),
+                w => w.InsteadOf<TypeDiscriminatingNodeDeserializer>())
             .WithNodeDeserializer(
                 inner => new LocationCapturingNodeDeserializer(inner),
                 w => w.InsteadOf<ObjectNodeDeserializer>())

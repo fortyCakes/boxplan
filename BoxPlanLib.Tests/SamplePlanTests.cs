@@ -19,7 +19,7 @@ public class SamplePlanTests
         Assert.True(result.Success, string.Join("; ", result.Errors));
         var box = Assert.IsType<BoxShape>(Assert.Single(result.Value!.Shapes));
         Assert.Equal("sample-box", box.Id);
-        Assert.Equal(new Vec3(100.0, 100.0, 100.0), box.Dimensions);
+        Assert.Equal(new Vec3(50.0, 50.0, 50.0), box.Dimensions);
         Assert.Equal(Origin.BottomLeftFront, box.Origin);
         Assert.Equal(FaceType.Closed, box.Faces.Single(f => f.Name == FaceName.Top).Type);
     }
@@ -50,6 +50,10 @@ public class SamplePlanTests
         Assert.Equal(6, frame.Inserts.Count);
         var drawer = plan.ShapesById["drawer"];
         Assert.All(frame.Inserts, i => Assert.Same(drawer, i.Target));
+        Assert.All(frame.Inserts, i => Assert.Equal(new Vec3(98, 98, 148), i.ResolvedDimensions));
+        var byCell = frame.Inserts.ToDictionary(i => i.Cell!.Value, i => i.ResolvedLocation!.Value);
+        Assert.Equal(new Vec3(1, 1, 1), byCell[(0, 0, 0)]);
+        Assert.Equal(new Vec3(201, 101, 1), byCell[(2, 1, 0)]);
 
         var drawerBox = Assert.IsType<BoxShape>(drawer);
         Assert.Null(drawerBox.Dimensions);
