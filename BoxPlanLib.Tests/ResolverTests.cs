@@ -6,7 +6,7 @@ namespace BoxPlanLib.Tests;
 
 public class ResolverTests
 {
-    private static Plan ResolveOk(string yaml)
+    private static BoxPlan ResolveOk(string yaml)
     {
         var parser = new PlanParser();
         var resolver = new PlanResolver();

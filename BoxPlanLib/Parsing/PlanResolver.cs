@@ -4,7 +4,7 @@ namespace BoxPlanLib.Parsing;
 
 public sealed class PlanResolver
 {
-    public ParseResult<Plan> Resolve(RawPlan raw)
+    public ParseResult<BoxPlan> Resolve(RawPlan raw)
     {
         var errors = new List<PlanError>();
 
@@ -59,11 +59,11 @@ public sealed class PlanResolver
 
         if (errors.Any(e => e.Severity == Severity.Error))
         {
-            return ParseResult<Plan>.Fail(errors);
+            return ParseResult<BoxPlan>.Fail(errors);
         }
 
-        var plan = new Plan { Shapes = shapes, ShapesById = byId };
-        return ParseResult<Plan>.Ok(plan, errors);
+        var plan = new BoxPlan { Shapes = shapes, ShapesById = byId };
+        return ParseResult<BoxPlan>.Ok(plan, errors);
     }
 
     private static Shape? ResolveShape(

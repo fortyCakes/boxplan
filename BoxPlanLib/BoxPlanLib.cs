@@ -1,5 +1,7 @@
+using BoxPlanLib.Cutting;
 using BoxPlanLib.Model;
 using BoxPlanLib.Parsing;
+using BoxPlanLib.Svg;
 
 namespace BoxPlanLib;
 
@@ -7,28 +9,35 @@ public class BoxPlanLib
 {
     private readonly PlanParser _parser = new();
     private readonly PlanResolver _resolver = new();
+    private readonly FitResolver _fitResolver = new();
+    private readonly CuttingPipeline _cuttingPipeline = new();
+    private readonly SimpleSvgGenerator _simpleSvgGenerator = new();
 
-    public ParseResult<Plan> ParsePlan(string yaml)
+    public ParseResult<BoxPlan> ParsePlan(string yaml)
     {
         var raw = _parser.Parse(yaml);
         if (!raw.Success || raw.Value is null)
         {
-            return ParseResult<Plan>.Fail(raw.Errors);
+            return ParseResult<BoxPlan>.Fail(raw.Errors);
         }
-        return _resolver.Resolve(raw.Value);
+        var resolved = _resolver.Resolve(raw.Value);
+        if (!resolved.Success || resolved.Value is null)
+        {
+            return resolved;
+        }
+        return _fitResolver.Resolve(resolved.Value);
     }
 
     // Downstream stages — re-enable once their underlying types exist.
     //
-    // public BoxPlanCuttableShape[] GetCuttableShapes(BoxPlan3DShape[] shapes, BoxPlanMaterialSettings materialSettings)
-    // {
-    //     return Array.Empty<BoxPlanCuttableShape>();
-    // }
-    //
-    // public string GenerateSimpleSVG(BoxPlanCuttableShape[] cuttableShapes)
-    // {
-    //     return "<svg></svg>";
-    // }
+    public BoxPlanCuttableShape[] GetCuttableShapes(BoxPlan plan, BoxPlanSettings settings)
+    {
+        return _cuttingPipeline.Run(plan, settings);
+    }
+
+    public string GenerateSimpleSVG(BoxPlanCuttableShape[] shapes, BoxPlanSettings settings)
+        => _simpleSvgGenerator.Generate(shapes, settings);
+
     //
     // public string GeneratePagedSVG(BoxPlanCuttableShape[] cuttableShapes, BoxPlanMaterialSettings materialSettings)
     // {

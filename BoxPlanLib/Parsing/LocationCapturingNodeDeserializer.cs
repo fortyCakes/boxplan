@@ -3,7 +3,7 @@ using YamlDotNet.Serialization;
 
 namespace BoxPlanLib.Parsing;
 
-internal sealed class LocationCapturingNodeDeserializer : INodeDeserializer
+internal class LocationCapturingNodeDeserializer : INodeDeserializer
 {
     private readonly INodeDeserializer _inner;
 
@@ -27,4 +27,9 @@ internal sealed class LocationCapturingNodeDeserializer : INodeDeserializer
         }
         return handled;
     }
+}
+
+internal sealed class LocationCapturingDiscriminatingDeserializer : LocationCapturingNodeDeserializer
+{
+    public LocationCapturingDiscriminatingDeserializer(INodeDeserializer inner) : base(inner) { }
 }
