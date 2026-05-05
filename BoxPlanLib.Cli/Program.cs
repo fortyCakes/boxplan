@@ -2,7 +2,7 @@ using BoxPlanLib;
 
 var inputPath = args.Length > 0
     ? args[0]
-    : Path.Combine(AppContext.BaseDirectory, "sample-plans", "divider-test.yml");
+    : Path.Combine(AppContext.BaseDirectory, "sample-plans", "drawer-test.yml");
 
 var outputPath = args.Length > 1
     ? args[1]
@@ -28,7 +28,7 @@ var settings = new BoxPlanSettings
 };
 
 var yaml = File.ReadAllText(inputPath);
-var parsed = lib.ParsePlan(yaml);
+var parsed = lib.ParsePlan(yaml, settings);
 if (!parsed.Success || parsed.Value is null)
 {
     Console.Error.WriteLine($"Failed to parse {inputPath}:");

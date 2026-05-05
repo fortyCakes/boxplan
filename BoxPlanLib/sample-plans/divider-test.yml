@@ -1,14 +1,3 @@
-# A 3-wide x 2-tall drawer frame with 6 sliding drawers.
-#
-# Demonstrates the composable shape model:
-#   - one primitive (`box`) for both the frame and the drawers
-#   - `dividers` to subdivide the frame interior into a grid of cells
-#   - `inserts` to place child shapes (the drawers) into those cells
-#   - `features` to add a finger-pull cutout to each drawer front
-#
-# Exterior frame: 200 wide x 200 tall x 150 deep (mm).
-# Cells are ~100 x 100 x 150 minus material/clearance.
-
 shapes:
 
   # ---- The outer frame ----------------------------------------------------
@@ -21,18 +10,10 @@ shapes:
     faces:
       - name: "front"
         type: "open"
-      - name: "top"
-        type: "open"
-      - name: "bottom"
-        type: "open"
-      - name: "left"
-        type: "open"
-      - name: "right"
-        type: "open"
 
     dividers:
       # Subdivide the interior into a 3x2 grid.
       # Material thickness and kerf are applied by the engine.
-      - split: {  y: 2 }
+      - split: {  x: 2, y: 2 }
       # Division is applied facing the configured face, so the dividers here are smooth at the front and tabbed into the back.
         facing: front

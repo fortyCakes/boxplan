@@ -4,7 +4,7 @@ namespace BoxPlanLib.Parsing;
 
 public sealed class FitResolver
 {
-    public ParseResult<BoxPlan> Resolve(BoxPlan plan)
+    public ParseResult<BoxPlan> Resolve(BoxPlan plan, double materialThickness = 0)
     {
         var errors = new List<PlanError>();
         var usedAsCellTarget = new HashSet<string>(StringComparer.Ordinal);
@@ -49,7 +49,7 @@ public sealed class FitResolver
                 }
 
                 var (cellOrigin, cellSize) = CellBounds(parentDims.Value, parent.Dividers, cell);
-                ResolveInsert(insert, cellOrigin, cellSize, insertPath, errors);
+                ResolveInsert(insert, cellOrigin, cellSize, materialThickness, insertPath, errors);
             }
         }
 
@@ -75,6 +75,7 @@ public sealed class FitResolver
         Insert insert,
         Vec3 cellOrigin,
         Vec3 cellSize,
+        double materialThickness,
         string path,
         List<PlanError> errors)
     {
@@ -98,9 +99,9 @@ public sealed class FitResolver
         }
 
         var clearance = fit.Clearance;
-        var (rx, ox, okX) = ResolveAxis(fit.Width, cellSize.X, cellOrigin.X, clearance, "width", path, errors);
-        var (ry, oy, okY) = ResolveAxis(fit.Height, cellSize.Y, cellOrigin.Y, clearance, "height", path, errors);
-        var (rz, oz, okZ) = ResolveAxis(fit.Depth, cellSize.Z, cellOrigin.Z, clearance, "depth", path, errors);
+        var (rx, ox, okX) = ResolveAxis(fit.Width, cellSize.X, cellOrigin.X, clearance, materialThickness, "width", path, errors);
+        var (ry, oy, okY) = ResolveAxis(fit.Height, cellSize.Y, cellOrigin.Y, clearance, materialThickness, "height", path, errors);
+        var (rz, oz, okZ) = ResolveAxis(fit.Depth, cellSize.Z, cellOrigin.Z, clearance, materialThickness, "depth", path, errors);
 
         if (!okX || !okY || !okZ)
         {
@@ -116,6 +117,7 @@ public sealed class FitResolver
         double cellSize,
         double cellOrigin,
         double clearance,
+        double materialThickness,
         string label,
         string path,
         List<PlanError> errors)
@@ -125,16 +127,16 @@ public sealed class FitResolver
             case FitDimension.Fixed f:
                 return (f.Value, cellOrigin, true);
             case FitDimension.Auto:
-                var size = cellSize - 2 * clearance;
+                var size = cellSize - 2 * clearance - materialThickness;
                 if (size <= 0)
                 {
                     errors.Add(new PlanError(
                         Severity.Error,
-                        $"Fit clearance {clearance} leaves no room on {label} (cell size {cellSize}).",
+                        $"Fit clearance {clearance} and material thickness {materialThickness} leave no room on {label} (cell size {cellSize}).",
                         path));
                     return (0, 0, false);
                 }
-                return (size, cellOrigin + clearance, true);
+                return (size, cellOrigin + clearance + (materialThickness / 2), true);
             default:
                 errors.Add(new PlanError(
                     Severity.Error,

@@ -13,7 +13,7 @@ public class BoxPlanLib
     private readonly CuttingPipeline _cuttingPipeline = new();
     private readonly SvgGenerator _svgGenerator = new();
 
-    public ParseResult<BoxPlan> ParsePlan(string yaml)
+    public ParseResult<BoxPlan> ParsePlan(string yaml, BoxPlanSettings? settings = null)
     {
         var raw = _parser.Parse(yaml);
         if (!raw.Success || raw.Value is null)
@@ -25,13 +25,18 @@ public class BoxPlanLib
         {
             return resolved;
         }
-        return _fitResolver.Resolve(resolved.Value);
+        return _fitResolver.Resolve(resolved.Value, settings?.MaterialThickness ?? 0);
     }
 
     // Downstream stages — re-enable once their underlying types exist.
     //
     public BoxPlanCuttableShape[] GetCuttableShapes(BoxPlan plan, BoxPlanSettings settings)
     {
+        var resolved = _fitResolver.Resolve(plan, settings.MaterialThickness);
+        if (!resolved.Success || resolved.Value is null)
+        {
+            throw new InvalidOperationException(string.Join("; ", resolved.Errors.Select(e => e.ToString())));
+        }
         return _cuttingPipeline.Run(plan, settings);
     }
 

@@ -76,12 +76,12 @@ public class InsertTests
         var pieces = new BoxPlanLib().GetCuttableShapes(plan, Settings());
 
         var drawerBottom = pieces.First(p => p.Id.Contains("/drawer.bottom"));
-        Assert.Equal(98, drawerBottom.BoundingBoxMax.X, 6);
-        Assert.Equal(148, drawerBottom.BoundingBoxMax.Y, 6);
+    Assert.Equal(95, drawerBottom.BoundingBoxMax.X, 6);
+    Assert.Equal(145, drawerBottom.BoundingBoxMax.Y, 6);
 
         var drawerFront = pieces.First(p => p.Id.Contains("/drawer.front"));
-        Assert.Equal(98, drawerFront.BoundingBoxMax.X, 6);
-        Assert.Equal(98, drawerFront.BoundingBoxMax.Y, 6);
+    Assert.Equal(95, drawerFront.BoundingBoxMax.X, 6);
+    Assert.Equal(95, drawerFront.BoundingBoxMax.Y, 6);
     }
 
     [Fact]
@@ -111,7 +111,7 @@ public class InsertTests
         var bottoms = pieces.Where(p => p.Id.Contains("/drawer.bottom")).ToArray();
         Assert.Equal(2, bottoms.Length);
         var widths = bottoms.Select(b => b.BoundingBoxMax.X).OrderBy(x => x).ToArray();
-        Assert.Equal(80, widths[0], 6);
-        Assert.Equal(220, widths[1], 6);
+    Assert.Equal(77, widths[0], 6);
+    Assert.Equal(217, widths[1], 6);
     }
 }

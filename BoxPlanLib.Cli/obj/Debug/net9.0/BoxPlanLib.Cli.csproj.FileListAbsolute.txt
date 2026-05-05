@@ -43,3 +43,4 @@ c:\Users\Lex\source\repos\boxplan\BoxPlanLib.Cli\obj\Debug\net9.0\BoxPlanLib.Cli
 c:\Users\Lex\source\repos\boxplan\BoxPlanLib.Cli\obj\Debug\net9.0\BoxPlanLib.Cli.genruntimeconfig.cache
 c:\Users\Lex\source\repos\boxplan\BoxPlanLib.Cli\obj\Debug\net9.0\ref\BoxPlanLib.Cli.dll
 c:\Users\Lex\source\repos\boxplan\BoxPlanLib.Cli\bin\Debug\net9.0\sample-plans\divider-test.yml
+c:\Users\Lex\source\repos\boxplan\BoxPlanLib.Cli\bin\Debug\net9.0\sample-plans\drawer-test.yml

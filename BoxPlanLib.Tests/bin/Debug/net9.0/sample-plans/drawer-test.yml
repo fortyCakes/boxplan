@@ -1,0 +1,28 @@
+shapes:
+
+  # ---- The outer frame ----------------------------------------------------
+  - id: "frame"
+    type: "box"
+    dimensions: [30.0, 30.0, 30.0]
+    origin: "bottom-left-front"
+    location: [0.0, 0.0, 0.0]
+
+    faces:
+      - name: "front"
+        type: "open"
+
+    inserts:
+      - fill: "all-cells"
+        ref: "drawer"
+
+  - id: "drawer" # This ref is used by the "inserts" section of the frame above
+    type: "box"
+
+    fit:
+      mode: "cell"
+      clearance: 1.0                 # 1mm all around inside the cell
+      depth: auto                    # can be overridden by a fixed dimension if desired; "auto" (default) means "use the cell depth minus clearance"
+
+    faces:
+      - name: "top"
+        type: "open"                 # open-top drawer

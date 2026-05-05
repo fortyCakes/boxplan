@@ -5,18 +5,21 @@ namespace BoxPlanLib.Tests;
 
 public class FitResolverTests
 {
-    private static BoxPlan ParseOk(string yaml)
+  private static BoxPlanSettings Settings(double materialThickness = 3.0) =>
+    new() { MaterialThickness = materialThickness };
+
+  private static BoxPlan ParseOk(string yaml, BoxPlanSettings? settings = null)
     {
         var lib = new BoxPlanLib();
-        var result = lib.ParsePlan(yaml);
+    var result = lib.ParsePlan(yaml, settings);
         Assert.True(result.Success, string.Join("; ", result.Errors));
         return result.Value!;
     }
 
-    private static IReadOnlyList<PlanError> ParseErrors(string yaml)
+  private static IReadOnlyList<PlanError> ParseErrors(string yaml, BoxPlanSettings? settings = null)
     {
         var lib = new BoxPlanLib();
-        var result = lib.ParsePlan(yaml);
+    var result = lib.ParsePlan(yaml, settings);
         Assert.False(result.Success);
         return result.Errors;
     }
@@ -39,16 +42,16 @@ public class FitResolverTests
                 fit:
                   mode: "cell"
                   clearance: 1.0
-            """);
+            """, Settings());
 
         var frame = plan.ShapesById["frame"];
         Assert.Equal(6, frame.Inserts.Count);
-        Assert.All(frame.Inserts, i => Assert.Equal(new Vec3(98, 98, 148), i.ResolvedDimensions));
+        Assert.All(frame.Inserts, i => Assert.Equal(new Vec3(95, 95, 145), i.ResolvedDimensions));
 
         var byCell = frame.Inserts.ToDictionary(i => i.Cell!.Value, i => i.ResolvedLocation!.Value);
-        Assert.Equal(new Vec3(1, 1, 1), byCell[(0, 0, 0)]);
-        Assert.Equal(new Vec3(101, 1, 1), byCell[(1, 0, 0)]);
-        Assert.Equal(new Vec3(201, 101, 1), byCell[(2, 1, 0)]);
+        Assert.Equal(new Vec3(2.5, 2.5, 2.5), byCell[(0, 0, 0)]);
+        Assert.Equal(new Vec3(102.5, 2.5, 2.5), byCell[(1, 0, 0)]);
+        Assert.Equal(new Vec3(202.5, 102.5, 2.5), byCell[(2, 1, 0)]);
     }
 
     [Fact]
@@ -71,16 +74,16 @@ public class FitResolverTests
                 type: "box"
                 fit:
                   mode: "cell"
-            """);
+            """, Settings());
 
         var frame = plan.ShapesById["frame"];
         var left = frame.Inserts.Single(i => i.Cell!.Value == (0, 0, 0));
         var right = frame.Inserts.Single(i => i.Cell!.Value == (1, 0, 0));
 
-        Assert.Equal(new Vec3(80, 100, 50), left.ResolvedDimensions);
-        Assert.Equal(new Vec3(0, 0, 0), left.ResolvedLocation);
-        Assert.Equal(new Vec3(220, 100, 50), right.ResolvedDimensions);
-        Assert.Equal(new Vec3(80, 0, 0), right.ResolvedLocation);
+        Assert.Equal(new Vec3(77, 97, 47), left.ResolvedDimensions);
+        Assert.Equal(new Vec3(1.5, 1.5, 1.5), left.ResolvedLocation);
+        Assert.Equal(new Vec3(217, 97, 47), right.ResolvedDimensions);
+        Assert.Equal(new Vec3(81.5, 1.5, 1.5), right.ResolvedLocation);
     }
 
     [Fact]
@@ -102,11 +105,11 @@ public class FitResolverTests
                   mode: "cell"
                   clearance: 1.0
                   depth: 145.5
-            """);
+            """, Settings());
 
         var insert = plan.ShapesById["frame"].Inserts.Single();
-        Assert.Equal(new Vec3(98, 198, 145.5), insert.ResolvedDimensions);
-        Assert.Equal(new Vec3(1, 1, 0), insert.ResolvedLocation);
+              Assert.Equal(new Vec3(95, 195, 145.5), insert.ResolvedDimensions);
+              Assert.Equal(new Vec3(2.5, 2.5, 0), insert.ResolvedLocation);
     }
 
     [Fact]
@@ -126,11 +129,11 @@ public class FitResolverTests
                 type: "box"
                 fit:
                   mode: "cell"
-            """);
+            """, Settings());
 
         var insert = plan.ShapesById["frame"].Inserts.Single(i => i.Cell!.Value == (0, 0, 0));
-        Assert.Equal(new Vec3(30, 20, 20), insert.ResolvedDimensions);
-        Assert.Equal(new Vec3(0, 0, 0), insert.ResolvedLocation);
+        Assert.Equal(new Vec3(27, 17, 17), insert.ResolvedDimensions);
+        Assert.Equal(new Vec3(1.5, 1.5, 1.5), insert.ResolvedLocation);
     }
 
     [Fact]
@@ -188,8 +191,8 @@ public class FitResolverTests
                 fit:
                   mode: "cell"
                   clearance: 5.0
-            """);
+            """, Settings());
 
-        Assert.Contains(errors, e => e.Severity == Severity.Error && e.Message.Contains("clearance"));
+        Assert.Contains(errors, e => e.Severity == Severity.Error && e.Message.Contains("clearance") && e.Message.Contains("material thickness"));
     }
 }
