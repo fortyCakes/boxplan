@@ -1,1 +1,4 @@
-/.claude/**.*
+BoxPlanLib/bin/
+BoxPlanLib/obj/
+BoxPlanLibTests/bin/
+BoxPlanLibTests/obj/
