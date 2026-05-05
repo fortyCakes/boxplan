@@ -23,7 +23,7 @@ internal sealed class LocationCapturingNodeDeserializer : INodeDeserializer
         var handled = _inner.Deserialize(reader, expectedType, nestedObjectDeserializer, out value, rootDeserializer);
         if (handled && value is IRawLocated located && start is { Line: > 0 } s)
         {
-            located.Location = new RawLocation((int)s.Line, (int)s.Column);
+            located.SourceLocation = new RawLocation((int)s.Line, (int)s.Column);
         }
         return handled;
     }

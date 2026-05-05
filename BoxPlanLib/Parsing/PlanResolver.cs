@@ -594,7 +594,7 @@ public sealed class PlanResolver
     }
 
     private static PlanError Err(string message, string path, IRawLocated? at = null) =>
-        new(Severity.Error, message, path, at?.Location?.Line, at?.Location?.Column);
+        new(Severity.Error, message, path, at?.SourceLocation?.Line, at?.SourceLocation?.Column);
 
     private static T? Fail<T>(List<PlanError> errors, string message, string path, IRawLocated? at = null)
     {
