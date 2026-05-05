@@ -38,7 +38,9 @@ public class ResolverTests
             """;
 
         var errors = ResolveErrors(yaml);
-        Assert.Contains(errors, e => e.Message.Contains("dimensions") && e.Message.Contains("fit"));
+        var error = Assert.Single(errors, e => e.Message.Contains("dimensions") && e.Message.Contains("fit"));
+        Assert.NotNull(error.Line);
+        Assert.True(error.Line is >= 2 and <= 3);
     }
 
     [Fact]
@@ -146,7 +148,10 @@ public class ResolverTests
                     ref: "missing"
             """);
 
-        Assert.Contains(errors, e => e.Message.Contains("missing"));
+        var error = Assert.Single(errors, e => e.Message.Contains("missing"));
+        Assert.NotNull(error.Line);
+        Assert.True(error.Line is >= 6 and <= 7,
+            $"expected error at insert mapping (line ~6), got line {error.Line}");
     }
 
     [Fact]
@@ -162,7 +167,10 @@ public class ResolverTests
                 dimensions: [2.0, 2.0, 2.0]
             """);
 
-        Assert.Contains(errors, e => e.Message.Contains("Duplicate"));
+        var error = Assert.Single(errors, e => e.Message.Contains("Duplicate"));
+        Assert.NotNull(error.Line);
+        Assert.True(error.Line is >= 5 and <= 6,
+            $"expected duplicate error at second shape (line ~5), got line {error.Line}");
     }
 
     [Fact]
@@ -243,6 +251,29 @@ public class ResolverTests
                     diameter: 5.0
             """);
 
-        Assert.Contains(errors, e => e.Message.Contains("northeast"));
+        var error = Assert.Single(errors, e => e.Message.Contains("northeast"));
+        Assert.NotNull(error.Line);
+        Assert.True(error.Line is >= 6 and <= 7,
+            $"expected error at feature mapping (line ~6), got line {error.Line}");
+    }
+
+    [Fact]
+    public void Cutout_missing_shape_is_reported_with_line()
+    {
+        var errors = ResolveErrors("""
+            shapes:
+              - id: "a"
+                type: "box"
+                dimensions: [10.0, 10.0, 10.0]
+                features:
+                  - face: "front"
+                    type: "cutout"
+                    diameter: 5.0
+            """);
+
+        var error = Assert.Single(errors, e => e.Message.Contains("Cutout requires 'shape'"));
+        Assert.NotNull(error.Line);
+        Assert.True(error.Line is >= 6 and <= 8,
+            $"expected error at cutout mapping (line ~6), got line {error.Line}");
     }
 }

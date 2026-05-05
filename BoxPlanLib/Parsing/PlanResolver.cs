@@ -15,18 +15,18 @@ public sealed class PlanResolver
             var path = $"shapes[{i}]";
             if (string.IsNullOrEmpty(rs.Id))
             {
-                errors.Add(Err($"Shape requires an 'id'.", path));
+                errors.Add(Err($"Shape requires an 'id'.", path, rs));
                 continue;
             }
             if (!rawById.TryAdd(rs.Id, rs))
             {
-                errors.Add(Err($"Duplicate shape id '{rs.Id}'.", path));
+                errors.Add(Err($"Duplicate shape id '{rs.Id}'.", path, rs));
             }
         }
 
         var byId = new Dictionary<string, Shape>();
         var shapes = new List<Shape>();
-        var pendingInsertRefs = new List<(Insert Insert, string RefId, string Path)>();
+        var pendingInsertRefs = new List<(Insert Insert, string RefId, string Path, IRawLocated? At)>();
 
         for (var i = 0; i < raw.Shapes.Count; i++)
         {
@@ -45,7 +45,7 @@ public sealed class PlanResolver
             }
         }
 
-        foreach (var (insert, refId, path) in pendingInsertRefs)
+        foreach (var (insert, refId, path, at) in pendingInsertRefs)
         {
             if (byId.TryGetValue(refId, out var target))
             {
@@ -53,7 +53,7 @@ public sealed class PlanResolver
             }
             else
             {
-                errors.Add(Err($"Insert references unknown shape '{refId}'.", path));
+                errors.Add(Err($"Insert references unknown shape '{refId}'.", path, at));
             }
         }
 
@@ -70,12 +70,12 @@ public sealed class PlanResolver
         RawShape raw,
         string path,
         List<PlanError> errors,
-        List<(Insert, string, string)> pendingRefs)
+        List<(Insert, string, string, IRawLocated?)> pendingRefs)
     {
         return raw switch
         {
             RawBoxShape box => ResolveBoxShape(box, path, errors, pendingRefs),
-            _ => Fail(errors, $"Unsupported shape type '{raw.Type}'.", path),
+            _ => Fail(errors, $"Unsupported shape type '{raw.Type}'.", path, raw),
         };
     }
 
@@ -83,18 +83,18 @@ public sealed class PlanResolver
         RawBoxShape raw,
         string path,
         List<PlanError> errors,
-        List<(Insert, string, string)> pendingRefs)
+        List<(Insert, string, string, IRawLocated?)> pendingRefs)
     {
-        var origin = ResolveOrigin(raw.Origin, $"{path}.origin", errors) ?? Origin.BottomLeftFront;
-        var location = ResolveVec3(raw.Location, 3, $"{path}.location", errors) ?? Vec3.Zero;
+        var origin = ResolveOrigin(raw.Origin, $"{path}.origin", errors, raw) ?? Origin.BottomLeftFront;
+        var location = ResolveVec3(raw.Location, 3, $"{path}.location", errors, raw) ?? Vec3.Zero;
 
         Vec3? dimensions = null;
         if (raw.Dimensions is not null)
         {
-            dimensions = ResolveVec3(raw.Dimensions, 3, $"{path}.dimensions", errors);
+            dimensions = ResolveVec3(raw.Dimensions, 3, $"{path}.dimensions", errors, raw);
             if (dimensions is { } d && (d.X <= 0 || d.Y <= 0 || d.Z <= 0))
             {
-                errors.Add(Err("Dimensions must be positive.", $"{path}.dimensions"));
+                errors.Add(Err("Dimensions must be positive.", $"{path}.dimensions", raw));
             }
         }
 
@@ -102,11 +102,11 @@ public sealed class PlanResolver
 
         if (dimensions is null && fit is null)
         {
-            errors.Add(Err("Box must specify either 'dimensions' or 'fit'.", path));
+            errors.Add(Err("Box must specify either 'dimensions' or 'fit'.", path, raw));
         }
         if (dimensions is not null && fit is not null)
         {
-            errors.Add(Err("Box may specify 'dimensions' or 'fit', not both.", path));
+            errors.Add(Err("Box may specify 'dimensions' or 'fit', not both.", path, raw));
         }
 
         var faces = ResolveFaces(raw.Faces, $"{path}.faces", errors);
@@ -143,13 +143,13 @@ public sealed class PlanResolver
                 var facePath = $"{path}[{i}]";
                 if (string.IsNullOrEmpty(rawFace.Name))
                 {
-                    errors.Add(Err("Face requires a 'name'.", facePath));
+                    errors.Add(Err("Face requires a 'name'.", facePath, rawFace));
                     continue;
                 }
-                var name = ResolveFaceName(rawFace.Name, $"{facePath}.name", errors);
+                var name = ResolveFaceName(rawFace.Name, $"{facePath}.name", errors, rawFace);
                 if (name is null) continue;
 
-                var type = ResolveFaceType(rawFace.Type, $"{facePath}.type", errors) ?? FaceType.Closed;
+                var type = ResolveFaceType(rawFace.Type, $"{facePath}.type", errors, rawFace) ?? FaceType.Closed;
                 byName[name.Value] = type;
             }
         }
@@ -175,19 +175,19 @@ public sealed class PlanResolver
         {
             var rd = raw[i];
             var dpath = $"{path}[{i}]";
-            var facing = rd.Facing is null ? null : ResolveFaceName(rd.Facing, $"{dpath}.facing", errors);
+            var facing = rd.Facing is null ? null : ResolveFaceName(rd.Facing, $"{dpath}.facing", errors, rd);
 
             var hasSplit = rd.Split is not null;
             var hasAxis = rd.Axis is not null || rd.Positions is not null;
 
             if (hasSplit && hasAxis)
             {
-                errors.Add(Err("Divider may use 'split' or 'axis'/'positions', not both.", dpath));
+                errors.Add(Err("Divider may use 'split' or 'axis'/'positions', not both.", dpath, rd));
                 continue;
             }
             if (!hasSplit && !hasAxis)
             {
-                errors.Add(Err("Divider must specify 'split' or 'axis'+'positions'.", dpath));
+                errors.Add(Err("Divider must specify 'split' or 'axis'+'positions'.", dpath, rd));
                 continue;
             }
 
@@ -195,18 +195,18 @@ public sealed class PlanResolver
             {
                 if (dimensions is null)
                 {
-                    errors.Add(Err("'split' is only allowed on shapes with explicit 'dimensions'.", dpath));
+                    errors.Add(Err("'split' is only allowed on shapes with explicit 'dimensions'.", dpath, rd));
                     continue;
                 }
-                ExpandSplit(rd.Split!, dimensions.Value, facing, result, dpath, errors);
+                ExpandSplit(rd.Split!, dimensions.Value, facing, result, dpath, errors, rd);
             }
             else
             {
-                var axis = ResolveAxis(rd.Axis, $"{dpath}.axis", errors);
+                var axis = ResolveAxis(rd.Axis, $"{dpath}.axis", errors, rd);
                 if (axis is null) continue;
                 if (rd.Positions is null || rd.Positions.Length == 0)
                 {
-                    errors.Add(Err("Divider 'positions' must contain at least one value.", $"{dpath}.positions"));
+                    errors.Add(Err("Divider 'positions' must contain at least one value.", $"{dpath}.positions", rd));
                     continue;
                 }
                 if (dimensions is { } dims)
@@ -218,7 +218,8 @@ public sealed class PlanResolver
                         {
                             errors.Add(Err(
                                 $"Divider position {p} is outside interior 0..{bound} on axis {axis}.",
-                                $"{dpath}.positions"));
+                                $"{dpath}.positions",
+                                rd));
                         }
                     }
                 }
@@ -239,7 +240,8 @@ public sealed class PlanResolver
         FaceName? facing,
         List<DividerSet> sink,
         string path,
-        List<PlanError> errors)
+        List<PlanError> errors,
+        IRawLocated? at)
     {
         AddSplit(Axis.X, split.X, dims.X);
         AddSplit(Axis.Y, split.Y, dims.Y);
@@ -251,7 +253,7 @@ public sealed class PlanResolver
             if (count is null) return;
             if (count.Value < 2)
             {
-                errors.Add(Err($"split.{axis.ToString().ToLowerInvariant()} must be 2 or more.", path));
+                errors.Add(Err($"split.{axis.ToString().ToLowerInvariant()} must be 2 or more.", path, at));
                 return;
             }
             var positions = new double[count.Value - 1];
@@ -273,7 +275,7 @@ public sealed class PlanResolver
         IReadOnlyList<DividerSet> dividers,
         string path,
         List<PlanError> errors,
-        List<(Insert, string, string)> pendingRefs)
+        List<(Insert, string, string, IRawLocated?)> pendingRefs)
     {
         if (raw is null || raw.Count == 0)
         {
@@ -290,12 +292,12 @@ public sealed class PlanResolver
 
             if (ri.Inline is not null)
             {
-                errors.Add(Err("Inline insert shapes are not yet supported.", $"{ipath}.inline"));
+                errors.Add(Err("Inline insert shapes are not yet supported.", $"{ipath}.inline", ri));
                 continue;
             }
             if (string.IsNullOrEmpty(ri.Ref))
             {
-                errors.Add(Err("Insert must specify 'ref'.", ipath));
+                errors.Add(Err("Insert must specify 'ref'.", ipath, ri));
                 continue;
             }
 
@@ -303,7 +305,7 @@ public sealed class PlanResolver
             {
                 if (!string.Equals(ri.Fill, "all-cells", StringComparison.OrdinalIgnoreCase))
                 {
-                    errors.Add(Err($"Unknown fill mode '{ri.Fill}'.", $"{ipath}.fill"));
+                    errors.Add(Err($"Unknown fill mode '{ri.Fill}'.", $"{ipath}.fill", ri));
                     continue;
                 }
                 for (var l = 0; l < layers; l++)
@@ -312,12 +314,12 @@ public sealed class PlanResolver
                 {
                     var insert = new Insert { Cell = (c, r, l) };
                     result.Add(insert);
-                    pendingRefs.Add((insert, ri.Ref!, $"{ipath}.ref"));
+                    pendingRefs.Add((insert, ri.Ref!, $"{ipath}.ref", ri));
                 }
             }
             else if (ri.Cell is not null)
             {
-                var cell = ParseCell(ri.Cell, ipath, errors);
+                var cell = ParseCell(ri.Cell, ipath, errors, ri);
                 if (cell is null) continue;
                 if (cell.Value.Col < 0 || cell.Value.Col >= cols ||
                     cell.Value.Row < 0 || cell.Value.Row >= rows ||
@@ -325,29 +327,30 @@ public sealed class PlanResolver
                 {
                     errors.Add(Err(
                         $"Cell {cell.Value} is outside grid {cols}x{rows}x{layers}.",
-                        $"{ipath}.cell"));
+                        $"{ipath}.cell",
+                        ri));
                     continue;
                 }
                 var insert = new Insert { Cell = cell };
                 result.Add(insert);
-                pendingRefs.Add((insert, ri.Ref!, $"{ipath}.ref"));
+                pendingRefs.Add((insert, ri.Ref!, $"{ipath}.ref", ri));
             }
             else
             {
-                errors.Add(Err("Insert must specify 'fill' or 'cell'.", ipath));
+                errors.Add(Err("Insert must specify 'fill' or 'cell'.", ipath, ri));
             }
         }
 
         return result;
     }
 
-    private static (int Col, int Row, int Layer)? ParseCell(int[] cell, string path, List<PlanError> errors)
+    private static (int Col, int Row, int Layer)? ParseCell(int[] cell, string path, List<PlanError> errors, IRawLocated? at)
     {
         return cell.Length switch
         {
             2 => (cell[0], cell[1], 0),
             3 => (cell[0], cell[1], cell[2]),
-            _ => Fail<(int, int, int)?>(errors, "Cell must have 2 or 3 integers.", $"{path}.cell"),
+            _ => Fail<(int, int, int)?>(errors, "Cell must have 2 or 3 integers.", $"{path}.cell", at),
         };
     }
 
@@ -385,11 +388,11 @@ public sealed class PlanResolver
         {
             var rf = raw[i];
             var fpath = $"{path}[{i}]";
-            var face = ResolveFaceName(rf.Face, $"{fpath}.face", errors);
+            var face = ResolveFaceName(rf.Face, $"{fpath}.face", errors, rf);
             if (face is null) continue;
             if (!legal.Contains(face.Value))
             {
-                errors.Add(Err($"Face '{face}' is not a valid face for this shape.", $"{fpath}.face"));
+                errors.Add(Err($"Face '{face}' is not a valid face for this shape.", $"{fpath}.face", rf));
                 continue;
             }
             var position = rf.Position is null ? null : ResolvePosition(rf.Position, $"{fpath}.position", errors);
@@ -401,7 +404,7 @@ public sealed class PlanResolver
                     if (feature is not null) result.Add(feature);
                     break;
                 default:
-                    errors.Add(Err($"Unsupported feature type '{rf.Type}'.", fpath));
+                    errors.Add(Err($"Unsupported feature type '{rf.Type}'.", fpath, rf));
                     break;
             }
         }
@@ -417,13 +420,13 @@ public sealed class PlanResolver
     {
         if (string.IsNullOrEmpty(raw.Shape))
         {
-            errors.Add(Err("Cutout requires 'shape'.", $"{path}.shape"));
+            errors.Add(Err("Cutout requires 'shape'.", $"{path}.shape", raw));
             return null;
         }
 
         if (!Enum.TryParse<CutoutShape>(raw.Shape, ignoreCase: true, out var shape))
         {
-            errors.Add(Err($"Unknown cutout shape '{raw.Shape}'.", $"{path}.shape"));
+            errors.Add(Err($"Unknown cutout shape '{raw.Shape}'.", $"{path}.shape", raw));
             return null;
         }
 
@@ -433,7 +436,7 @@ public sealed class PlanResolver
         {
             if (raw.Width is not null || raw.Height is not null)
             {
-                errors.Add(Err("Cutout may specify 'diameter' or 'width'+'height', not both.", path));
+                errors.Add(Err("Cutout may specify 'diameter' or 'width'+'height', not both.", path, raw));
                 return null;
             }
             width = d;
@@ -446,7 +449,7 @@ public sealed class PlanResolver
         }
         else
         {
-            errors.Add(Err("Cutout requires 'diameter' or both 'width' and 'height'.", path));
+            errors.Add(Err("Cutout requires 'diameter' or both 'width' and 'height'.", path, raw));
             return null;
         }
 
@@ -462,11 +465,11 @@ public sealed class PlanResolver
 
     private static Position? ResolvePosition(RawPosition raw, string path, List<PlanError> errors)
     {
-        var anchor = ResolveAnchor(raw.Anchor, $"{path}.anchor", errors);
+        var anchor = ResolveAnchor(raw.Anchor, $"{path}.anchor", errors, raw);
         if (anchor is null) return null;
         var offset = raw.Offset is null
             ? Vec2.Zero
-            : ResolveVec2(raw.Offset, $"{path}.offset", errors) ?? Vec2.Zero;
+            : ResolveVec2(raw.Offset, $"{path}.offset", errors, raw) ?? Vec2.Zero;
         return new Position(anchor.Value, offset);
     }
 
@@ -474,12 +477,12 @@ public sealed class PlanResolver
     {
         if (string.IsNullOrEmpty(raw.Mode))
         {
-            errors.Add(Err("Fit requires 'mode'.", $"{path}.mode"));
+            errors.Add(Err("Fit requires 'mode'.", $"{path}.mode", raw));
             return null;
         }
         if (!Enum.TryParse<FitMode>(raw.Mode, ignoreCase: true, out var mode))
         {
-            errors.Add(Err($"Unknown fit mode '{raw.Mode}'.", $"{path}.mode"));
+            errors.Add(Err($"Unknown fit mode '{raw.Mode}'.", $"{path}.mode", raw));
             return null;
         }
 
@@ -506,23 +509,23 @@ public sealed class PlanResolver
         _ => 0,
     };
 
-    private static Vec3? ResolveVec3(double[]? raw, int expected, string path, List<PlanError> errors)
+    private static Vec3? ResolveVec3(double[]? raw, int expected, string path, List<PlanError> errors, IRawLocated? at)
     {
         if (raw is null) return null;
         if (raw.Length != expected)
         {
-            errors.Add(Err($"Expected {expected} numbers, got {raw.Length}.", path));
+            errors.Add(Err($"Expected {expected} numbers, got {raw.Length}.", path, at));
             return null;
         }
         return new Vec3(raw[0], raw[1], raw[2]);
     }
 
-    private static Vec2? ResolveVec2(double[]? raw, string path, List<PlanError> errors)
+    private static Vec2? ResolveVec2(double[]? raw, string path, List<PlanError> errors, IRawLocated? at)
     {
         if (raw is null) return null;
         if (raw.Length != 2)
         {
-            errors.Add(Err($"Expected 2 numbers, got {raw.Length}.", path));
+            errors.Add(Err($"Expected 2 numbers, got {raw.Length}.", path, at));
             return null;
         }
         return new Vec2(raw[0], raw[1]);
@@ -566,42 +569,42 @@ public sealed class PlanResolver
         { "center", Anchor.Center },
     };
 
-    private static Origin? ResolveOrigin(string? raw, string path, List<PlanError> errors) =>
-        ResolveEnum(raw, _origins, "origin", path, errors);
+    private static Origin? ResolveOrigin(string? raw, string path, List<PlanError> errors, IRawLocated? at) =>
+        ResolveEnum(raw, _origins, "origin", path, errors, at);
 
-    private static FaceName? ResolveFaceName(string? raw, string path, List<PlanError> errors) =>
-        ResolveEnum(raw, _faces, "face name", path, errors);
+    private static FaceName? ResolveFaceName(string? raw, string path, List<PlanError> errors, IRawLocated? at) =>
+        ResolveEnum(raw, _faces, "face name", path, errors, at);
 
-    private static FaceType? ResolveFaceType(string? raw, string path, List<PlanError> errors) =>
-        ResolveEnum(raw, _faceTypes, "face type", path, errors);
+    private static FaceType? ResolveFaceType(string? raw, string path, List<PlanError> errors, IRawLocated? at) =>
+        ResolveEnum(raw, _faceTypes, "face type", path, errors, at);
 
-    private static Axis? ResolveAxis(string? raw, string path, List<PlanError> errors) =>
-        ResolveEnum(raw, _axes, "axis", path, errors);
+    private static Axis? ResolveAxis(string? raw, string path, List<PlanError> errors, IRawLocated? at) =>
+        ResolveEnum(raw, _axes, "axis", path, errors, at);
 
-    private static Anchor? ResolveAnchor(string? raw, string path, List<PlanError> errors) =>
-        ResolveEnum(raw, _anchors, "anchor", path, errors);
+    private static Anchor? ResolveAnchor(string? raw, string path, List<PlanError> errors, IRawLocated? at) =>
+        ResolveEnum(raw, _anchors, "anchor", path, errors, at);
 
-    private static T? ResolveEnum<T>(string? raw, Dictionary<string, T> table, string label, string path, List<PlanError> errors)
+    private static T? ResolveEnum<T>(string? raw, Dictionary<string, T> table, string label, string path, List<PlanError> errors, IRawLocated? at)
         where T : struct
     {
         if (raw is null) return null;
         if (table.TryGetValue(raw, out var value)) return value;
-        errors.Add(Err($"Unknown {label} '{raw}'.", path));
+        errors.Add(Err($"Unknown {label} '{raw}'.", path, at));
         return null;
     }
 
-    private static PlanError Err(string message, string path) =>
-        new(Severity.Error, message, path);
+    private static PlanError Err(string message, string path, IRawLocated? at = null) =>
+        new(Severity.Error, message, path, at?.Location?.Line, at?.Location?.Column);
 
-    private static T? Fail<T>(List<PlanError> errors, string message, string path)
+    private static T? Fail<T>(List<PlanError> errors, string message, string path, IRawLocated? at = null)
     {
-        errors.Add(Err(message, path));
+        errors.Add(Err(message, path, at));
         return default;
     }
 
-    private static Shape? Fail(List<PlanError> errors, string message, string path)
+    private static Shape? Fail(List<PlanError> errors, string message, string path, IRawLocated? at = null)
     {
-        errors.Add(Err(message, path));
+        errors.Add(Err(message, path, at));
         return null;
     }
 }
