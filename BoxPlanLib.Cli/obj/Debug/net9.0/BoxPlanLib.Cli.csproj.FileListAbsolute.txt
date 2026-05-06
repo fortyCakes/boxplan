@@ -45,3 +45,7 @@ c:\Users\Lex\source\repos\boxplan\BoxPlanLib.Cli\obj\Debug\net9.0\ref\BoxPlanLib
 c:\Users\Lex\source\repos\boxplan\BoxPlanLib.Cli\bin\Debug\net9.0\sample-plans\divider-test.yml
 c:\Users\Lex\source\repos\boxplan\BoxPlanLib.Cli\bin\Debug\net9.0\sample-plans\drawer-test.yml
 c:\Users\Lex\source\repos\boxplan\BoxPlanLib.Cli\bin\Debug\net9.0\sample-plans\cutout-test.yml
+c:\Users\Alex.Stuart\source\repos\boxplan\BoxPlanLib.Cli\bin\Debug\net9.0\sample-plans\cutout-test.yml
+c:\Users\Alex.Stuart\source\repos\boxplan\BoxPlanLib.Cli\bin\Debug\net9.0\sample-plans\divider-test.yml
+c:\Users\Alex.Stuart\source\repos\boxplan\BoxPlanLib.Cli\bin\Debug\net9.0\sample-plans\drawer-test.yml
+c:\Users\Alex.Stuart\source\repos\boxplan\BoxPlanLib.Cli\bin\Debug\net9.0\Clipper2Lib.dll

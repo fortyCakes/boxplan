@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("BoxPlanLib.Tests")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+e33594e6aae9a429b8902e16a778be17339fbd8f")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+315d2b631763ef5afc135434cf2f592d618c2399")]
 [assembly: System.Reflection.AssemblyProductAttribute("BoxPlanLib.Tests")]
 [assembly: System.Reflection.AssemblyTitleAttribute("BoxPlanLib.Tests")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
