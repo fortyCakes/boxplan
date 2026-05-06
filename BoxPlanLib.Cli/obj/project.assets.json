@@ -71,11 +71,11 @@
   "project": {
     "version": "1.0.0",
     "restore": {
-      "projectUniqueName": "c:\\Users\\Lex\\source\\repos\\boxplan\\BoxPlanLib.Cli\\BoxPlanLib.Cli.csproj",
+      "projectUniqueName": "C:\\Users\\Lex\\source\\repos\\boxplan\\BoxPlanLib.Cli\\BoxPlanLib.Cli.csproj",
       "projectName": "BoxPlanLib.Cli",
-      "projectPath": "c:\\Users\\Lex\\source\\repos\\boxplan\\BoxPlanLib.Cli\\BoxPlanLib.Cli.csproj",
+      "projectPath": "C:\\Users\\Lex\\source\\repos\\boxplan\\BoxPlanLib.Cli\\BoxPlanLib.Cli.csproj",
       "packagesPath": "C:\\Users\\Lex\\.nuget\\packages\\",
-      "outputPath": "c:\\Users\\Lex\\source\\repos\\boxplan\\BoxPlanLib.Cli\\obj\\",
+      "outputPath": "C:\\Users\\Lex\\source\\repos\\boxplan\\BoxPlanLib.Cli\\obj\\",
       "projectStyle": "PackageReference",
       "configFilePaths": [
         "C:\\Users\\Lex\\AppData\\Roaming\\NuGet\\NuGet.Config",
@@ -92,8 +92,8 @@
         "net9.0": {
           "targetAlias": "net9.0",
           "projectReferences": {
-            "c:\\Users\\Lex\\source\\repos\\boxplan\\BoxPlanLib\\BoxPlanLib.csproj": {
-              "projectPath": "c:\\Users\\Lex\\source\\repos\\boxplan\\BoxPlanLib\\BoxPlanLib.csproj"
+            "C:\\Users\\Lex\\source\\repos\\boxplan\\BoxPlanLib\\BoxPlanLib.csproj": {
+              "projectPath": "C:\\Users\\Lex\\source\\repos\\boxplan\\BoxPlanLib\\BoxPlanLib.csproj"
             }
           }
         }

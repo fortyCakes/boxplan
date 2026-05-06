@@ -1,8 +1,8 @@
 {
   "version": 2,
-  "dgSpecHash": "ImFzlklntA8=",
+  "dgSpecHash": "AlJ/U46POZI=",
   "success": true,
-  "projectFilePath": "c:\\Users\\Lex\\source\\repos\\boxplan\\BoxPlanLib.Cli\\BoxPlanLib.Cli.csproj",
+  "projectFilePath": "C:\\Users\\Lex\\source\\repos\\boxplan\\BoxPlanLib.Cli\\BoxPlanLib.Cli.csproj",
   "expectedPackageFiles": [
     "C:\\Users\\Lex\\.nuget\\packages\\yamldotnet\\17.1.0\\yamldotnet.17.1.0.nupkg.sha512"
   ],

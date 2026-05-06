@@ -2,7 +2,7 @@ using BoxPlanLib;
 
 var inputPath = args.Length > 0
     ? args[0]
-    : Path.Combine(AppContext.BaseDirectory, "sample-plans", "drawer-test.yml");
+    : Path.Combine(AppContext.BaseDirectory, "sample-plans", "divider-test.yml");
 
 var outputPath = args.Length > 1
     ? args[1]

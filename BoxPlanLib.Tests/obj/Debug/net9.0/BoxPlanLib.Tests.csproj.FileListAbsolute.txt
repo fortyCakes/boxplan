@@ -212,3 +212,4 @@ C:\Users\Alex.Stuart\source\repos\boxplan\BoxPlanLib.Tests\obj\Debug\net9.0\ref\
 C:\Users\Lex\source\repos\boxplan\BoxPlanLib.Tests\obj\Debug\net9.0\BoxPlanLib.Tests.sourcelink.json
 C:\Users\Lex\source\repos\boxplan\BoxPlanLib.Tests\bin\Debug\net9.0\sample-plans\divider-test.yml
 C:\Users\Lex\source\repos\boxplan\BoxPlanLib.Tests\bin\Debug\net9.0\sample-plans\drawer-test.yml
+C:\Users\Lex\source\repos\boxplan\BoxPlanLib.Tests\bin\Debug\net9.0\sample-plans\cutout-test.yml
