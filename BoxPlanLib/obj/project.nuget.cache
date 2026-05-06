@@ -1,8 +1,8 @@
 {
   "version": 2,
-  "dgSpecHash": "dF9og3QTwcQ=",
+  "dgSpecHash": "1Cllg/lKQrg=",
   "success": true,
-  "projectFilePath": "c:\\Users\\Alex.Stuart\\source\\repos\\boxplan\\BoxPlanLib\\BoxPlanLib.csproj",
+  "projectFilePath": "C:\\Users\\Alex.Stuart\\source\\repos\\boxplan\\BoxPlanLib\\BoxPlanLib.csproj",
   "expectedPackageFiles": [
     "C:\\Users\\Alex.Stuart\\.nuget\\packages\\clipper2\\2.0.0\\clipper2.2.0.0.nupkg.sha512",
     "C:\\Users\\Alex.Stuart\\.nuget\\packages\\yamldotnet\\17.1.0\\yamldotnet.17.1.0.nupkg.sha512",

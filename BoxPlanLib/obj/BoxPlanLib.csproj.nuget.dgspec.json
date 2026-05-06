@@ -1,17 +1,17 @@
 {
   "format": 1,
   "restore": {
-    "c:\\Users\\Alex.Stuart\\source\\repos\\boxplan\\BoxPlanLib\\BoxPlanLib.csproj": {}
+    "C:\\Users\\Alex.Stuart\\source\\repos\\boxplan\\BoxPlanLib\\BoxPlanLib.csproj": {}
   },
   "projects": {
-    "c:\\Users\\Alex.Stuart\\source\\repos\\boxplan\\BoxPlanLib\\BoxPlanLib.csproj": {
+    "C:\\Users\\Alex.Stuart\\source\\repos\\boxplan\\BoxPlanLib\\BoxPlanLib.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "c:\\Users\\Alex.Stuart\\source\\repos\\boxplan\\BoxPlanLib\\BoxPlanLib.csproj",
+        "projectUniqueName": "C:\\Users\\Alex.Stuart\\source\\repos\\boxplan\\BoxPlanLib\\BoxPlanLib.csproj",
         "projectName": "BoxPlanLib",
-        "projectPath": "c:\\Users\\Alex.Stuart\\source\\repos\\boxplan\\BoxPlanLib\\BoxPlanLib.csproj",
+        "projectPath": "C:\\Users\\Alex.Stuart\\source\\repos\\boxplan\\BoxPlanLib\\BoxPlanLib.csproj",
         "packagesPath": "C:\\Users\\Alex.Stuart\\.nuget\\packages\\",
-        "outputPath": "c:\\Users\\Alex.Stuart\\source\\repos\\boxplan\\BoxPlanLib\\obj\\",
+        "outputPath": "C:\\Users\\Alex.Stuart\\source\\repos\\boxplan\\BoxPlanLib\\obj\\",
         "projectStyle": "PackageReference",
         "fallbackFolders": [
           "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"

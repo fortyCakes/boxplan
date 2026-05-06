@@ -5,13 +5,20 @@ namespace BoxPlanLib.Tests;
 
 public class SamplePlanTests
 {
-    private static string LoadSample(string filename) =>
-        File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "sample-plans", filename));
-
     [Fact]
     public void Simple_cube_round_trips_through_full_pipeline()
     {
-        var yaml = LoadSample("simple-cube.yml");
+        const string yaml = """
+            shapes:
+              - id: "sample-box"
+                type: "box"
+                dimensions: [200.0, 75.0, 200.0]
+                location: [0.0, 0.0, 0.0]
+                origin: "bottom-left-front"
+                faces:
+                  - name: "top"
+                    type: "closed"
+            """;
         var lib = new BoxPlanLib();
 
         var result = lib.ParsePlan(yaml);
@@ -27,7 +34,40 @@ public class SamplePlanTests
     [Fact]
     public void Drawer_frame_3x2_round_trips_through_full_pipeline()
     {
-        var yaml = LoadSample("drawer-frame-3x2.yml");
+        const string yaml = """
+            shapes:
+              - id: "frame"
+                type: "box"
+                dimensions: [200.0, 200.0, 150.0]
+                origin: "bottom-left-front"
+                location: [0.0, 0.0, 0.0]
+                faces:
+                  - name: "front"
+                    type: "open"
+                dividers:
+                  - split: { x: 3, y: 2 }
+                    facing: front
+                inserts:
+                  - fill: "all-cells"
+                    ref: "drawer"
+              - id: "drawer"
+                type: "box"
+                fit:
+                  mode: "cell"
+                  clearance: 1.0
+                  depth: auto
+                faces:
+                  - name: "top"
+                    type: "open"
+                features:
+                  - face: "front"
+                    type: "cutout"
+                    shape: "semicircle"
+                    diameter: 50.0
+                    position:
+                      anchor: "top-center"
+                      offset: [0.0, 15.0]
+            """;
         var lib = new BoxPlanLib();
         var settings = new BoxPlanSettings { MaterialThickness = 3.0 };
 
