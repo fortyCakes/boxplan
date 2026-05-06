@@ -369,13 +369,7 @@ public class DividerTests
         var xDivider = pieces.First(p => p.Id.Contains("divider-x"));
         var pts = Points(xDivider);
         var settings = Settings();
-        var verticalCorner = new Vec2(xDivider.BoundingBoxMax.X, xDivider.BoundingBoxMax.Y - settings.MaterialThickness);
-        var innerCorner = new Vec2(xDivider.BoundingBoxMax.X - settings.MaterialThickness, xDivider.BoundingBoxMax.Y - settings.MaterialThickness);
-        var horizontalCorner = new Vec2(xDivider.BoundingBoxMax.X - settings.MaterialThickness, xDivider.BoundingBoxMax.Y);
-
-        Assert.Contains(verticalCorner, pts);
-        Assert.Contains(innerCorner, pts);
-        Assert.Contains(horizontalCorner, pts);
+        AssertCornerHasClearance(pts, xDivider.BoundingBoxMax, settings.MaterialThickness);
     }
 
     [Fact]
@@ -395,13 +389,23 @@ public class DividerTests
         var xDivider = pieces.First(p => p.Id.Contains("divider-x"));
         var pts = Points(xDivider);
         var settings = Settings();
-        var verticalCorner = new Vec2(xDivider.BoundingBoxMax.X, xDivider.BoundingBoxMax.Y - settings.MaterialThickness);
-        var innerCorner = new Vec2(xDivider.BoundingBoxMax.X - settings.MaterialThickness, xDivider.BoundingBoxMax.Y - settings.MaterialThickness);
-        var horizontalCorner = new Vec2(xDivider.BoundingBoxMax.X - settings.MaterialThickness, xDivider.BoundingBoxMax.Y);
+        AssertCornerHasClearance(pts, xDivider.BoundingBoxMax, settings.MaterialThickness);
+    }
 
-        Assert.Contains(verticalCorner, pts);
+    // The top-right corner is shared by two joined edges whose end-insets meet at
+    // the corner. The polygon should: (a) include the inner L-corner where the two
+    // depth-t cuts meet, and (b) place no vertex strictly inside the t×t corner cube
+    // (which would be a spike artifact).
+    private static void AssertCornerHasClearance(IReadOnlyList<Vec2> pts, Vec2 bbMax, double t)
+    {
+        var innerCorner = new Vec2(bbMax.X - t, bbMax.Y - t);
         Assert.Contains(innerCorner, pts);
-        Assert.Contains(horizontalCorner, pts);
+        const double slack = 1e-9;
+        foreach (var p in pts)
+        {
+            Assert.False(p.X > bbMax.X - t + slack && p.Y > bbMax.Y - t + slack,
+                $"Vertex {p} is inside the t×t corner cube at ({bbMax.X}, {bbMax.Y}) — corner artefact.");
+        }
     }
 
     [Fact]

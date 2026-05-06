@@ -2,6 +2,15 @@
   "version": 3,
   "targets": {
     "net9.0": {
+      "Clipper2/2.0.0": {
+        "type": "package",
+        "compile": {
+          "lib/netstandard2.0/Clipper2Lib.dll": {}
+        },
+        "runtime": {
+          "lib/netstandard2.0/Clipper2Lib.dll": {}
+        }
+      },
       "YamlDotNet/17.1.0": {
         "type": "package",
         "compile": {
@@ -18,6 +27,21 @@
     }
   },
   "libraries": {
+    "Clipper2/2.0.0": {
+      "sha512": "2X23RZxJrjRjOSZc20aqXY9jpmHLekDRy4PIMfrsi2LPNzxFYlnuqzX/nLdk77fbURHUeX+gMhUn2a1z9/wMTQ==",
+      "type": "package",
+      "path": "clipper2/2.0.0",
+      "files": [
+        ".nupkg.metadata",
+        ".signature.p7s",
+        "License.txt",
+        "README.md",
+        "clipper2.2.0.0.nupkg.sha512",
+        "clipper2.nuspec",
+        "icon.png",
+        "lib/netstandard2.0/Clipper2Lib.dll"
+      ]
+    },
     "YamlDotNet/17.1.0": {
       "sha512": "AhsNXgeAs3Ugt653t8LC44xXDuldFfwBpWbWX9pN3e4Yg8U5Bk8jLn8eXtGv5HV2V2nHu7F46fqsPC+tpcTGAA==",
       "type": "package",
@@ -44,23 +68,29 @@
   },
   "projectFileDependencyGroups": {
     "net9.0": [
+      "Clipper2 >= 2.0.0",
       "YamlDotNet >= 17.1.0"
     ]
   },
   "packageFolders": {
-    "C:\\Users\\Lex\\.nuget\\packages\\": {}
+    "C:\\Users\\Alex.Stuart\\.nuget\\packages\\": {},
+    "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages": {}
   },
   "project": {
     "version": "1.0.0",
     "restore": {
-      "projectUniqueName": "C:\\Users\\Lex\\source\\repos\\boxplan\\BoxPlanLib\\BoxPlanLib.csproj",
+      "projectUniqueName": "c:\\Users\\Alex.Stuart\\source\\repos\\boxplan\\BoxPlanLib\\BoxPlanLib.csproj",
       "projectName": "BoxPlanLib",
-      "projectPath": "C:\\Users\\Lex\\source\\repos\\boxplan\\BoxPlanLib\\BoxPlanLib.csproj",
-      "packagesPath": "C:\\Users\\Lex\\.nuget\\packages\\",
-      "outputPath": "C:\\Users\\Lex\\source\\repos\\boxplan\\BoxPlanLib\\obj\\",
+      "projectPath": "c:\\Users\\Alex.Stuart\\source\\repos\\boxplan\\BoxPlanLib\\BoxPlanLib.csproj",
+      "packagesPath": "C:\\Users\\Alex.Stuart\\.nuget\\packages\\",
+      "outputPath": "c:\\Users\\Alex.Stuart\\source\\repos\\boxplan\\BoxPlanLib\\obj\\",
       "projectStyle": "PackageReference",
+      "fallbackFolders": [
+        "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"
+      ],
       "configFilePaths": [
-        "C:\\Users\\Lex\\AppData\\Roaming\\NuGet\\NuGet.Config",
+        "C:\\Users\\Alex.Stuart\\AppData\\Roaming\\NuGet\\NuGet.Config",
+        "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.FallbackLocation.config",
         "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.Offline.config"
       ],
       "originalTargetFrameworks": [
@@ -86,12 +116,16 @@
         "auditLevel": "low",
         "auditMode": "direct"
       },
-      "SdkAnalysisLevel": "9.0.300"
+      "SdkAnalysisLevel": "10.0.200"
     },
     "frameworks": {
       "net9.0": {
         "targetAlias": "net9.0",
         "dependencies": {
+          "Clipper2": {
+            "target": "Package",
+            "version": "[2.0.0, )"
+          },
           "YamlDotNet": {
             "target": "Package",
             "version": "[17.1.0, )"
@@ -108,12 +142,26 @@
         ],
         "assetTargetFallback": true,
         "warn": true,
+        "downloadDependencies": [
+          {
+            "name": "Microsoft.AspNetCore.App.Ref",
+            "version": "[9.0.15, 9.0.15]"
+          },
+          {
+            "name": "Microsoft.NETCore.App.Ref",
+            "version": "[9.0.15, 9.0.15]"
+          },
+          {
+            "name": "Microsoft.WindowsDesktop.App.Ref",
+            "version": "[9.0.15, 9.0.15]"
+          }
+        ],
         "frameworkReferences": {
           "Microsoft.NETCore.App": {
             "privateAssets": "all"
           }
         },
-        "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\9.0.306/PortableRuntimeIdentifierGraph.json"
+        "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\10.0.203/PortableRuntimeIdentifierGraph.json"
       }
     }
   }

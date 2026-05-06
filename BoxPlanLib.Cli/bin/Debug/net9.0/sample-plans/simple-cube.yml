@@ -1,7 +1,7 @@
 shapes:
 - id: "sample-box"
   type: "box" # The type of shape to create. This will determine how the dimensions are interpreted.
-  dimensions: [200.0, 75.0, 200.0] # width, height, depth in mm
+  dimensions: [30.0, 30.0, 30.0] # width, height, depth in mm
   location: [0.0, 0.0, 0.0] # Location isn't needed here as this is the only shape, but it can be used to position shapes in more complex plans
   origin: "bottom-left-front" # The reference point for the shape's location. This can be "bottom-left-front", "center", etc., depending on how you want to position the shape.
   faces: #default is all closed, but you can specify open faces here

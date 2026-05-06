@@ -14,6 +14,6 @@ shapes:
     dividers:
       # Subdivide the interior into a 3x2 grid.
       # Material thickness and kerf are applied by the engine.
-      - split: {  x: 2, y: 2 }
+      - split: {  y: 2 }
       # Division is applied facing the configured face, so the dividers here are smooth at the front and tabbed into the back.
         facing: front
