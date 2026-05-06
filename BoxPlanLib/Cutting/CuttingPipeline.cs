@@ -199,129 +199,52 @@ internal static class FaceLayout
     };
 }
 
-internal static class JointGeometry
-{
-    public static readonly Vec2[] AlongCcw = { new(1, 0), new(0, 1), new(-1, 0), new(0, -1) };
-    public static readonly Vec2[] InwardCcw = { new(0, 1), new(-1, 0), new(0, -1), new(1, 0) };
-
-    public static Vec2 Move(Vec2 p, Vec2 dir, double scale) => Add(p, dir, scale);
-
-    public static bool StartsWithNeighborBlock(FaceEdgeMap edge, SharedEdge shared)
-    {
-        var ordered = edge.ForwardAlongShared
-            ? shared.Blocks
-            : shared.Blocks.Reverse().ToList();
-        return ordered.Count > 0 && ordered[0].Owner != edge.Face;
-    }
-
-    public static bool EndsWithNeighborBlock(FaceEdgeMap edge, SharedEdge shared)
-    {
-        var ordered = edge.ForwardAlongShared
-            ? shared.Blocks
-            : shared.Blocks.Reverse().ToList();
-        return ordered.Count > 0 && ordered[^1].Owner != edge.Face;
-    }
-
-    public static List<LineSegment> EmitEdge(
-        FaceEdgeMap edge,
-        SharedEdge shared,
-        int edgeIndex,
-        double t,
-        Vec2 startPos,
-        bool omitLeadingInset,
-        bool omitTrailingReturn)
-    {
-        var along = AlongCcw[edgeIndex];
-        var inward = InwardCcw[edgeIndex];
-        var segments = new List<LineSegment>();
-
-        var ordered = edge.ForwardAlongShared
-            ? shared.Blocks
-            : shared.Blocks.Reverse().ToList();
-
-        var p = startPos;
-        for (var blockIndex = 0; blockIndex < ordered.Count; blockIndex++)
-        {
-            var block = ordered[blockIndex];
-            var L = block.Length;
-            if (block.Owner == edge.Face)
-            {
-                p = Add(p, along, L);
-                segments.Add(new LineSegment(p));
-            }
-            else
-            {
-                var isFirstBlock = blockIndex == 0;
-                if (!(omitLeadingInset && isFirstBlock))
-                {
-                    p = Add(p, inward, t);
-                    segments.Add(new LineSegment(p));
-                }
-                p = Add(p, along, L);
-                segments.Add(new LineSegment(p));
-                var isLastBlock = blockIndex == ordered.Count - 1;
-                if (!(omitTrailingReturn && isLastBlock))
-                {
-                    p = Add(p, inward, -t);
-                    segments.Add(new LineSegment(p));
-                }
-            }
-        }
-        return segments;
-    }
-
-    private static Vec2 Add(Vec2 p, Vec2 dir, double scale) =>
-        new(p.X + dir.X * scale, p.Y + dir.Y * scale);
-}
 
 internal static class KerfOffset
 {
+    // Compute a closed-polygon kerf offset using miter joins. Each vertex is moved
+    // outward by k along the bisector of the two adjacent edge normals. This naturally
+    // handles closure without needing a separate start/end convention.
     public static (CuttablePath path, Vec2 bbMin, Vec2 bbMax, Vec2 translation) OffsetOutwardAndTranslate(
-        Vec2 start, IReadOnlyList<LineSegment> segments, double kerf)
+        IReadOnlyList<Vec2> polygon, double kerf)
     {
         var k = kerf / 2.0;
-        var pts = new List<Vec2> { start };
-        foreach (var seg in segments) pts.Add(seg.To);
+        var n = polygon.Count;
+        var offsetPts = new Vec2[n];
 
-        var n = pts.Count - 1;
-        var offsetPts = new Vec2[n + 1];
         for (var i = 0; i < n; i++)
         {
-            var a = pts[i];
-            var b = pts[i + 1];
-            var dx = b.X - a.X;
-            var dy = b.Y - a.Y;
-            var len = Math.Sqrt(dx * dx + dy * dy);
-            if (len < 1e-9) continue;
-            var nx = dy / len;
-            var ny = -dx / len;
-            offsetPts[i] = new Vec2(a.X + nx * k, a.Y + ny * k);
-            offsetPts[i + 1] = new Vec2(b.X + nx * k, b.Y + ny * k);
-        }
+            var prev = polygon[(i + n - 1) % n];
+            var curr = polygon[i];
+            var next = polygon[(i + 1) % n];
 
-        var resolved = new List<Vec2>();
-        for (var i = 0; i < n; i++)
-        {
-            var a0 = offsetPts[i];
-            var b0 = offsetPts[i + 1];
-            if (i == 0)
+            var dxIn = curr.X - prev.X;
+            var dyIn = curr.Y - prev.Y;
+            var lenIn = Math.Sqrt(dxIn * dxIn + dyIn * dyIn);
+
+            var dxOut = next.X - curr.X;
+            var dyOut = next.Y - curr.Y;
+            var lenOut = Math.Sqrt(dxOut * dxOut + dyOut * dyOut);
+
+            if (lenIn < 1e-9 || lenOut < 1e-9)
             {
-                resolved.Add(a0);
+                offsetPts[i] = curr;
+                continue;
             }
-            else
-            {
-                var prev = resolved[^1];
-                if (Math.Abs(prev.X - a0.X) > 1e-7 || Math.Abs(prev.Y - a0.Y) > 1e-7)
-                {
-                    resolved.Add(a0);
-                }
-            }
-            resolved.Add(b0);
+
+            // Outward normal = right-perpendicular of edge direction (same convention
+            // as the per-segment offset used elsewhere in this class).
+            var nxIn  =  dyIn  / lenIn;
+            var nyIn  = -dxIn  / lenIn;
+            var nxOut =  dyOut / lenOut;
+            var nyOut = -dxOut / lenOut;
+
+            offsetPts[i] = new Vec2(curr.X + k * (nxIn + nxOut), curr.Y + k * (nyIn + nyOut));
         }
 
         var minX = double.MaxValue; var minY = double.MaxValue;
         var maxX = double.MinValue; var maxY = double.MinValue;
-        foreach (var p in resolved)
+        foreach (var p in offsetPts)
         {
             if (p.X < minX) minX = p.X;
             if (p.Y < minY) minY = p.Y;
@@ -329,23 +252,23 @@ internal static class KerfOffset
             if (p.Y > maxY) maxY = p.Y;
         }
 
-        var translated = resolved.Select(p => new Vec2(p.X - minX, p.Y - minY)).ToList();
-        var newSegments = new List<PathSegment>();
-        for (var i = 1; i < translated.Count; i++)
-        {
-            newSegments.Add(new LineSegment(translated[i]));
-        }
+        var translated = offsetPts.Select(p => new Vec2(p.X - minX, p.Y - minY)).ToList();
+        var pathSegments = new List<PathSegment>(n);
+        for (var i = 1; i < n; i++)
+            pathSegments.Add(new LineSegment(translated[i]));
+        pathSegments.Add(new LineSegment(translated[0])); // close
 
         var path = new CuttablePath
         {
             Start = translated[0],
-            Segments = newSegments,
+            Segments = pathSegments,
             Closed = true,
         };
         var bbMin = new Vec2(0, 0);
         var bbMax = new Vec2(maxX - minX, maxY - minY);
         return (path, bbMin, bbMax, new Vec2(-minX, -minY));
     }
+
 }
 
 internal static class CutoutBuilder
@@ -1002,122 +925,25 @@ public sealed class CuttingPipeline
         };
 
         if (settings.Debug)
-        {
             LogDividerTabSizes(id, edges, spans);
-        }
 
-        var corners = new[]
-        {
-            new Vec2(0, 0),
-            new Vec2(u, 0),
-            new Vec2(u, v),
-            new Vec2(0, v),
-        };
+        var builder = new PanelShapeBuilder(u, v);
 
-        // When edge 3 ends with a trailing EndInset whose outward return is
-        // skipped (because edge 0 is smooth), the path closes at the L-cut's
-        // post-corner point — `t` along edge 0 from the panel's origin corner —
-        // rather than the corner itself.
-        var start = corners[0];
-        if (spans[0].Count > 0 && spans[0][0].Kind == DividerJointSpanKind.Smooth
-            && spans[3].Count > 0 && spans[3][^1].Kind == DividerJointSpanKind.EndInset)
-        {
-            start = JointGeometry.Move(corners[0], JointGeometry.AlongCcw[0], t);
-        }
-        var segments = new List<LineSegment>();
-        var p = start;
-        var skipLeadingInset = false;
+        // Subtract notches for DividerTab and EndInset spans. FaceSlot and Smooth spans
+        // leave the outline untouched (FaceSlots are interior cuts on the face panels).
         for (var edgeIndex = 0; edgeIndex < 4; edgeIndex++)
         {
-            var along = JointGeometry.AlongCcw[edgeIndex];
-            var inward = JointGeometry.InwardCcw[edgeIndex];
-            var prevEdgeIndex = (edgeIndex + 3) % spans.Length;
-            var nextEdgeIndex = (edgeIndex + 1) % spans.Length;
-            var prevEndsEndInset = spans[prevEdgeIndex].Count > 0
-                && spans[prevEdgeIndex][^1].Kind == DividerJointSpanKind.EndInset;
-            var nextStartsEndInset = spans[nextEdgeIndex].Count > 0
-                && spans[nextEdgeIndex][0].Kind == DividerJointSpanKind.EndInset;
-            var prevEndsSmooth = spans[prevEdgeIndex].Count > 0
-                && spans[prevEdgeIndex][^1].Kind == DividerJointSpanKind.Smooth;
-            var nextStartsSmooth = spans[nextEdgeIndex].Count > 0
-                && spans[nextEdgeIndex][0].Kind == DividerJointSpanKind.Smooth;
-
-            for (var spanIndex = 0; spanIndex < spans[edgeIndex].Count; spanIndex++)
+            var cursor = 0.0;
+            foreach (var span in spans[edgeIndex])
             {
-                var span = spans[edgeIndex][spanIndex];
-                var isFirstSpan = spanIndex == 0;
-                var isLastSpan = spanIndex == spans[edgeIndex].Count - 1;
-
-                if (span.Kind == DividerJointSpanKind.Smooth)
-                {
-                    // When the corner at either end is shared with an EndInset on
-                    // the neighboring tabbed edge, shorten this smooth walk by t
-                    // so the EndInset's lateral leg lands on a clean L-cut instead
-                    // of doubling back along this edge (which would leave a kerf
-                    // sliver — the visible "spike").
-                    var len = span.Length;
-                    if (isFirstSpan && prevEndsEndInset) len -= t;
-                    if (isLastSpan && nextStartsEndInset) len -= t;
-                    if (len > 0)
-                    {
-                        p = JointGeometry.Move(p, along, len);
-                        segments.Add(new LineSegment(p));
-                    }
-                    continue;
-                }
-
                 if (span.Kind is DividerJointSpanKind.DividerTab or DividerJointSpanKind.EndInset)
-                {
-                    var skipInwardDip = span.Kind == DividerJointSpanKind.EndInset
-                        && isFirstSpan && prevEndsSmooth;
-                    var skipOutwardReturn = span.Kind == DividerJointSpanKind.EndInset
-                        && isLastSpan && nextStartsSmooth;
-                    var nextStartsWithEndInset = isLastSpan
-                        && span.Kind == DividerJointSpanKind.EndInset
-                        && spans[nextEdgeIndex].Count > 0
-                        && spans[nextEdgeIndex][0].Kind == DividerJointSpanKind.EndInset;
-
-                    if (!skipLeadingInset && !skipInwardDip)
-                    {
-                        p = JointGeometry.Move(p, inward, t);
-                        segments.Add(new LineSegment(p));
-                    }
-                    else if (skipLeadingInset)
-                    {
-                        skipLeadingInset = false;
-                    }
-
-                    var spanLength = span.Length;
-                    if (spanLength > 0)
-                    {
-                        p = JointGeometry.Move(p, along, spanLength);
-                        segments.Add(new LineSegment(p));
-                    }
-
-                    if (nextStartsWithEndInset)
-                    {
-                        var nextInward = JointGeometry.InwardCcw[nextEdgeIndex];
-                        p = JointGeometry.Move(p, nextInward, t);
-                        segments.Add(new LineSegment(p));
-                        p = JointGeometry.Move(p, inward, -t);
-                        segments.Add(new LineSegment(p));
-                        skipLeadingInset = true;
-                    }
-                    else if (!skipOutwardReturn)
-                    {
-                        p = JointGeometry.Move(p, inward, -t);
-                        segments.Add(new LineSegment(p));
-                    }
-
-                    continue;
-                }
-
-                p = JointGeometry.Move(p, along, span.Length);
-                segments.Add(new LineSegment(p));
+                    builder.SubtractEdgeNotch(edgeIndex, cursor, span.Length, t);
+                cursor += span.Length;
             }
         }
 
-        var (path, bbMin, bbMax, translation) = KerfOffset.OffsetOutwardAndTranslate(start, segments, settings.Kerf);
+        var polygon = builder.Build();
+        var (path, bbMin, bbMax, translation) = KerfOffset.OffsetOutwardAndTranslate(polygon, settings.Kerf);
         var interiorCuts = dividerSlots
             .Select(slot => CutoutBuilder.BuildSlotRectangle(slot, settings.Kerf, translation))
             .ToArray();
@@ -1407,19 +1233,8 @@ public sealed class CuttingPipeline
         var (panelU, panelV) = FaceLayout.PanelSize(face, dims);
         var t = settings.MaterialThickness;
         var ccw = FaceLayout.EdgesCcw(face);
+        double[] edgeLengths = { panelU, panelV, panelU, panelV };
 
-        var corners = new[]
-        {
-            new Vec2(0, 0),
-            new Vec2(panelU, 0),
-            new Vec2(panelU, panelV),
-            new Vec2(0, panelV),
-        };
-
-        // For each panel corner (cube vertex), determine whether this face is the
-        // lowest-priority of the 3 faces that meet there. The lowest face owns the
-        // corner cube; the other two need a t×t notch cut at this corner so the
-        // owning face's tab can pass through.
         var cornerOwned = new bool[4];
         for (var i = 0; i < 4; i++)
         {
@@ -1428,80 +1243,40 @@ public sealed class CuttingPipeline
             cornerOwned[i] = OwnsCorner(face, prevNeighbor, nextNeighbor, openFaces);
         }
 
-        // Path starts at the inner-end of the last edge (= the point where the path
-        // first arrives at corner 0 from edge 3, before the corner geometry is drawn).
-        bool EdgeStartsInset(FaceEdgeMap edgeMap, int cornerIndex)
-        {
-            if (openFaces.Contains(edgeMap.Neighbor) || cornerOwned[cornerIndex]) return false;
-            var shared = edges[SharedEdgeTable.Id(edgeMap.Face, edgeMap.Neighbor)];
-            return JointGeometry.StartsWithNeighborBlock(edgeMap, shared);
-        }
+        var builder = new PanelShapeBuilder(panelU, panelV);
 
-        bool EdgeEndsInset(FaceEdgeMap edgeMap, int nextCornerIndex)
-        {
-            if (openFaces.Contains(edgeMap.Neighbor) || cornerOwned[nextCornerIndex]) return false;
-            var shared = edges[SharedEdgeTable.Id(edgeMap.Face, edgeMap.Neighbor)];
-            return JointGeometry.EndsWithNeighborBlock(edgeMap, shared);
-        }
-
-        var startAlong = JointGeometry.AlongCcw[3];
-        var startPath = JointGeometry.Move(corners[0], startAlong, -t);
-        if (EdgeEndsInset(ccw[3], 0))
-        {
-            startPath = JointGeometry.Move(startPath, JointGeometry.AlongCcw[0], t);
-        }
-
-        var segments = new List<LineSegment>();
+        // Corner notches at each non-owned corner: subtract a t×t square shared between
+        // the two edges meeting at that corner.
         for (var i = 0; i < 4; i++)
         {
-            var corner = corners[i];
-            var nextCorner = corners[(i + 1) % 4];
-            var along = JointGeometry.AlongCcw[i];
-            var prevAlong = JointGeometry.AlongCcw[(i + 3) % 4];
+            if (cornerOwned[i]) continue;
+            var prevI = (i + 3) % 4;
+            builder.SubtractEdgeNotch(prevI, edgeLengths[prevI] - t, t, t);
+            builder.SubtractEdgeNotch(i, 0, t, t);
+        }
 
-            var innerStart = JointGeometry.Move(corner, along, t);
-            var innerEnd = JointGeometry.Move(nextCorner, along, -t);
-
-            // Corner geometry at corner i (between edge i-1 and edge i).
-            if (cornerOwned[i])
-            {
-                // Path goes through the panel corner: inner-end-of-prev → corner → inner-start-of-next.
-                segments.Add(new LineSegment(corner));
-            }
-            else
-            {
-                // t×t notch: path detours around the corner cut.
-                var notchInner = JointGeometry.Move(JointGeometry.Move(corner, prevAlong, -t), along, t);
-                if (!EdgeEndsInset(ccw[(i + 3) % 4], i))
-                {
-                    segments.Add(new LineSegment(notchInner));
-                }
-            }
-            if (!EdgeStartsInset(ccw[i], i))
-            {
-                segments.Add(new LineSegment(innerStart));
-            }
-
-            // Edge i emission (over the inner region).
+        // Finger notches: for each edge, subtract the blocks owned by the neighbour face.
+        for (var i = 0; i < 4; i++)
+        {
             var edgeMap = ccw[i];
-            if (openFaces.Contains(edgeMap.Neighbor))
+            if (openFaces.Contains(edgeMap.Neighbor)) continue;
+
+            var shared = edges[SharedEdgeTable.Id(edgeMap.Face, edgeMap.Neighbor)];
+            var ordered = edgeMap.ForwardAlongShared
+                ? shared.Blocks
+                : shared.Blocks.Reverse().ToList();
+
+            var cursor = t; // inner region starts t from the CCW-start corner
+            foreach (var block in ordered)
             {
-                segments.Add(new LineSegment(innerEnd));
-            }
-            else
-            {
-                var shared = edges[SharedEdgeTable.Id(edgeMap.Face, edgeMap.Neighbor)];
-                var omitLeadingInset = !cornerOwned[i] && JointGeometry.StartsWithNeighborBlock(edgeMap, shared);
-                var omitTrailingReturn = !cornerOwned[(i + 1) % 4];
-                var edgeStart = omitLeadingInset
-                    ? JointGeometry.Move(JointGeometry.Move(corner, prevAlong, -t), along, t)
-                    : innerStart;
-                var emitted = JointGeometry.EmitEdge(edgeMap, shared, i, t, edgeStart, omitLeadingInset, omitTrailingReturn);
-                segments.AddRange(emitted);
+                if (block.Owner != face)
+                    builder.SubtractEdgeNotch(i, cursor, block.Length, t);
+                cursor += block.Length;
             }
         }
 
-        var (path, bbMin, bbMax, translation) = KerfOffset.OffsetOutwardAndTranslate(startPath, segments, settings.Kerf);
+        var polygon = builder.Build();
+        var (path, bbMin, bbMax, translation) = KerfOffset.OffsetOutwardAndTranslate(polygon, settings.Kerf);
 
         var interiorCuts = new List<CuttablePath>();
         foreach (var feature in features)
