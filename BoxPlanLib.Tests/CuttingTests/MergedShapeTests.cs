@@ -278,6 +278,46 @@ public class MergedShapeTests
     }
 
     [Fact]
+    public void Staircase_front_finger_notch_extends_to_reflex_corner()
+    {
+        // At the staircase's reflex 2D corners (20,10) and (10,20) on the
+        // front face, no corner cube exists for the perpendicular faces to
+        // share. The previous bug reserved t at every shared-segment end
+        // unconditionally, leaving an unfinished 3mm gap of unjointed edge
+        // adjacent to each reflex corner. The finger pattern should run all
+        // the way to the corner.
+        var plan = ParseOk("""
+            shapes:
+              - id: "lower"
+                type: "box"
+                dimensions: [30.0, 10.0, 10.0]
+                location: [0.0, 0.0, 0.0]
+              - id: "middle"
+                type: "box"
+                dimensions: [20.0, 10.0, 10.0]
+                location: [0.0, 10.0, 0.0]
+              - id: "upper"
+                type: "box"
+                dimensions: [10.0, 10.0, 10.0]
+                location: [0.0, 20.0, 0.0]
+            """);
+
+        var lib = new BoxPlanLib();
+        var pieces = lib.GetCuttableShapes(plan, Settings(kerf: 0.0, t: 3.0, s: 5.0));
+        var front = pieces.Single(p => p.Id.StartsWith("merged-0.z-@"));
+        var pts = Points(front);
+
+        // Outline should include a vertex at exactly the reflex 2D corner
+        // x=20, y=7 (i.e. the inner corner of the notch reaching from
+        // x=27 down to x=20 on the y=10 edge). With the bug the inner
+        // corner stopped at x=23, leaving 3mm of un-notched edge.
+        Assert.Contains(pts, p => Math.Abs(p.X - 20) < 1e-6 && Math.Abs(p.Y - 7) < 1e-6);
+        // Same on the y=20 edge between middle and upper steps: notch
+        // reaches the reflex corner at (10, 20).
+        Assert.Contains(pts, p => Math.Abs(p.X - 10) < 1e-6 && Math.Abs(p.Y - 17) < 1e-6);
+    }
+
+    [Fact]
     public void Mergeable_check_skips_box_with_open_face()
     {
         // Two stacked boxes but the lower has an open top face.

@@ -79,6 +79,31 @@ internal sealed class PolygonPanelShapeBuilder
 
         if (best is null || bestArea <= Eps) return new List<Vec2>();
 
-        return best.Select(p => new Vec2(p.x, p.y)).ToList();
+        return RemoveCollinearVertices(best.Select(p => new Vec2(p.x, p.y)).ToList());
+    }
+
+    // Clipper2 may leave collinear vertices at the boundary between adjacent
+    // notch clip rectangles or where a notch flattens an originally reflex
+    // polygon corner into a straight edge. Strip them so KerfOffset's miter
+    // logic doesn't shift the false vertex.
+    private static List<Vec2> RemoveCollinearVertices(IReadOnlyList<Vec2> polygon)
+    {
+        const double SimplifyEps = 1e-6;
+        var result = new List<Vec2>(polygon.Count);
+        var n = polygon.Count;
+        for (var i = 0; i < n; i++)
+        {
+            var prev = polygon[(i + n - 1) % n];
+            var curr = polygon[i];
+            var next = polygon[(i + 1) % n];
+            var ax = curr.X - prev.X;
+            var ay = curr.Y - prev.Y;
+            var bx = next.X - curr.X;
+            var by = next.Y - curr.Y;
+            var cross = ax * by - ay * bx;
+            var dot = ax * bx + ay * by;
+            if (Math.Abs(cross) > SimplifyEps || dot <= 0) result.Add(curr);
+        }
+        return result;
     }
 }
