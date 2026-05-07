@@ -236,6 +236,48 @@ public class MergedShapeTests
     }
 
     [Fact]
+    public void Staircase_front_left_edge_has_continuous_finger_pattern()
+    {
+        // Three stacked boxes meet on x=0 across the full 30mm height of the
+        // front face. Clipper preserves collinear vertices in unioned polygons
+        // by default, so without merging these the left edge would be three
+        // 10mm sub-segments — each with t-reservation eating most of the
+        // edge, producing a degenerate single-block joint with no notches on
+        // the front face. With collinear-merge we expect a continuous
+        // multi-block finger pattern: the front (lower-priority) face must
+        // surface alternating inward jogs along its left edge.
+        var plan = ParseOk("""
+            shapes:
+              - id: "lower"
+                type: "box"
+                dimensions: [30.0, 10.0, 10.0]
+                location: [0.0, 0.0, 0.0]
+              - id: "middle"
+                type: "box"
+                dimensions: [20.0, 10.0, 10.0]
+                location: [0.0, 10.0, 0.0]
+              - id: "upper"
+                type: "box"
+                dimensions: [10.0, 10.0, 10.0]
+                location: [0.0, 20.0, 0.0]
+            """);
+
+        var lib = new BoxPlanLib();
+        var pieces = lib.GetCuttableShapes(plan, Settings(kerf: 0.0, t: 3.0, s: 5.0));
+        var front = pieces.Single(p => p.Id.StartsWith("merged-0.z-@"));
+        var pts = Points(front);
+
+        // Inward-jog vertices along the left edge (x=0): with proper merging
+        // the multi-block finger pattern produces at least 4 such vertices
+        // (a pair per inward notch). A degenerate single-segment-per-box
+        // path would have zero — the edge would run straight from (0,0) up
+        // to (0,30).
+        var leftJogVertices = pts.Count(p => p.X > 1e-6 && p.X < 5 && p.Y > 5 && p.Y < 25);
+        Assert.True(leftJogVertices >= 4,
+            $"expected merged staircase front-face left edge to carry ≥4 inward-jog vertices, got {leftJogVertices}");
+    }
+
+    [Fact]
     public void Mergeable_check_skips_box_with_open_face()
     {
         // Two stacked boxes but the lower has an open top face.
