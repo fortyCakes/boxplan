@@ -318,6 +318,66 @@ public class MergedShapeTests
     }
 
     [Fact]
+    public void Staircase_tread_has_inner_corner_notches_where_front_back_face_is_reflex()
+    {
+        // At the inner step corners of the staircase the front and back faces
+        // have REFLEX vertices. Their material wraps around the corner and
+        // physically fills the t×t×t cube that sits at that vertex. Both
+        // the tread and the adjacent step-side panel must therefore subtract
+        // a t×t notch from that corner, regardless of face-priority order.
+        //
+        // Staircase geometry (t=3, s=1000 suppresses finger jointing):
+        //   lower  30×10×10 at y=0
+        //   middle 20×10×10 at y=10
+        //   upper  10×10×10 at y=20
+        //
+        // The first tread sits at y=10 (x:[20,30], z:[0,10]) and the second
+        // at y=20 (x:[10,20], z:[0,10]). Each has one inner edge (at x=20
+        // and x=10 respectively) with two corners where a reflex face (front
+        // or back) neighbour fills the corner cube. Without the fix those
+        // treads are emitted as plain 4-vertex rectangles. With the fix each
+        // inner corner gains a t×t L-cut, adding 2 extra vertices per corner
+        // (4 extra total) → 8 vertices per tread.
+        //
+        // The upper tread (x:[0,10], y=30) has no inner step corner; the
+        // front and back faces are convex at all four of its corners, so the
+        // standard priority rule applies and Top owns — it stays a plain
+        // 4-vertex rectangle.
+        var plan = ParseOk("""
+            shapes:
+              - id: "lower"
+                type: "box"
+                dimensions: [30.0, 10.0, 10.0]
+                location: [0.0, 0.0, 0.0]
+              - id: "middle"
+                type: "box"
+                dimensions: [20.0, 10.0, 10.0]
+                location: [0.0, 10.0, 0.0]
+              - id: "upper"
+                type: "box"
+                dimensions: [10.0, 10.0, 10.0]
+                location: [0.0, 20.0, 0.0]
+            """);
+
+        var lib = new BoxPlanLib();
+        // Large s suppresses finger joints, leaving only corner notches visible.
+        var pieces = lib.GetCuttableShapes(plan, Settings(kerf: 0.0, t: 3.0, s: 1000.0));
+
+        var treads = pieces.Where(p => p.Id.StartsWith("merged-0.y+@")).ToList();
+        Assert.Equal(3, treads.Count);
+
+        var uniqueVertexCounts = treads
+            .Select(t => Points(t).GroupBy(p => (Math.Round(p.X, 3), Math.Round(p.Y, 3))).Count())
+            .OrderBy(c => c)
+            .ToList();
+
+        // Exactly one tread is a plain rectangle (4 vertices) — the uppermost,
+        // whose front/back neighbours are convex at all its corners.
+        // The other two each carry two t×t inner-corner notches (8 vertices).
+        Assert.Equal([4, 8, 8], uniqueVertexCounts);
+    }
+
+    [Fact]
     public void Mergeable_check_skips_box_with_open_face()
     {
         // Two stacked boxes but the lower has an open top face.

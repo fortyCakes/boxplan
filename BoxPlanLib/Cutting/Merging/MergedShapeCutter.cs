@@ -75,6 +75,11 @@ internal static class MergedShapeCutter
             // (this one + the two neighbours touching the vertex) share a
             // t×t corner cube. The lowest-priority face owns it; the others
             // subtract a notch.
+            //
+            // Special case – convex-to-reflex: when one of the neighbours has a
+            // REFLEX vertex at the same 3D world point its material naturally
+            // wraps around the inner corner and fills the cube. Both convex faces
+            // must then subtract a notch regardless of priority order.
             for (var vi = 0; vi < n; vi++)
             {
                 var prevEdge = (vi + n - 1) % n;
@@ -86,15 +91,30 @@ internal static class MergedShapeCutter
 
                 // Sub-segments touching this vertex: the LAST of prev edge
                 // (its end is at the corner) and the FIRST of next edge.
-                var prevSeg = prevSegs.Last(seg => Math.Abs(seg.Start + seg.Length - prevEdgeLength) < Eps);
-                var nextSeg = nextSegs.First(seg => Math.Abs(seg.Start) < Eps);
+                var prevSeg = prevSegs.LastOrDefault(seg => Math.Abs(seg.Start + seg.Length - prevEdgeLength) < Eps);
+                var nextSeg = nextSegs.FirstOrDefault(seg => Math.Abs(seg.Start) < Eps);
+                if (prevSeg is null || nextSeg is null) continue;
 
                 if (!IsConvex(face.Outline, vi)) continue;
 
-                var prevName = prevSeg.NeighbourDirection.ToFaceName();
-                var nextName = nextSeg.NeighbourDirection.ToFaceName();
-                var p = FacePriority.Of(faceName);
-                var owns = FacePriority.Of(prevName) >= p && FacePriority.Of(nextName) >= p;
+                // If either neighbour face is REFLEX at this world vertex its material
+                // fills the corner cube; this convex face must give up a notch.
+                var worldVertex = face.ToWorld(face.Outline[vi]);
+                var prevNeighbourReflex = FaceIsReflexAt(faces[prevSeg.NeighbourFaceIndex], worldVertex);
+                var nextNeighbourReflex = FaceIsReflexAt(faces[nextSeg.NeighbourFaceIndex], worldVertex);
+
+                bool owns;
+                if (prevNeighbourReflex || nextNeighbourReflex)
+                {
+                    owns = false; // reflex neighbour's material fills the cube; this face does not own it
+                }
+                else
+                {
+                    var prevName = prevSeg.NeighbourDirection.ToFaceName();
+                    var nextName = nextSeg.NeighbourDirection.ToFaceName();
+                    var p = FacePriority.Of(faceName);
+                    owns = FacePriority.Of(prevName) >= p && FacePriority.Of(nextName) >= p;
+                }
                 if (owns) continue;
 
                 builder.SubtractEdgeNotch(prevEdge, prevEdgeLength - t, t, t);
@@ -153,5 +173,24 @@ internal static class MergedShapeCutter
         var by = next.Y - curr.Y;
         var cross = ax * by - ay * bx;
         return cross < -Eps;
+    }
+
+    // Returns true if the given face has a REFLEX vertex at the specified 3D world point.
+    // A reflex vertex means the face material naturally wraps around the inner corner and
+    // physically occupies the corner-cube volume — both convex neighbours must yield notches.
+    private static bool FaceIsReflexAt(MergedFace face, Vec3 worldPt)
+    {
+        var n = face.Outline.Count;
+        for (var vi = 0; vi < n; vi++)
+        {
+            var wp = face.ToWorld(face.Outline[vi]);
+            if (Math.Abs(wp.X - worldPt.X) < Eps &&
+                Math.Abs(wp.Y - worldPt.Y) < Eps &&
+                Math.Abs(wp.Z - worldPt.Z) < Eps)
+            {
+                return IsReflex(face.Outline, vi);
+            }
+        }
+        return false;
     }
 }
