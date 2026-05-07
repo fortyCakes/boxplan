@@ -1,0 +1,10 @@
+shapes:
+  - id: "middle"
+    type: "box"
+    dimensions: [80.0, 40.0, 40.0]
+    location: [0.0, 0.0, 0.0]
+
+  - id: "upper"
+    type: "box"
+    dimensions: [40.0, 40.0, 40.0]
+    location: [0.0, 40.0, 0.0]

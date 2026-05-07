@@ -399,10 +399,21 @@ public class MergedShapeTests
         var lib = new BoxPlanLib();
         var pieces = lib.GetCuttableShapes(plan, Settings(kerf: 0.0, t: 3.0, s: 5.0));
 
-        // In staircase ordering by X+ plane position, the second-to-last right
-        // face is at x=50.8 and the last is at x=71.2.
-        var secondToLast = pieces.Single(p => p.Id.StartsWith("merged-0.x+@50.8"));
-        var last = pieces.Single(p => p.Id.StartsWith("merged-0.x+@71.2"));
+        var rightFaces = pieces
+          .Where(p => p.Id.StartsWith("merged-0.x+@"))
+          .Select(p => new
+          {
+            Piece = p,
+            Plane = double.Parse(
+              p.Id.Split('@')[1].Split('#')[0],
+              System.Globalization.CultureInfo.InvariantCulture),
+          })
+          .OrderBy(x => x.Plane)
+          .ToList();
+
+        Assert.True(rightFaces.Count >= 2);
+        var secondToLast = rightFaces[^2].Piece;
+        var last = rightFaces[^1].Piece;
 
         var secondToLastWidth = secondToLast.BoundingBoxMax.X - secondToLast.BoundingBoxMin.X;
         var lastWidth = last.BoundingBoxMax.X - last.BoundingBoxMin.X;

@@ -11,6 +11,7 @@ internal sealed class SvgGenerator
     private const string OutlineColor = "red";
     private const string InteriorColor = "blue";
     private const string EngravingColor = "black";
+    private const string LabelColor = "green";
     private const string PageOutlineColor = "green";
 
     public string GenerateSimpleSvg(BoxPlanCuttableShape[] shapes, BoxPlanSettings settings)
@@ -51,6 +52,7 @@ internal sealed class SvgGenerator
             EmitPath(sb, s.Outline, s.BoundingBoxMin, OutlineColor);
             foreach (var p in s.InteriorCuts) EmitPath(sb, p, s.BoundingBoxMin, InteriorColor);
             foreach (var p in s.Engravings) EmitPath(sb, p, s.BoundingBoxMin, EngravingColor);
+                        if (settings.Labels) EmitLabel(sb, s);
             sb.Append("</g>");
             xCursor += widths[i] + settings.Spacing;
         }
@@ -113,6 +115,7 @@ internal sealed class SvgGenerator
                 EmitPath(sb, placement.Shape.Outline, placement.Shape.BoundingBoxMin, OutlineColor);
                 foreach (var path in placement.Shape.InteriorCuts) EmitPath(sb, path, placement.Shape.BoundingBoxMin, InteriorColor);
                 foreach (var path in placement.Shape.Engravings) EmitPath(sb, path, placement.Shape.BoundingBoxMin, EngravingColor);
+                if (settings.Labels) EmitLabel(sb, placement.Shape);
                 sb.Append("</g>");
             }
 
@@ -299,6 +302,48 @@ internal sealed class SvgGenerator
     private static double Width(BoxPlanCuttableShape shape) => shape.BoundingBoxMax.X - shape.BoundingBoxMin.X;
 
     private static double Height(BoxPlanCuttableShape shape) => shape.BoundingBoxMax.Y - shape.BoundingBoxMin.Y;
+
+    private static void EmitLabel(StringBuilder sb, BoxPlanCuttableShape shape)
+    {
+        var width = Width(shape);
+        var height = Height(shape);
+        if (width <= 1e-6 || height <= 1e-6)
+        {
+            return;
+        }
+
+        var label = shape.Id;
+        if (string.IsNullOrWhiteSpace(label))
+        {
+            return;
+        }
+
+        var fontSize = ComputeLabelFontSize(width, height, label);
+        if (fontSize < 1.0)
+        {
+            return;
+        }
+
+        var cx = width * 0.5;
+        var cy = height * 0.5;
+        sb.Append("<g transform=\"translate(")
+          .Append(F(cx)).Append(' ').Append(F(cy))
+          .Append(") scale(1 -1)\">");
+        sb.Append("<text x=\"0\" y=\"0\" fill=\"").Append(LabelColor)
+          .Append("\" text-anchor=\"middle\" dominant-baseline=\"middle\" font-size=\"")
+          .Append(F(fontSize)).Append("\" font-family=\"sans-serif\">")
+          .Append(Escape(label)).Append("</text>");
+        sb.Append("</g>");
+    }
+
+    private static double ComputeLabelFontSize(double width, double height, string label)
+    {
+        var count = Math.Max(1, label.Length);
+        var widthLimit = width * 0.85;
+        var heightLimit = height * 0.45;
+        var byWidth = widthLimit / (0.6 * count);
+        return Math.Min(byWidth, heightLimit);
+    }
 
     private static void EmitPath(StringBuilder sb, CuttablePath path, Vec2 origin, string color)
     {

@@ -10,6 +10,7 @@ public class BoxPlanSettings
     public double FingerJointSize { get; set; } 
     public double Spacing { get; set; }
     public bool Debug { get; set; }
+    public bool Labels { get; set; }
 
     public BoxPlanSettings Default => new BoxPlanSettings
     {
@@ -21,5 +22,6 @@ public class BoxPlanSettings
         FingerJointSize = 5.0,
         Spacing = 5.0,
         Debug = false,
+        Labels = false,
     };
 }

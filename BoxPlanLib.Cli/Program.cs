@@ -10,7 +10,8 @@ var settings = new BoxPlanSettings
     MaterialThickness = 3.0,
     FingerJointSize = 5.0,
     Spacing = 1.0,
-    Debug = true
+    Debug = true,
+    Labels = false
 };
 
 if (args.Length == 0)

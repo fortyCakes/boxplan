@@ -25,7 +25,8 @@ internal static class MergedShapeCutter
         {
             var face = faces[fi];
             var faceName = face.Direction.ToFaceName();
-            var builder = new Cutting.PolygonPanelShapeBuilder(face.Outline, logger);
+            var panelOutline = GrowBasePanelOutline(face, faces, t);
+            var builder = new Cutting.PolygonPanelShapeBuilder(panelOutline, logger);
             var n = face.Outline.Count;
 
             // Group shared segments by edge index, sorted by start position.
@@ -34,20 +35,6 @@ internal static class MergedShapeCutter
                 .ToDictionary(g => g.Key, g => g.OrderBy(x => x.Start).ToList());
 
             var cornerOwnership = ComputeCornerOwnership(face, faces, byEdge, faceName);
-
-            // Concave edge joints are interior to the model. The mating tab must
-            // extend outside this face outline by t so the cut part has the
-            // required physical extent.
-            foreach (var (edgeIndex, segs) in byEdge)
-            {
-                foreach (var seg in segs)
-                {
-                    if (faceName != FaceName.Top && IsConcaveSharedSegment(face, seg, faces))
-                    {
-                        builder.AddEdgeExtension(edgeIndex, seg.Start, seg.Length, t);
-                    }
-                }
-            }
 
             // Subtract finger-joint notches owned by the neighbour face.
             // The standard joint pattern reserves t at each end of a shared
@@ -59,25 +46,36 @@ internal static class MergedShapeCutter
             foreach (var (edgeIndex, segs) in byEdge)
             {
                 var edgeLen = EdgeLength(face, edgeIndex);
+                var panelEdgeLen = EdgeLength(panelOutline, edgeIndex);
                 foreach (var seg in segs)
                 {
                     var neighbourName = seg.NeighbourDirection.ToFaceName();
                     var lowerName = FacePriority.Lower(faceName, neighbourName);
                     var thisIsLower = lowerName == faceName;
 
-                    var startAtVertex = seg.Start <= Eps;
-                    var endAtVertex = Math.Abs(seg.Start + seg.Length - edgeLen) <= Eps;
+                    var coversFullEdge = seg.Start <= Eps && Math.Abs(seg.Start + seg.Length - edgeLen) <= Eps;
+                    var mappedStart = coversFullEdge
+                        ? 0
+                        : MapDistanceToPanelEdge(face.Outline, panelOutline, edgeIndex, seg.Start);
+                    var mappedEnd = coversFullEdge
+                        ? panelEdgeLen
+                        : MapDistanceToPanelEdge(face.Outline, panelOutline, edgeIndex, seg.Start + seg.Length);
+                    var startAtVertex = mappedStart <= Eps;
+                    var endAtVertex = Math.Abs(mappedEnd - panelEdgeLen) <= Eps;
                     var startVertexIndex = edgeIndex;
                     var endVertexIndex = (edgeIndex + 1) % n;
-                    var reserveStart = startAtVertex && ShouldReserveCornerCube(face.Outline, cornerOwnership, startVertexIndex, faceName);
-                    var reserveEnd = endAtVertex && ShouldReserveCornerCube(face.Outline, cornerOwnership, endVertexIndex, faceName);
+                    var reserveStart = startAtVertex && ShouldReserveCornerCube(face.Outline, cornerOwnership, startVertexIndex);
+                    var reserveEnd = endAtVertex && ShouldReserveCornerCube(face.Outline, cornerOwnership, endVertexIndex);
 
                     var startInset = reserveStart ? t : 0;
                     var endInset = reserveEnd ? t : 0;
-                    var inner = Math.Max(0, seg.Length - startInset - endInset);
+                    var mappedLength = Math.Max(0, mappedEnd - mappedStart);
+                    var inner = Math.Max(0, mappedLength - startInset - endInset);
                     if (inner <= Eps) continue;
+
                     var blocks = FingerJointPattern.Build(inner, s, t, msg => logger?.Warn($"[merged {faceName}] {msg}"));
-                    var cursor = seg.Start + startInset;
+
+                    var cursor = mappedStart + startInset;
                     foreach (var block in blocks)
                     {
                         // PrimaryOwns blocks belong to the lower-priority face.
@@ -106,7 +104,7 @@ internal static class MergedShapeCutter
 
                 var prevEdge = (vi + n - 1) % n;
                 var nextEdge = vi;
-                var prevEdgeLength = EdgeLength(face, prevEdge);
+                var prevEdgeLength = EdgeLength(panelOutline, prevEdge);
                 builder.SubtractEdgeNotch(prevEdge, prevEdgeLength - t, t, t);
                 builder.SubtractEdgeNotch(nextEdge, 0, t, t);
             }
@@ -126,55 +124,6 @@ internal static class MergedShapeCutter
             });
             logger?.Log($"[merge] Emitted merged shape {face.Id}");
         }
-    }
-
-    private static bool IsConcaveSharedSegment(
-        MergedFace face,
-        SharedSegment seg,
-        IReadOnlyList<MergedFace> faces)
-    {
-        if (seg.Length <= Eps) return false;
-
-        var startWorld = PointAlongEdgeWorld(face, seg.EdgeIndex, seg.Start);
-        var endWorld = PointAlongEdgeWorld(face, seg.EdgeIndex, seg.Start + seg.Length);
-
-        var excludeA = seg.FaceIndex;
-        var excludeB = seg.NeighbourFaceIndex;
-        var startReflexFaces = GetOtherReflexFacesAt(faces, startWorld, excludeA, excludeB);
-        var endReflexFaces = GetOtherReflexFacesAt(faces, endWorld, excludeA, excludeB);
-        return startReflexFaces.Overlaps(endReflexFaces);
-    }
-
-    private static Vec3 PointAlongEdgeWorld(MergedFace face, int edgeIndex, double distanceAlong)
-    {
-        var n = face.Outline.Count;
-        var p0 = face.Outline[edgeIndex % n];
-        var p1 = face.Outline[(edgeIndex + 1) % n];
-        var dx = p1.X - p0.X;
-        var dy = p1.Y - p0.Y;
-        var len = Math.Sqrt(dx * dx + dy * dy);
-        if (len <= Eps) return face.ToWorld(p0);
-
-        var t = Math.Clamp(distanceAlong / len, 0, 1);
-        var u = p0.X + dx * t;
-        var v = p0.Y + dy * t;
-        return face.ToWorld(new Vec2(u, v));
-    }
-
-    private static HashSet<int> GetOtherReflexFacesAt(
-        IReadOnlyList<MergedFace> faces,
-        Vec3 worldPt,
-        int excludeFaceA,
-        int excludeFaceB)
-    {
-        var reflexFaces = new HashSet<int>();
-        for (var i = 0; i < faces.Count; i++)
-        {
-            if (i == excludeFaceA || i == excludeFaceB) continue;
-            if (FaceIsReflexAt(faces[i], worldPt)) reflexFaces.Add(i);
-        }
-
-        return reflexFaces;
     }
 
     // null => no corner-cube ownership available (missing adjacency data).
@@ -247,43 +196,106 @@ internal static class MergedShapeCutter
     private static bool ShouldReserveCornerCube(
         IReadOnlyList<Vec2> polygon,
         IReadOnlyList<bool?> cornerOwnership,
-        int vertexIndex,
-        FaceName faceName)
+        int vertexIndex)
     {
         if (IsReflex(polygon, vertexIndex))
         {
             return false;
         }
+        // Keep shared-edge end reservation symmetric between mating faces.
+        // Ownership affects corner-notch placement, not the edge inner span.
+        return true;
+    }
 
-        var owns = cornerOwnership[vertexIndex];
-        if (owns is bool ownsCorner)
+    // Apply base-size growth only to the emitted panel geometry for interior
+    // side faces (non-Y), without mutating the topological face graph used for shared
+    // edge and corner ownership calculations.
+    private static IReadOnlyList<Vec2> GrowBasePanelOutline(MergedFace face, IReadOnlyList<MergedFace> allFaces, double t)
+    {
+        if (t <= 0 || face.Direction.Axis == Axis.Y)
         {
-            if (!ownsCorner)
-            {
-                return true;
-            }
-
-            // The staircase run/rise issue shows up on front/back merged faces:
-            // allow owned convex tabs to run to the corner there.
-            if (faceName is FaceName.Front or FaceName.Back)
-            {
-                return false;
-            }
-
-            return true;
+            return face.Outline;
         }
 
-        return true;
+        if (!IsInteriorSideFace(face, allFaces))
+        {
+            return face.Outline;
+        }
+
+        const double eps = 1e-6;
+        var sign = face.Direction.Sign;
+        var minU = face.Outline.Min(p => p.X);
+        var maxU = face.Outline.Max(p => p.X);
+        return face.Outline
+            .Select(p =>
+            {
+                if (sign > 0 && Math.Abs(p.X - minU) <= eps) return new Vec2(p.X - t, p.Y);
+                if (sign < 0 && Math.Abs(p.X - maxU) <= eps) return new Vec2(p.X + t, p.Y);
+                return p;
+            })
+            .ToList();
+    }
+
+    private static bool IsInteriorSideFace(MergedFace face, IReadOnlyList<MergedFace> allFaces)
+    {
+        if (face.Direction.Axis == Axis.Y) return false;
+
+        const double eps = 1e-6;
+        var sign = face.Direction.Sign;
+        var axis = face.Direction.Axis;
+        var peers = allFaces
+            .Where(f => f.Direction.Axis == axis && f.Direction.Sign == sign)
+            .ToList();
+        if (peers.Count <= 1) return false;
+
+        return sign > 0
+            ? face.Plane < peers.Max(f => f.Plane) - eps
+            : face.Plane > peers.Min(f => f.Plane) + eps;
     }
 
     private static double EdgeLength(MergedFace face, int edgeIndex)
     {
-        var n = face.Outline.Count;
-        var p0 = face.Outline[edgeIndex];
-        var p1 = face.Outline[(edgeIndex + 1) % n];
+        return EdgeLength(face.Outline, edgeIndex);
+    }
+
+    private static double EdgeLength(IReadOnlyList<Vec2> polygon, int edgeIndex)
+    {
+        var n = polygon.Count;
+        var p0 = polygon[edgeIndex];
+        var p1 = polygon[(edgeIndex + 1) % n];
         var dx = p1.X - p0.X;
         var dy = p1.Y - p0.Y;
         return Math.Sqrt(dx * dx + dy * dy);
+    }
+
+    private static double MapDistanceToPanelEdge(
+        IReadOnlyList<Vec2> original,
+        IReadOnlyList<Vec2> panel,
+        int edgeIndex,
+        double originalDistance)
+    {
+        var n = original.Count;
+        var p0 = original[edgeIndex % n];
+        var p1 = original[(edgeIndex + 1) % n];
+        var g0 = panel[edgeIndex % n];
+        var g1 = panel[(edgeIndex + 1) % n];
+
+        var dx = p1.X - p0.X;
+        var dy = p1.Y - p0.Y;
+        var len = Math.Sqrt(dx * dx + dy * dy);
+        if (len <= Eps) return originalDistance;
+
+        var ex = dx / len;
+        var ey = dy / len;
+        var startShiftX = g0.X - p0.X;
+        var startShiftY = g0.Y - p0.Y;
+        var endShiftX = g1.X - p1.X;
+        var endShiftY = g1.Y - p1.Y;
+        var startShiftAlongEdge = startShiftX * ex + startShiftY * ey;
+        var endShiftAlongEdge = endShiftX * ex + endShiftY * ey;
+        var fraction = originalDistance / len;
+        var shiftAlongEdge = startShiftAlongEdge + ((endShiftAlongEdge - startShiftAlongEdge) * fraction);
+        return originalDistance + shiftAlongEdge;
     }
 
     private static bool IsConvex(IReadOnlyList<Vec2> polygon, int vi)

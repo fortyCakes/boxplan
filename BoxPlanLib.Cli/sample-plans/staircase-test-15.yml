@@ -1,0 +1,15 @@
+shapes:
+  - id: "lower"
+    type: "box"
+    dimensions: [71.2, 15.0, 25.4]
+    location: [0.0, 0.0, 0.0]
+
+  - id: "middle"
+    type: "box"
+    dimensions: [50.8, 15.0, 25.4]
+    location: [0.0, 15.0, 0.0]
+
+  - id: "upper"
+    type: "box"
+    dimensions: [25.4, 15.0, 25.4]
+    location: [0.0, 30.0, 0.0]

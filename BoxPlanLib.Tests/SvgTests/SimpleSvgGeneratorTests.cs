@@ -404,6 +404,122 @@ public class SimpleSvgGeneratorTests
         Assert.Equal(3.0, middleWidth - bottomWidth, 6);
     }
 
+    [Fact]
+    public void Staircase_layout_all_three_risers_have_20_points()
+    {
+        var lib = new BoxPlanLib();
+                var parsed = lib.ParsePlan(
+                        "shapes:\n" +
+                        "  - id: \"lower\"\n" +
+                        "    type: \"box\"\n" +
+                        "    dimensions: [71.2, 15.0, 25.4]\n" +
+                        "    location: [0.0, 0.0, 0.0]\n" +
+                        "\n" +
+                        "  - id: \"middle\"\n" +
+                        "    type: \"box\"\n" +
+                        "    dimensions: [50.8, 15.0, 25.4]\n" +
+                        "    location: [0.0, 15.0, 0.0]\n" +
+                        "\n" +
+                        "  - id: \"upper\"\n" +
+                        "    type: \"box\"\n" +
+                        "    dimensions: [25.4, 15.0, 25.4]\n" +
+                        "    location: [0.0, 30.0, 0.0]\n");
+                Assert.True(parsed.Success, string.Join("; ", parsed.Errors));
+                var plan = parsed.Value!;
+
+        var settings = new BoxPlanSettings
+        {
+            SheetWidth = 400,
+            SheetHeight = 400,
+            Margin = 5.0,
+            Kerf = 0.1,
+            MaterialThickness = 3.0,
+            FingerJointSize = 5.0,
+            Spacing = 1.0,
+        };
+
+        var pieces = lib.GetCuttableShapes(plan, settings);
+        var svg = lib.GeneratePagedSVG(pieces, settings);
+        var doc = XDocument.Parse(svg);
+
+        var risers = doc.Descendants(Svg + "g")
+            .Where(g => g.Attribute("id")?.Value.StartsWith("merged-0.x+@") == true)
+            .OrderBy(g => g.Attribute("id")!.Value)
+            .ToArray();
+
+        Assert.Equal(3, risers.Length);
+
+        var distinctCounts = risers
+            .Select(riser => riser.Descendants(Svg + "path").First().Attribute("d")!.Value)
+            .Select(d => ParsePathPoints(d)
+                .GroupBy(p => (Math.Round(p.X, 3), Math.Round(p.Y, 3)))
+                .Count())
+            .ToArray();
+
+        Assert.Equal(new[] { 20, 20, 20 }, distinctCounts);
+    }
+
+    [Fact]
+    public void Staircase_layout_middle_riser_bottom_tab_is_centered_in_grown_face()
+    {
+        var lib = new BoxPlanLib();
+        var plan = lib.ParsePlan("""
+            shapes:
+              - id: "lower"
+                type: "box"
+                dimensions: [71.2, 12.7, 25.4]
+                location: [0.0, 0.0, 0.0]
+
+              - id: "middle"
+                type: "box"
+                dimensions: [50.8, 12.7, 25.4]
+                location: [0.0, 12.7, 0.0]
+
+              - id: "upper"
+                type: "box"
+                dimensions: [25.4, 12.7, 25.4]
+                location: [0.0, 25.4, 0.0]
+            """).Value!;
+
+        var settings = new BoxPlanSettings
+        {
+            SheetWidth = 400,
+            SheetHeight = 400,
+            Margin = 5.0,
+            Kerf = 0.1,
+            MaterialThickness = 3.0,
+            FingerJointSize = 5.0,
+            Spacing = 1.0,
+        };
+
+        var pieces = lib.GetCuttableShapes(plan, settings);
+        var svg = lib.GeneratePagedSVG(pieces, settings);
+        var doc = XDocument.Parse(svg);
+
+        var middleRiser = doc.Descendants(Svg + "g")
+            .Single(g => g.Attribute("id")?.Value.StartsWith("merged-0.x+@50.8") == true);
+
+        var d = middleRiser.Descendants(Svg + "path").First().Attribute("d")!.Value;
+        var points = ParsePathPoints(d);
+        var minX = points.Min(p => p.X);
+        var maxX = points.Max(p => p.X);
+        var minY = points.Min(p => p.Y);
+
+        var bottomXs = points
+            .Where(p => Math.Abs(p.Y - minY) < 1e-6)
+            .Select(p => Math.Round(p.X, 3))
+            .Distinct()
+            .OrderBy(x => x)
+            .ToArray();
+
+        Assert.Equal(2, bottomXs.Length);
+
+        var tabCenter = (bottomXs[0] + bottomXs[1]) / 2.0;
+        var faceCenter = (minX + maxX) / 2.0;
+
+        Assert.Equal(faceCenter, tabCenter, 6);
+    }
+
     private static double LayoutXWidth(XElement pieceGroup)
     {
         var pageGroup = pieceGroup.Parent;
