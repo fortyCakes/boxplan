@@ -32,18 +32,34 @@ internal static class MergedShapeCutter
                 .ToDictionary(g => g.Key, g => g.OrderBy(x => x.Start).ToList());
 
             // Subtract finger-joint notches owned by the neighbour face.
+            // The standard joint pattern reserves t at each end of a shared
+                // segment for the perpendicular face's corner-cube to slot into.
+                // At a REFLEX 2D corner, however, no corner cube exists — the
+                // panel naturally extends into the corner — so no reservation
+                // is needed and the finger pattern should run all the way to
+                // the corner vertex.
             foreach (var (edgeIndex, segs) in byEdge)
             {
+                var edgeLen = EdgeLength(face, edgeIndex);
                 foreach (var seg in segs)
                 {
                     var neighbourName = seg.NeighbourDirection.ToFaceName();
                     var lowerName = FacePriority.Lower(faceName, neighbourName);
                     var thisIsLower = lowerName == faceName;
 
-                    var inner = Math.Max(0, seg.Length - 2 * t);
+                    var startAtVertex = seg.Start <= Eps;
+                    var endAtVertex = Math.Abs(seg.Start + seg.Length - edgeLen) <= Eps;
+                    var startVertexIndex = edgeIndex;
+                    var endVertexIndex = (edgeIndex + 1) % n;
+                    var reserveStart = !(startAtVertex && IsReflex(face.Outline, startVertexIndex));
+                    var reserveEnd = !(endAtVertex && IsReflex(face.Outline, endVertexIndex));
+
+                    var startInset = reserveStart ? t : 0;
+                    var endInset = reserveEnd ? t : 0;
+                    var inner = Math.Max(0, seg.Length - startInset - endInset);
                     if (inner <= Eps) continue;
                     var blocks = FingerJointPattern.Build(inner, s);
-                    var cursor = seg.Start + t;
+                    var cursor = seg.Start + startInset;
                     foreach (var block in blocks)
                     {
                         // PrimaryOwns blocks belong to the lower-priority face.
@@ -123,5 +139,19 @@ internal static class MergedShapeCutter
         var by = next.Y - curr.Y;
         var cross = ax * by - ay * bx;
         return cross > Eps;
+    }
+
+    private static bool IsReflex(IReadOnlyList<Vec2> polygon, int vi)
+    {
+        var n = polygon.Count;
+        var prev = polygon[(vi + n - 1) % n];
+        var curr = polygon[vi];
+        var next = polygon[(vi + 1) % n];
+        var ax = curr.X - prev.X;
+        var ay = curr.Y - prev.Y;
+        var bx = next.X - curr.X;
+        var by = next.Y - curr.Y;
+        var cross = ax * by - ay * bx;
+        return cross < -Eps;
     }
 }
