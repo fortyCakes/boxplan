@@ -13,9 +13,9 @@
   </ItemGroup>
 
   <ItemGroup>
-    <None Include="..\BoxPlanLib\sample-plans\*.yml"
-          Link="sample-plans\%(Filename)%(Extension)"
-          CopyToOutputDirectory="Always" />
+    <Content Include="..\BoxPlanLib\sample-plans\**\*.yml"
+             Link="sample-plans\%(RecursiveDir)%(Filename)%(Extension)"
+             CopyToOutputDirectory="Always" />
   </ItemGroup>
 
 </Project>

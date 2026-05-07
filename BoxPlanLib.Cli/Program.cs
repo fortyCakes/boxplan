@@ -15,7 +15,7 @@ var settings = new BoxPlanSettings
 
 if (args.Length == 0)
 {
-    var sampleDir = Path.Combine(AppContext.BaseDirectory, "sample-plans");
+    var sampleDir = ResolveSamplePlansDirectory();
     if (!Directory.Exists(sampleDir))
     {
         Console.Error.WriteLine($"Sample plans directory not found: {sampleDir}");
@@ -68,4 +68,27 @@ static bool ProcessPlan(BoxPlanLib.BoxPlanLib lib, BoxPlanSettings settings, str
     File.WriteAllText(outputPath, svg);
     Console.WriteLine($"Wrote paged SVG for {pieces.Length} pieces to {Path.GetFullPath(outputPath)}");
     return true;
+}
+
+static string ResolveSamplePlansDirectory()
+{
+    // Prefer copied content next to the executable, then search parent directories
+    // for either sample-plans or BoxPlanLib/sample-plans in source tree layouts.
+    var roots = new[] { AppContext.BaseDirectory, Directory.GetCurrentDirectory() }
+        .Where(d => !string.IsNullOrWhiteSpace(d))
+        .Distinct(StringComparer.OrdinalIgnoreCase);
+
+    foreach (var root in roots)
+    {
+        for (var dir = new DirectoryInfo(root); dir is not null; dir = dir.Parent)
+        {
+            var direct = Path.Combine(dir.FullName, "sample-plans");
+            if (Directory.Exists(direct)) return direct;
+
+            var repoStyle = Path.Combine(dir.FullName, "BoxPlanLib", "sample-plans");
+            if (Directory.Exists(repoStyle)) return repoStyle;
+        }
+    }
+
+    return Path.Combine(AppContext.BaseDirectory, "sample-plans");
 }
