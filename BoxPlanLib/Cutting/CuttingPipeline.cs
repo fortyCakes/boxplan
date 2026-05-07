@@ -7,6 +7,7 @@ public sealed class CuttingPipeline
 {
     public BoxPlanCuttableShape[] Run(BoxPlan plan, BoxPlanSettings settings)
     {
+        var logger = new PipelineLogger(settings.Debug);
         var output = new List<BoxPlanCuttableShape>();
         var insertTargets = CollectInsertTargets(plan);
         var groupCandidates = plan.Shapes
@@ -34,8 +35,8 @@ public sealed class CuttingPipeline
         {
             if (shape is not BoxShape box || box.Dimensions is not { } dims) continue;
             if (multiBoxIds.Contains(box.Id)) continue;
-            EmitShape(box.Id, box, dims, output, settings);
-            EmitInserts(box.Id, box, output, settings);
+            EmitShape(box.Id, box, dims, output, settings, logger);
+            EmitInserts(box.Id, box, output, settings, logger);
         }
         return output.ToArray();
     }
@@ -70,7 +71,8 @@ public sealed class CuttingPipeline
         Vec3 dims,
         IReadOnlySet<FaceName> openFaces,
         List<BoxPlanCuttableShape> output,
-        BoxPlanSettings settings)
+        BoxPlanSettings settings,
+        PipelineLogger logger)
     {
         var t = settings.MaterialThickness;
         for (var di = 0; di < parent.Dividers.Count; di++)
@@ -88,7 +90,8 @@ public sealed class CuttingPipeline
                     panelV,
                     edges,
                     dividerSlots,
-                    settings));
+                    settings,
+                    logger));
             }
         }
     }
@@ -138,7 +141,8 @@ public sealed class CuttingPipeline
         double v,
         IReadOnlyList<DividerEdgeSpec> edges,
         IReadOnlyList<SlotSpec> dividerSlots,
-        BoxPlanSettings settings)
+        BoxPlanSettings settings,
+        PipelineLogger logger)
     {
         var t = settings.MaterialThickness;
         var spans = new[]
@@ -149,8 +153,7 @@ public sealed class CuttingPipeline
             BuildDividerJointSpans(v, t, settings.FingerJointSize, edges[3].Joined, edges[3].DividerOwnsPrimary),
         };
 
-        if (settings.Debug)
-            LogDividerTabSizes(id, edges, spans);
+        LogDividerTabSizes(id, edges, spans, logger);
 
         var builder = new PanelShapeBuilder(u, v);
 
@@ -186,7 +189,8 @@ public sealed class CuttingPipeline
     private static void LogDividerTabSizes(
         string id,
         IReadOnlyList<DividerEdgeSpec> edges,
-        IReadOnlyList<DividerJointSpan>[] spans)
+        IReadOnlyList<DividerJointSpan>[] spans,
+        PipelineLogger logger)
     {
         for (var index = 0; index < spans.Length; index++)
         {
@@ -204,7 +208,7 @@ public sealed class CuttingPipeline
                 continue;
             }
 
-            Console.WriteLine(
+            logger.Log(
                 $"[divider-joint] {id} edge={edges[index].Face} tabs=[{string.Join(", ", tabSizes)}] slots=[{string.Join(", ", slotSizes)}]");
         }
     }
@@ -298,14 +302,15 @@ public sealed class CuttingPipeline
         string parentId,
         Shape parent,
         List<BoxPlanCuttableShape> output,
-        BoxPlanSettings settings)
+        BoxPlanSettings settings,
+        PipelineLogger logger)
     {
         for (var i = 0; i < parent.Inserts.Count; i++)
         {
             var insert = parent.Inserts[i];
             if (insert.Target is not BoxShape target || insert.ResolvedDimensions is not { } dims) continue;
             var idPrefix = $"{parentId}/{i}/{target.Id}";
-            EmitShape(idPrefix, target, dims, output, settings);
+            EmitShape(idPrefix, target, dims, output, settings, logger);
         }
     }
 
@@ -314,7 +319,8 @@ public sealed class CuttingPipeline
         BoxShape box,
         Vec3 dims,
         List<BoxPlanCuttableShape> output,
-        BoxPlanSettings settings)
+        BoxPlanSettings settings,
+        PipelineLogger logger)
     {
         var edges = SharedEdgeTable.Build(dims, settings);
         var openFaces = box.Faces.Where(f => f.Type == FaceType.Open).Select(f => f.Name).ToHashSet();
@@ -328,7 +334,7 @@ public sealed class CuttingPipeline
             output.Add(BuildFacePiece(idPrefix, face.Name, dims, edges, openFaces, faceFeatures, faceSlots, settings));
         }
 
-        EmitDividerPanels(idPrefix, box, dims, openFaces, output, settings);
+        EmitDividerPanels(idPrefix, box, dims, openFaces, output, settings, logger);
     }
 
     private static IReadOnlyDictionary<FaceName, IReadOnlyList<SlotSpec>> BuildSlotsByFace(

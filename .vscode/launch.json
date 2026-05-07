@@ -12,7 +12,8 @@
             "cwd": "${workspaceFolder}",
             "args": [],
             "console": "integratedTerminal",
-            "stopAtEntry": false
+            "stopAtEntry": false,
+            "preLaunchTask": "build BoxPlanLib.Cli"
         }
     ]
 }

@@ -1,0 +1,17 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "build BoxPlanLib.Cli",
+            "type": "process",
+            "command": "dotnet",
+            "args": ["build", "${workspaceFolder}/BoxPlanLib.Cli/BoxPlanLib.Cli.csproj"],
+            "group": "build",
+            "presentation": {
+                "reveal": "silent",
+                "panel": "shared"
+            },
+            "problemMatcher": "$msCompile"
+        }
+    ]
+}
