@@ -3,21 +3,21 @@
 # detects the contact areas, fuses the three boxes into a single solid, and
 # emits face panels with all internal contact regions culled.
 #
-# Lower step:  30 wide x 10 tall x 10 deep (mm), origin at (0,0,0)
-# Middle step: 20 wide x 10 tall x 10 deep, sitting on top of the lower
-# Upper step:  10 wide x 10 tall x 10 deep, sitting on top of the middle
+# Lower step:  300 wide x 100 tall x 100 deep (mm), origin at (0,0,0)
+# Middle step: 200 wide x 100 tall x 100 deep, sitting on top of the lower
+# Upper step:  100 wide x 100 tall x 100 deep, sitting on top of the middle
 shapes:
   - id: "lower"
     type: "box"
-    dimensions: [30.0, 10.0, 10.0]
+    dimensions: [71.2, 25.4, 25.4]
     location: [0.0, 0.0, 0.0]
 
   - id: "middle"
     type: "box"
-    dimensions: [20.0, 10.0, 10.0]
-    location: [0.0, 10.0, 0.0]
+    dimensions: [50.8, 25.4, 25.4]
+    location: [0.0, 25.4, 0.0]
 
   - id: "upper"
     type: "box"
-    dimensions: [10.0, 10.0, 10.0]
-    location: [0.0, 20.0, 0.0]
+    dimensions: [25.4, 25.4, 25.4]
+    location: [0.0, 50.8, 0.0]
