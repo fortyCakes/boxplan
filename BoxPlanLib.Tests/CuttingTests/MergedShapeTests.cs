@@ -1,0 +1,265 @@
+using BoxPlanLib;
+using BoxPlanLib.Model;
+
+namespace BoxPlanLib.Tests.CuttingTests;
+
+public class MergedShapeTests
+{
+    private static BoxPlan ParseOk(string yaml)
+    {
+        var lib = new BoxPlanLib();
+        var result = lib.ParsePlan(yaml);
+        Assert.True(result.Success, string.Join("; ", result.Errors));
+        return result.Value!;
+    }
+
+    private static BoxPlanSettings Settings(double kerf = 0.0, double t = 3.0, double s = 20.0) =>
+        new()
+        {
+            Kerf = kerf,
+            MaterialThickness = t,
+            FingerJointSize = s,
+            SheetWidth = 300,
+            SheetHeight = 300,
+        };
+
+    private static IReadOnlyList<Vec2> Points(BoxPlanCuttableShape shape)
+    {
+        var pts = new List<Vec2> { shape.Outline.Start };
+        foreach (var seg in shape.Outline.Segments)
+        {
+            if (seg is LineSegment ls) pts.Add(ls.To);
+            else throw new InvalidOperationException("Expected polyline outline.");
+        }
+        return pts;
+    }
+
+    [Fact]
+    public void Two_disjoint_cubes_remain_independent()
+    {
+        var plan = ParseOk("""
+            shapes:
+              - id: "a"
+                type: "box"
+                dimensions: [30.0, 30.0, 30.0]
+                location: [0.0, 0.0, 0.0]
+              - id: "b"
+                type: "box"
+                dimensions: [30.0, 30.0, 30.0]
+                location: [100.0, 0.0, 0.0]
+            """);
+
+        var lib = new BoxPlanLib();
+        var pieces = lib.GetCuttableShapes(plan, Settings());
+
+        var ids = pieces.Select(p => p.Id).ToHashSet();
+        // 6 per cube, totally separate.
+        Assert.Equal(12, pieces.Length);
+        Assert.Contains("a.top", ids);
+        Assert.Contains("b.top", ids);
+        Assert.DoesNotContain(ids, id => id.StartsWith("merged-"));
+    }
+
+    [Fact]
+    public void Two_stacked_equal_cubes_emit_six_merged_faces()
+    {
+        var plan = ParseOk("""
+            shapes:
+              - id: "lower"
+                type: "box"
+                dimensions: [30.0, 30.0, 30.0]
+                location: [0.0, 0.0, 0.0]
+              - id: "upper"
+                type: "box"
+                dimensions: [30.0, 30.0, 30.0]
+                location: [0.0, 30.0, 0.0]
+            """);
+
+        var lib = new BoxPlanLib();
+        var pieces = lib.GetCuttableShapes(plan, Settings());
+
+        // Two boxes touching on their y=30 plane fully cancel that contact area.
+        // The merged solid is one 30 x 60 x 30 prism: 6 outward face panels.
+        Assert.Equal(6, pieces.Length);
+        Assert.All(pieces, p => Assert.StartsWith("merged-0.", p.Id));
+    }
+
+    [Fact]
+    public void Two_side_by_side_cubes_emit_six_merged_faces()
+    {
+        var plan = ParseOk("""
+            shapes:
+              - id: "left"
+                type: "box"
+                dimensions: [30.0, 30.0, 30.0]
+                location: [0.0, 0.0, 0.0]
+              - id: "right"
+                type: "box"
+                dimensions: [30.0, 30.0, 30.0]
+                location: [30.0, 0.0, 0.0]
+            """);
+
+        var lib = new BoxPlanLib();
+        var pieces = lib.GetCuttableShapes(plan, Settings());
+
+        Assert.Equal(6, pieces.Length);
+        Assert.All(pieces, p => Assert.StartsWith("merged-0.", p.Id));
+    }
+
+    [Fact]
+    public void Staircase_emits_expected_face_count_and_outline_shape()
+    {
+        var plan = ParseOk("""
+            shapes:
+              - id: "lower"
+                type: "box"
+                dimensions: [30.0, 10.0, 10.0]
+                location: [0.0, 0.0, 0.0]
+              - id: "middle"
+                type: "box"
+                dimensions: [20.0, 10.0, 10.0]
+                location: [0.0, 10.0, 0.0]
+              - id: "upper"
+                type: "box"
+                dimensions: [10.0, 10.0, 10.0]
+                location: [0.0, 20.0, 0.0]
+            """);
+
+        var lib = new BoxPlanLib();
+        var pieces = lib.GetCuttableShapes(plan, Settings(kerf: 0.0, t: 3.0, s: 5.0));
+
+        // Expected merged faces:
+        //   1 bottom (30 x 10)
+        //   3 top treads at y=10, 20, 30 (each 10 x 10)
+        //   1 front (staircase polygon at z=0)
+        //   1 back  (staircase polygon at z=10)
+        //   1 left  (10 x 30 rectangle at x=0)
+        //   3 right faces (10 x 10 each at x=10, 20, 30)
+        Assert.Equal(10, pieces.Length);
+
+        var ids = pieces.Select(p => p.Id).ToList();
+        Assert.Single(ids, id => id.StartsWith("merged-0.y-@"));
+        Assert.Equal(3, ids.Count(id => id.StartsWith("merged-0.y+@")));
+        Assert.Single(ids, id => id.StartsWith("merged-0.z-@"));
+        Assert.Single(ids, id => id.StartsWith("merged-0.z+@"));
+        Assert.Single(ids, id => id.StartsWith("merged-0.x-@"));
+        Assert.Equal(3, ids.Count(id => id.StartsWith("merged-0.x+@")));
+    }
+
+    [Fact]
+    public void Staircase_front_face_has_reentrant_polygon_with_eight_distinct_vertices()
+    {
+        var plan = ParseOk("""
+            shapes:
+              - id: "lower"
+                type: "box"
+                dimensions: [30.0, 10.0, 10.0]
+                location: [0.0, 0.0, 0.0]
+              - id: "middle"
+                type: "box"
+                dimensions: [20.0, 10.0, 10.0]
+                location: [0.0, 10.0, 0.0]
+              - id: "upper"
+                type: "box"
+                dimensions: [10.0, 10.0, 10.0]
+                location: [0.0, 20.0, 0.0]
+            """);
+
+        var lib = new BoxPlanLib();
+        // Set s very large so finger jointing degenerates to the smooth edge case
+        // and we can inspect the raw staircase polygon corners.
+        var pieces = lib.GetCuttableShapes(plan, Settings(kerf: 0.0, t: 3.0, s: 1000.0));
+
+        // The two staircase polygons (front, back) have 8 90-degree corners.
+        // Pick the front (-Z) panel.
+        var front = pieces.Single(p => p.Id.StartsWith("merged-0.z-@"));
+        var pts = Points(front);
+
+        // Closed polyline: first point repeats at end. Distinct vertex positions:
+        var distinct = pts.GroupBy(p => (Math.Round(p.X, 3), Math.Round(p.Y, 3))).Count();
+        // The staircase shape has 8 corner positions when joints/notches are
+        // suppressed by an oversized finger size and zero kerf.
+        Assert.True(distinct >= 8, $"expected at least 8 distinct corners, got {distinct}");
+    }
+
+    [Fact]
+    public void Bottom_face_of_two_stacked_cubes_matches_box_footprint()
+    {
+        var plan = ParseOk("""
+            shapes:
+              - id: "lower"
+                type: "box"
+                dimensions: [30.0, 30.0, 30.0]
+                location: [0.0, 0.0, 0.0]
+              - id: "upper"
+                type: "box"
+                dimensions: [30.0, 30.0, 30.0]
+                location: [0.0, 30.0, 0.0]
+            """);
+
+        var lib = new BoxPlanLib();
+        var pieces = lib.GetCuttableShapes(plan, Settings(kerf: 0.0, t: 3.0, s: 1000.0));
+
+        var bottom = pieces.Single(p => p.Id.StartsWith("merged-0.y-@"));
+        Assert.Equal(30, bottom.BoundingBoxMax.X, 6);
+        Assert.Equal(30, bottom.BoundingBoxMax.Y, 6);
+    }
+
+    [Fact]
+    public void Side_face_of_two_stacked_cubes_spans_doubled_dimension()
+    {
+        var plan = ParseOk("""
+            shapes:
+              - id: "lower"
+                type: "box"
+                dimensions: [100.0, 100.0, 100.0]
+                location: [0.0, 0.0, 0.0]
+              - id: "upper"
+                type: "box"
+                dimensions: [100.0, 100.0, 100.0]
+                location: [0.0, 100.0, 0.0]
+            """);
+
+        var lib = new BoxPlanLib();
+        var pieces = lib.GetCuttableShapes(plan, Settings(kerf: 0.0, t: 3.0, s: 20.0));
+
+        // The +X (right) face of the merged 100x200x100 solid: with proper
+        // finger-jointing the panel outline reaches the full 200mm extent on
+        // its longer axis (the merged Y dimension).
+        var rightFace = pieces.Single(p => p.Id.StartsWith("merged-0.x+@"));
+        var width = rightFace.BoundingBoxMax.X - rightFace.BoundingBoxMin.X;
+        var height = rightFace.BoundingBoxMax.Y - rightFace.BoundingBoxMin.Y;
+        var longer = Math.Max(width, height);
+        var shorter = Math.Min(width, height);
+        Assert.Equal(200, longer, 0);
+        Assert.Equal(100, shorter, 0);
+    }
+
+    [Fact]
+    public void Mergeable_check_skips_box_with_open_face()
+    {
+        // Two stacked boxes but the lower has an open top face.
+        // Without merge eligibility, both boxes go through the per-box pipeline.
+        var plan = ParseOk("""
+            shapes:
+              - id: "lower"
+                type: "box"
+                dimensions: [30.0, 30.0, 30.0]
+                location: [0.0, 0.0, 0.0]
+                faces:
+                  - name: "top"
+                    type: "open"
+              - id: "upper"
+                type: "box"
+                dimensions: [30.0, 30.0, 30.0]
+                location: [0.0, 30.0, 0.0]
+            """);
+
+        var lib = new BoxPlanLib();
+        var pieces = lib.GetCuttableShapes(plan, Settings());
+        var ids = pieces.Select(p => p.Id).ToHashSet();
+        Assert.DoesNotContain(ids, id => id.StartsWith("merged-"));
+        Assert.Contains("lower.front", ids);
+        Assert.Contains("upper.bottom", ids);
+    }
+}

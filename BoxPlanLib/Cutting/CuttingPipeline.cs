@@ -1,3 +1,4 @@
+using BoxPlanLib.Cutting.Merging;
 using BoxPlanLib.Model;
 
 namespace BoxPlanLib.Cutting;
@@ -7,14 +8,61 @@ public sealed class CuttingPipeline
     public BoxPlanCuttableShape[] Run(BoxPlan plan, BoxPlanSettings settings)
     {
         var output = new List<BoxPlanCuttableShape>();
+        var insertTargets = CollectInsertTargets(plan);
+        var groupCandidates = plan.Shapes
+            .OfType<BoxShape>()
+            .Where(b => b.Dimensions is not null)
+            .Where(b => IsMergeCandidate(b) && !insertTargets.Contains(b.Id))
+            .ToList();
+        var candidateSet = new HashSet<string>(groupCandidates.Select(b => b.Id));
+
+        var groups = BoxGrouper.Compute(groupCandidates);
+        var multiBoxIds = new HashSet<string>(
+            groups.Where(g => g.Members.Count > 1).SelectMany(g => g.Members.Select(m => m.Box.Id)));
+
+        var groupIndex = 0;
+        foreach (var group in groups.Where(g => g.Members.Count > 1))
+        {
+            var groupId = $"merged-{groupIndex}";
+            var faces = MergedFacePolygons.Compute(group, groupId);
+            var shared = SharedEdgeGraph.Build(faces);
+            MergedShapeCutter.Emit(faces, shared, settings, output);
+            groupIndex++;
+        }
+
         foreach (var shape in plan.Shapes)
         {
             if (shape is not BoxShape box || box.Dimensions is not { } dims) continue;
+            if (multiBoxIds.Contains(box.Id)) continue;
             EmitShape(box.Id, box, dims, output, settings);
             EmitInserts(box.Id, box, output, settings);
         }
         return output.ToArray();
     }
+
+    private static HashSet<string> CollectInsertTargets(BoxPlan plan)
+    {
+        var ids = new HashSet<string>();
+        foreach (var shape in plan.Shapes)
+            CollectFromShape(shape, ids);
+        return ids;
+    }
+
+    private static void CollectFromShape(Shape shape, HashSet<string> ids)
+    {
+        foreach (var insert in shape.Inserts)
+        {
+            if (insert.Target is null) continue;
+            ids.Add(insert.Target.Id);
+            CollectFromShape(insert.Target, ids);
+        }
+    }
+
+    private static bool IsMergeCandidate(BoxShape box) =>
+        box.Dividers.Count == 0
+        && box.Inserts.Count == 0
+        && box.Features.Count == 0
+        && box.Faces.All(f => f.Type == FaceType.Closed);
 
     private static void EmitDividerPanels(
         string parentId,

@@ -1,4 +1,2 @@
-BoxPlanLib/bin/
-BoxPlanLib/obj/
-BoxPlanLibTests/bin/
-BoxPlanLibTests/obj/
+**/bin/
+**/obj/

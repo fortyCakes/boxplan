@@ -1,0 +1,84 @@
+using BoxPlanLib.Model;
+using Clipper2Lib;
+
+namespace BoxPlanLib.Cutting;
+
+// Like PanelShapeBuilder but for an arbitrary CCW polygon panel (e.g. an
+// L-shape produced by merging boxes). Notches are specified by which polygon
+// edge they sit on, the distance along that edge from its start vertex, the
+// notch length and depth into the panel interior.
+internal sealed class PolygonPanelShapeBuilder
+{
+    private const double Eps = 1e-9;
+    private const int ClipperPrecision = 8;
+
+    private readonly IReadOnlyList<Vec2> _polygon;
+    private readonly List<PathD> _notchClips = new();
+
+    public PolygonPanelShapeBuilder(IReadOnlyList<Vec2> polygon)
+    {
+        _polygon = polygon;
+    }
+
+    // edgeIndex: index of the polygon edge (i.e. segment from polygon[i] to polygon[i+1])
+    // start: distance from polygon[i] toward polygon[i+1]
+    // length: notch length along the edge
+    // depth: how far the notch extends inward (CCW left-normal direction)
+    public void SubtractEdgeNotch(int edgeIndex, double start, double length, double depth)
+    {
+        if (length <= Eps || depth <= Eps) return;
+        var n = _polygon.Count;
+        var p0 = _polygon[edgeIndex % n];
+        var p1 = _polygon[(edgeIndex + 1) % n];
+        var dx = p1.X - p0.X;
+        var dy = p1.Y - p0.Y;
+        var len = Math.Sqrt(dx * dx + dy * dy);
+        if (len < Eps) return;
+        var ex = dx / len;
+        var ey = dy / len;
+        // Left-normal of the edge — points into the interior for a CCW polygon.
+        var nx = -ey;
+        var ny = ex;
+
+        var aX = p0.X + ex * start;
+        var aY = p0.Y + ey * start;
+        var bX = p0.X + ex * (start + length);
+        var bY = p0.Y + ey * (start + length);
+
+        // Build clip rectangle CCW: a → b → b+depth*n → a+depth*n
+        _notchClips.Add(new PathD
+        {
+            new PointD(aX, aY),
+            new PointD(bX, bY),
+            new PointD(bX + nx * depth, bY + ny * depth),
+            new PointD(aX + nx * depth, aY + ny * depth),
+        });
+    }
+
+    public List<Vec2> Build()
+    {
+        var subjects = new PathsD
+        {
+            new PathD(_polygon.Select(p => new PointD(p.X, p.Y))),
+        };
+        var clips = new PathsD(_notchClips);
+
+        var solution = Clipper.Difference(subjects, clips, FillRule.NonZero, ClipperPrecision);
+
+        PathD? best = null;
+        var bestArea = double.NegativeInfinity;
+        foreach (var p in solution)
+        {
+            var a = Clipper.Area(p);
+            if (a > bestArea)
+            {
+                bestArea = a;
+                best = p;
+            }
+        }
+
+        if (best is null || bestArea <= Eps) return new List<Vec2>();
+
+        return best.Select(p => new Vec2(p.x, p.y)).ToList();
+    }
+}
