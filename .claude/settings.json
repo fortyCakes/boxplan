@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(find ~/.nuget/packages/yamldotnet -name \"*.dll\" 2>/dev/null | head -5)",
+      "Read(//c/Users/Alex.Stuart/.nuget/packages/yamldotnet/**)",
+      "Bash(Get-ChildItem -Path \"c:\\\\Users\\\\Alex.Stuart\\\\source\\\\repos\\\\boxplan\" -Directory)",
+      "Bash(Select-Object Name)",
+      "Bash(Get-ChildItem -Path \"c:\\\\Users\\\\Alex.Stuart\\\\source\\\\repos\\\\boxplan\" -Recurse -Directory)",
+      "Bash(Select-Object -First 30 FullName)",
+      "Bash(dotnet run *)",
+      "Bash(ls *)",
+      "Read(*)"
+    ]
+  }
+}

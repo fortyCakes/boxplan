@@ -50,7 +50,7 @@ public enum FitMode
     Cell,
 }
 
-public sealed class Plan
+public sealed class BoxPlan
 {
     public required IReadOnlyList<Shape> Shapes { get; init; }
     public required IReadOnlyDictionary<string, Shape> ShapesById { get; init; }
@@ -86,6 +86,8 @@ public sealed class Insert
 {
     public (int Col, int Row, int Layer)? Cell { get; init; }
     public Shape Target { get; internal set; } = null!;
+    public Vec3? ResolvedDimensions { get; internal set; }
+    public Vec3? ResolvedLocation { get; internal set; }
 }
 
 public abstract class Feature

@@ -1,0 +1,408 @@
+using System.Globalization;
+using System.Security;
+using System.Text;
+using BoxPlanLib.Model;
+
+namespace BoxPlanLib.Svg;
+
+internal sealed class SvgGenerator
+{
+    private const double StrokeWidthMm = 0.1;
+    private const string OutlineColor = "red";
+    private const string InteriorColor = "blue";
+    private const string EngravingColor = "black";
+    private const string PageOutlineColor = "green";
+
+    public string GenerateSimpleSvg(BoxPlanCuttableShape[] shapes, BoxPlanSettings settings)
+    {
+        if (shapes.Length == 0)
+        {
+            return "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"0mm\" height=\"0mm\" viewBox=\"0 0 0 0\"/>";
+        }
+
+        var widths = new double[shapes.Length];
+        var heights = new double[shapes.Length];
+        for (int i = 0; i < shapes.Length; i++)
+        {
+            widths[i] = shapes[i].BoundingBoxMax.X - shapes[i].BoundingBoxMin.X;
+            heights[i] = shapes[i].BoundingBoxMax.Y - shapes[i].BoundingBoxMin.Y;
+        }
+
+        double totalW = 0;
+        for (int i = 0; i < widths.Length; i++) totalW += widths[i];
+        totalW += settings.Spacing * (shapes.Length - 1);
+
+        double totalH = 0;
+        for (int i = 0; i < heights.Length; i++) if (heights[i] > totalH) totalH = heights[i];
+
+        var sb = new StringBuilder(256 + shapes.Length * 128);
+        sb.Append("<svg xmlns=\"http://www.w3.org/2000/svg\" ");
+        sb.Append("width=\"").Append(F(totalW)).Append("mm\" ");
+        sb.Append("height=\"").Append(F(totalH)).Append("mm\" ");
+        sb.Append("viewBox=\"0 0 ").Append(F(totalW)).Append(' ').Append(F(totalH)).Append("\">");
+        sb.Append("<g transform=\"translate(0 ").Append(F(totalH)).Append(") scale(1 -1)\">");
+
+        double xCursor = 0;
+        for (int i = 0; i < shapes.Length; i++)
+        {
+            var s = shapes[i];
+            sb.Append("<g id=\"").Append(Escape(s.Id)).Append("\" transform=\"translate(")
+              .Append(F(xCursor)).Append(" 0)\">");
+            EmitPath(sb, s.Outline, s.BoundingBoxMin, OutlineColor);
+            foreach (var p in s.InteriorCuts) EmitPath(sb, p, s.BoundingBoxMin, InteriorColor);
+            foreach (var p in s.Engravings) EmitPath(sb, p, s.BoundingBoxMin, EngravingColor);
+            sb.Append("</g>");
+            xCursor += widths[i] + settings.Spacing;
+        }
+
+        sb.Append("</g></svg>");
+        return sb.ToString();
+    }
+
+    public string GeneratePagedSvg(BoxPlanCuttableShape[] shapes, BoxPlanSettings settings)
+    {
+        if (shapes.Length == 0)
+        {
+            return "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"0mm\" height=\"0mm\" viewBox=\"0 0 0 0\"/>";
+        }
+
+        if (settings.SheetWidth <= 0 || settings.SheetHeight <= 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(settings), "Sheet dimensions must be positive.");
+        }
+
+        if (settings.Margin < 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(settings), "Margin cannot be negative.");
+        }
+
+        double usableWidth = settings.SheetWidth - (2 * settings.Margin);
+        double usableHeight = settings.SheetHeight - (2 * settings.Margin);
+        if (usableWidth <= 0 || usableHeight <= 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(settings), "Margin leaves no usable sheet area.");
+        }
+
+        var placements = LayoutPages(shapes, settings);
+        double totalWidth = placements.PageCount * settings.SheetWidth + Math.Max(0, placements.PageCount - 1) * settings.Spacing;
+        double totalHeight = settings.SheetHeight;
+
+        var sb = new StringBuilder(256 + shapes.Length * 192 + placements.PageCount * 128);
+        sb.Append("<svg xmlns=\"http://www.w3.org/2000/svg\" ");
+        sb.Append("width=\"").Append(F(totalWidth)).Append("mm\" ");
+        sb.Append("height=\"").Append(F(totalHeight)).Append("mm\" ");
+        sb.Append("viewBox=\"0 0 ").Append(F(totalWidth)).Append(' ').Append(F(totalHeight)).Append("\">");
+        sb.Append("<g transform=\"translate(0 ").Append(F(totalHeight)).Append(") scale(1 -1)\">");
+
+        for (int pageIndex = 0; pageIndex < placements.PageCount; pageIndex++)
+        {
+            double pageX = pageIndex * (settings.SheetWidth + settings.Spacing);
+            sb.Append("<g id=\"page-").Append(pageIndex).Append("\" transform=\"translate(")
+              .Append(F(pageX)).Append(" 0)\">");
+            EmitPageOutline(sb, settings.SheetWidth, settings.SheetHeight);
+
+            foreach (var placement in placements.Items.Where(p => p.PageIndex == pageIndex))
+            {
+                sb.Append("<g id=\"").Append(Escape(placement.Shape.Id)).Append("\" transform=\"translate(")
+                  .Append(F(settings.Margin + placement.X)).Append(' ').Append(F(settings.Margin + placement.Y)).Append(')');
+                if (placement.Rotated)
+                {
+                    sb.Append(" translate(").Append(F(Height(placement.Shape))).Append(" 0) rotate(90)");
+                }
+                sb.Append("\">");
+                EmitPath(sb, placement.Shape.Outline, placement.Shape.BoundingBoxMin, OutlineColor);
+                foreach (var path in placement.Shape.InteriorCuts) EmitPath(sb, path, placement.Shape.BoundingBoxMin, InteriorColor);
+                foreach (var path in placement.Shape.Engravings) EmitPath(sb, path, placement.Shape.BoundingBoxMin, EngravingColor);
+                sb.Append("</g>");
+            }
+
+            sb.Append("</g>");
+        }
+
+        sb.Append("</g></svg>");
+        return sb.ToString();
+    }
+
+    private static LayoutResult LayoutPages(BoxPlanCuttableShape[] shapes, BoxPlanSettings settings)
+    {
+        double usableWidth = settings.SheetWidth - (2 * settings.Margin);
+        double usableHeight = settings.SheetHeight - (2 * settings.Margin);
+        var orderedShapes = shapes
+            .Select((shape, index) => new IndexedShape(shape, index, Width(shape), Height(shape)))
+            .OrderByDescending(item => Math.Max(item.Width, item.Height))
+            .ThenByDescending(item => Math.Min(item.Width, item.Height))
+            .ThenByDescending(item => item.Height)
+            .ThenByDescending(item => item.Width)
+            .ThenBy(item => item.Index)
+            .ToArray();
+
+        var pages = new List<PageLayout>();
+        var placements = new List<ShapePlacement>(shapes.Length);
+
+        foreach (var item in orderedShapes)
+        {
+            var pageFit = ChoosePageFit(item, usableWidth, usableHeight);
+            if (pageFit is null)
+            {
+                throw new InvalidOperationException($"Shape '{item.Shape.Id}' does not fit within the configured sheet size.");
+            }
+
+            if (!TryPlaceOnExistingPage(item, settings, usableWidth, usableHeight, pages, placements))
+            {
+                var page = new PageLayout();
+                pages.Add(page);
+                var shelf = CreateShelf(page, pageFit.Height, settings.Spacing);
+                PlaceOnShelf(item, page, shelf, pages.Count - 1, settings.Spacing, pageFit, placements);
+            }
+        }
+
+        return new LayoutResult(placements, pages.Count);
+    }
+
+    private static bool TryPlaceOnExistingPage(
+        IndexedShape item,
+        BoxPlanSettings settings,
+        double usableWidth,
+        double usableHeight,
+        List<PageLayout> pages,
+        List<ShapePlacement> placements)
+    {
+        for (int pageIndex = 0; pageIndex < pages.Count; pageIndex++)
+        {
+            var page = pages[pageIndex];
+            foreach (var shelf in page.Shelves)
+            {
+                var shelfFit = ChooseShelfFit(item, shelf, usableWidth, settings.Spacing);
+                if (shelfFit is not null)
+                {
+                    PlaceOnShelf(item, page, shelf, pageIndex, settings.Spacing, shelfFit, placements);
+                    return true;
+                }
+            }
+
+            var newShelfFit = ChooseNewShelfFit(item, page, usableHeight, settings.Spacing);
+            if (newShelfFit is not null)
+            {
+                var shelf = CreateShelf(page, newShelfFit.Height, settings.Spacing);
+                PlaceOnShelf(item, page, shelf, pageIndex, settings.Spacing, newShelfFit, placements);
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static OrientationFit? ChoosePageFit(IndexedShape item, double usableWidth, double usableHeight)
+    {
+        return EnumerateFits(item)
+            .Where(fit => fit.Width <= usableWidth + 1e-6 && fit.Height <= usableHeight + 1e-6)
+            .OrderBy(fit => fit.Width)
+            .ThenByDescending(fit => fit.Height)
+            .ThenBy(fit => fit.Rotated)
+            .FirstOrDefault();
+    }
+
+    private static OrientationFit? ChooseShelfFit(IndexedShape item, ShelfLayout shelf, double usableWidth, double spacing)
+    {
+        return EnumerateFits(item)
+            .Where(fit => fit.Height <= shelf.Height + 1e-6 && FitsOnShelf(fit.Width, shelf, usableWidth, spacing))
+            .OrderBy(fit => fit.Width)
+            .ThenBy(fit => fit.Height)
+            .ThenBy(fit => fit.Rotated)
+            .FirstOrDefault();
+    }
+
+    private static OrientationFit? ChooseNewShelfFit(IndexedShape item, PageLayout page, double usableHeight, double spacing)
+    {
+        return EnumerateFits(item)
+            .Where(fit => CanCreateShelf(page, fit.Height, usableHeight, spacing))
+            .OrderBy(fit => fit.Width)
+            .ThenByDescending(fit => fit.Height)
+            .ThenBy(fit => fit.Rotated)
+            .FirstOrDefault();
+    }
+
+    private static IEnumerable<OrientationFit> EnumerateFits(IndexedShape item)
+    {
+        yield return new OrientationFit(item.Width, item.Height, Rotated: false);
+
+        if (Math.Abs(item.Width - item.Height) > 1e-6)
+        {
+            yield return new OrientationFit(item.Height, item.Width, Rotated: true);
+        }
+    }
+
+    private static bool FitsOnShelf(double width, ShelfLayout shelf, double sheetWidth, double spacing)
+    {
+        double x = shelf.NextX;
+        if (shelf.ItemCount > 0)
+        {
+            x += spacing;
+        }
+        return x + width <= sheetWidth + 1e-6;
+    }
+
+    private static bool CanCreateShelf(PageLayout page, double height, double sheetHeight, double spacing)
+    {
+        double y = page.NextShelfY;
+        if (page.Shelves.Count > 0)
+        {
+            y += spacing;
+        }
+        return y + height <= sheetHeight + 1e-6;
+    }
+
+    private static ShelfLayout CreateShelf(PageLayout page, double height, double spacing)
+    {
+        double y = page.NextShelfY;
+        if (page.Shelves.Count > 0)
+        {
+            y += spacing;
+        }
+
+        var shelf = new ShelfLayout(y, height);
+        page.Shelves.Add(shelf);
+        page.NextShelfY = y + height;
+        return shelf;
+    }
+
+    private static void PlaceOnShelf(
+        IndexedShape item,
+        PageLayout page,
+        ShelfLayout shelf,
+        int pageIndex,
+        double spacing,
+        OrientationFit fit,
+        List<ShapePlacement> placements)
+    {
+        double x = shelf.NextX;
+        if (shelf.ItemCount > 0)
+        {
+            x += spacing;
+        }
+
+        placements.Add(new ShapePlacement(item.Shape, pageIndex, x, shelf.Y, fit.Rotated));
+        shelf.NextX = x + fit.Width;
+        shelf.ItemCount++;
+        page.UsedWidth = Math.Max(page.UsedWidth, shelf.NextX);
+    }
+
+    private static void EmitPageOutline(StringBuilder sb, double width, double height)
+    {
+        sb.Append("<rect x=\"0\" y=\"0\" width=\"").Append(F(width))
+          .Append("\" height=\"").Append(F(height))
+          .Append("\" stroke=\"").Append(PageOutlineColor)
+          .Append("\" stroke-width=\"").Append(F(StrokeWidthMm))
+          .Append("\" fill=\"none\"/>");
+    }
+
+    private static double Width(BoxPlanCuttableShape shape) => shape.BoundingBoxMax.X - shape.BoundingBoxMin.X;
+
+    private static double Height(BoxPlanCuttableShape shape) => shape.BoundingBoxMax.Y - shape.BoundingBoxMin.Y;
+
+    private static void EmitPath(StringBuilder sb, CuttablePath path, Vec2 origin, string color)
+    {
+        var (start, segments) = CollapseReversals(path.Start, path.Segments);
+
+        sb.Append("<path d=\"M ").Append(F(start.X - origin.X)).Append(' ').Append(F(start.Y - origin.Y));
+        foreach (var seg in segments)
+        {
+            switch (seg)
+            {
+                case LineSegment ls:
+                    sb.Append(" L ").Append(F(ls.To.X - origin.X)).Append(' ').Append(F(ls.To.Y - origin.Y));
+                    break;
+                case ArcSegment a:
+                    int large = a.LargeArc ? 1 : 0;
+                    int sweep = a.Clockwise ? 0 : 1;
+                    sb.Append(" A ").Append(F(a.Radius)).Append(' ').Append(F(a.Radius))
+                      .Append(" 0 ").Append(large).Append(' ').Append(sweep).Append(' ')
+                      .Append(F(a.To.X - origin.X)).Append(' ').Append(F(a.To.Y - origin.Y));
+                    break;
+            }
+        }
+        if (path.Closed) sb.Append(" Z");
+        sb.Append("\" stroke=\"").Append(color).Append("\" stroke-width=\"").Append(F(StrokeWidthMm))
+          .Append("\" fill=\"none\"/>");
+    }
+
+    // Collapse runs where a line segment is immediately followed by its exact reverse —
+    // both segments cancel out. Stack-based so chains like A→B→C→B→A reduce all the
+    // way to A. Only line/line cancellations are removed; arcs are treated as opaque
+    // and never collapse.
+    private static (Vec2 Start, IReadOnlyList<PathSegment> Segments) CollapseReversals(
+        Vec2 start, IReadOnlyList<PathSegment> segments)
+    {
+        var points = new List<Vec2> { start };
+        var segs = new List<PathSegment?> { null };
+
+        foreach (var seg in segments)
+        {
+            var to = seg switch
+            {
+                LineSegment ls => ls.To,
+                ArcSegment a => a.To,
+                _ => throw new InvalidOperationException($"Unsupported segment {seg.GetType().Name}"),
+            };
+
+            if (seg is LineSegment
+                && segs[^1] is LineSegment
+                && points.Count >= 2
+                && PointsEqual(points[^2], to))
+            {
+                points.RemoveAt(points.Count - 1);
+                segs.RemoveAt(segs.Count - 1);
+            }
+            else
+            {
+                points.Add(to);
+                segs.Add(seg);
+            }
+        }
+
+        var result = new List<PathSegment>(segs.Count - 1);
+        for (int i = 1; i < segs.Count; i++) result.Add(segs[i]!);
+        return (points[0], result);
+    }
+
+    private static bool PointsEqual(Vec2 a, Vec2 b) =>
+        Math.Abs(a.X - b.X) < 1e-6 && Math.Abs(a.Y - b.Y) < 1e-6;
+
+    private static string F(double v) => v.ToString("F3", CultureInfo.InvariantCulture);
+
+    private static string Escape(string s) => SecurityElement.Escape(s) ?? s;
+
+    private sealed record IndexedShape(BoxPlanCuttableShape Shape, int Index, double Width, double Height);
+
+    private sealed record ShapePlacement(BoxPlanCuttableShape Shape, int PageIndex, double X, double Y, bool Rotated);
+
+    private sealed record OrientationFit(double Width, double Height, bool Rotated);
+
+    private sealed record LayoutResult(IReadOnlyList<ShapePlacement> Items, int PageCount);
+
+    private sealed class PageLayout
+    {
+        public List<ShelfLayout> Shelves { get; } = new();
+
+        public double NextShelfY { get; set; }
+
+        public double UsedWidth { get; set; }
+    }
+
+    private sealed class ShelfLayout
+    {
+        public ShelfLayout(double y, double height)
+        {
+            Y = y;
+            Height = height;
+        }
+
+        public double Y { get; }
+
+        public double Height { get; }
+
+        public double NextX { get; set; }
+
+        public int ItemCount { get; set; }
+    }
+}

@@ -6,14 +6,14 @@ public readonly record struct RawLocation(int Line, int Column);
 
 public interface IRawLocated
 {
-    [YamlIgnore] RawLocation? Location { get; set; }
+    [YamlIgnore] RawLocation? SourceLocation { get; set; }
 }
 
 public sealed class RawPlan : IRawLocated
 {
     public List<RawShape> Shapes { get; set; } = new();
 
-    [YamlIgnore] public RawLocation? Location { get; set; }
+    [YamlIgnore] public RawLocation? SourceLocation { get; set; }
 }
 
 public abstract class RawShape : IRawLocated
@@ -31,7 +31,7 @@ public abstract class RawShape : IRawLocated
     public List<RawFeature>? Features { get; set; }
     public RawFit? Fit { get; set; }
 
-    [YamlIgnore] RawLocation? IRawLocated.Location { get; set; }
+    [YamlIgnore] public RawLocation? SourceLocation { get; set; }
 }
 
 public sealed class RawBoxShape : RawShape
@@ -44,7 +44,7 @@ public sealed class RawFace : IRawLocated
     public string? Name { get; set; }
     public string? Type { get; set; }
 
-    [YamlIgnore] public RawLocation? Location { get; set; }
+    [YamlIgnore] public RawLocation? SourceLocation { get; set; }
 }
 
 public sealed class RawSplit : IRawLocated
@@ -53,7 +53,7 @@ public sealed class RawSplit : IRawLocated
     public int? Y { get; set; }
     public int? Z { get; set; }
 
-    [YamlIgnore] public RawLocation? Location { get; set; }
+    [YamlIgnore] public RawLocation? SourceLocation { get; set; }
 }
 
 public sealed class RawDividerSet : IRawLocated
@@ -63,7 +63,7 @@ public sealed class RawDividerSet : IRawLocated
     public double[]? Positions { get; set; }
     public string? Facing { get; set; }
 
-    [YamlIgnore] public RawLocation? Location { get; set; }
+    [YamlIgnore] public RawLocation? SourceLocation { get; set; }
 }
 
 public sealed class RawInsert : IRawLocated
@@ -78,7 +78,7 @@ public sealed class RawInsert : IRawLocated
 
     public RawShape? Inline { get; set; }
 
-    [YamlIgnore] public RawLocation? Location { get; set; }
+    [YamlIgnore] public RawLocation? SourceLocation { get; set; }
 }
 
 public abstract class RawFeature : IRawLocated
@@ -90,7 +90,7 @@ public abstract class RawFeature : IRawLocated
 
     public RawPosition? Position { get; set; }
 
-    [YamlIgnore] public RawLocation? Location { get; set; }
+    [YamlIgnore] public RawLocation? SourceLocation { get; set; }
 }
 
 public sealed class RawCutoutFeature : RawFeature
@@ -106,7 +106,7 @@ public sealed class RawPosition : IRawLocated
     public string? Anchor { get; set; }
     public double[]? Offset { get; set; }
 
-    [YamlIgnore] public RawLocation? Location { get; set; }
+    [YamlIgnore] public RawLocation? SourceLocation { get; set; }
 }
 
 public sealed class RawFit : IRawLocated
@@ -117,7 +117,7 @@ public sealed class RawFit : IRawLocated
     public RawFitDimension? Height { get; set; }
     public RawFitDimension? Depth { get; set; }
 
-    [YamlIgnore] public RawLocation? Location { get; set; }
+    [YamlIgnore] public RawLocation? SourceLocation { get; set; }
 }
 
 public readonly record struct RawFitDimension(bool IsAuto, double Value)
