@@ -1023,39 +1023,33 @@
     ]
   },
   "packageFolders": {
-    "C:\\Users\\Alex.Stuart\\.nuget\\packages\\": {},
-    "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages": {}
+    "/root/.nuget/packages/": {}
   },
   "project": {
     "version": "1.0.0",
     "restore": {
-      "projectUniqueName": "C:\\Users\\Alex.Stuart\\source\\repos\\boxplan\\BoxPlanLib.Tests\\BoxPlanLib.Tests.csproj",
+      "projectUniqueName": "/home/user/boxplan/BoxPlanLib.Tests/BoxPlanLib.Tests.csproj",
       "projectName": "BoxPlanLib.Tests",
-      "projectPath": "C:\\Users\\Alex.Stuart\\source\\repos\\boxplan\\BoxPlanLib.Tests\\BoxPlanLib.Tests.csproj",
-      "packagesPath": "C:\\Users\\Alex.Stuart\\.nuget\\packages\\",
-      "outputPath": "C:\\Users\\Alex.Stuart\\source\\repos\\boxplan\\BoxPlanLib.Tests\\obj\\",
+      "projectPath": "/home/user/boxplan/BoxPlanLib.Tests/BoxPlanLib.Tests.csproj",
+      "packagesPath": "/root/.nuget/packages/",
+      "outputPath": "/home/user/boxplan/BoxPlanLib.Tests/obj/",
       "projectStyle": "PackageReference",
-      "fallbackFolders": [
-        "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"
-      ],
       "configFilePaths": [
-        "C:\\Users\\Alex.Stuart\\AppData\\Roaming\\NuGet\\NuGet.Config",
-        "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.FallbackLocation.config",
-        "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.Offline.config"
+        "/root/.nuget/NuGet/NuGet.Config"
       ],
       "originalTargetFrameworks": [
         "net9.0"
       ],
       "sources": {
-        "C:\\Program Files (x86)\\Microsoft SDKs\\NuGetPackages\\": {},
+        "/usr/lib/dotnet/library-packs": {},
         "https://api.nuget.org/v3/index.json": {}
       },
       "frameworks": {
         "net9.0": {
           "targetAlias": "net9.0",
           "projectReferences": {
-            "C:\\Users\\Alex.Stuart\\source\\repos\\boxplan\\BoxPlanLib\\BoxPlanLib.csproj": {
-              "projectPath": "C:\\Users\\Alex.Stuart\\source\\repos\\boxplan\\BoxPlanLib\\BoxPlanLib.csproj"
+            "/home/user/boxplan/BoxPlanLib/BoxPlanLib.csproj": {
+              "projectPath": "/home/user/boxplan/BoxPlanLib/BoxPlanLib.csproj"
             }
           }
         }
@@ -1070,7 +1064,7 @@
         "auditLevel": "low",
         "auditMode": "direct"
       },
-      "SdkAnalysisLevel": "10.0.200"
+      "SdkAnalysisLevel": "10.0.100"
     },
     "frameworks": {
       "net9.0": {
@@ -1112,10 +1106,6 @@
           {
             "name": "Microsoft.NETCore.App.Ref",
             "version": "[9.0.15, 9.0.15]"
-          },
-          {
-            "name": "Microsoft.WindowsDesktop.App.Ref",
-            "version": "[9.0.15, 9.0.15]"
           }
         ],
         "frameworkReferences": {
@@ -1123,7 +1113,7 @@
             "privateAssets": "all"
           }
         },
-        "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\10.0.203/PortableRuntimeIdentifierGraph.json"
+        "runtimeIdentifierGraphPath": "/usr/lib/dotnet/sdk/10.0.107/PortableRuntimeIdentifierGraph.json"
       }
     }
   }
