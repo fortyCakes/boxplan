@@ -18,4 +18,9 @@ internal sealed class PipelineLogger
         if (_enabled)
             Console.WriteLine(message);
     }
+
+    public void Warn(string message)
+    {
+        Console.WriteLine($"[warn] {message}");
+    }
 }

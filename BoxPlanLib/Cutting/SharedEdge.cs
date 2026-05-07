@@ -26,25 +26,25 @@ internal sealed class SharedEdge
 
 internal static class SharedEdgeTable
 {
-    public static IReadOnlyDictionary<string, SharedEdge> Build(Vec3 dims, BoxPlanSettings settings)
+    public static IReadOnlyDictionary<string, SharedEdge> Build(Vec3 dims, BoxPlanSettings settings, PipelineLogger? logger = null)
     {
         var t = settings.MaterialThickness;
         var s = settings.FingerJointSize;
 
         var edges = new Dictionary<string, SharedEdge>();
 
-        Add(edges, FaceName.Bottom, FaceName.Front, dims.X, t, s);
-        Add(edges, FaceName.Bottom, FaceName.Back,  dims.X, t, s);
-        Add(edges, FaceName.Bottom, FaceName.Left,  dims.Z, t, s);
-        Add(edges, FaceName.Bottom, FaceName.Right, dims.Z, t, s);
-        Add(edges, FaceName.Top,    FaceName.Front, dims.X, t, s);
-        Add(edges, FaceName.Top,    FaceName.Back,  dims.X, t, s);
-        Add(edges, FaceName.Top,    FaceName.Left,  dims.Z, t, s);
-        Add(edges, FaceName.Top,    FaceName.Right, dims.Z, t, s);
-        Add(edges, FaceName.Front,  FaceName.Left,  dims.Y, t, s);
-        Add(edges, FaceName.Front,  FaceName.Right, dims.Y, t, s);
-        Add(edges, FaceName.Back,   FaceName.Left,  dims.Y, t, s);
-        Add(edges, FaceName.Back,   FaceName.Right, dims.Y, t, s);
+        Add(edges, FaceName.Bottom, FaceName.Front, dims.X, t, s, logger);
+        Add(edges, FaceName.Bottom, FaceName.Back,  dims.X, t, s, logger);
+        Add(edges, FaceName.Bottom, FaceName.Left,  dims.Z, t, s, logger);
+        Add(edges, FaceName.Bottom, FaceName.Right, dims.Z, t, s, logger);
+        Add(edges, FaceName.Top,    FaceName.Front, dims.X, t, s, logger);
+        Add(edges, FaceName.Top,    FaceName.Back,  dims.X, t, s, logger);
+        Add(edges, FaceName.Top,    FaceName.Left,  dims.Z, t, s, logger);
+        Add(edges, FaceName.Top,    FaceName.Right, dims.Z, t, s, logger);
+        Add(edges, FaceName.Front,  FaceName.Left,  dims.Y, t, s, logger);
+        Add(edges, FaceName.Front,  FaceName.Right, dims.Y, t, s, logger);
+        Add(edges, FaceName.Back,   FaceName.Left,  dims.Y, t, s, logger);
+        Add(edges, FaceName.Back,   FaceName.Right, dims.Y, t, s, logger);
 
         return edges;
     }
@@ -54,7 +54,7 @@ internal static class SharedEdgeTable
             ? $"{a}-{b}"
             : $"{b}-{a}";
 
-    private static void Add(Dictionary<string, SharedEdge> sink, FaceName a, FaceName b, double length, double t, double s)
+    private static void Add(Dictionary<string, SharedEdge> sink, FaceName a, FaceName b, double length, double t, double s, PipelineLogger? logger)
     {
         var lower = FacePriority.Lower(a, b);
         var higher = lower == a ? b : a;
@@ -63,14 +63,14 @@ internal static class SharedEdgeTable
         // vertex, NOTCH-into-corner otherwise). Blocks describe the joint over the
         // remaining inner region only.
         var innerLength = Math.Max(0, length - 2 * t);
-        var blocks = BuildBlocks(innerLength, s, lower, higher);
+        var blocks = BuildBlocks(innerLength, t, s, lower, higher, logger);
         var id = Id(a, b);
         sink[id] = new SharedEdge { Id = id, FaceA = a, FaceB = b, Length = length, Blocks = blocks };
     }
 
-    private static IReadOnlyList<FingerBlock> BuildBlocks(double length, double s, FaceName lower, FaceName higher)
+    private static IReadOnlyList<FingerBlock> BuildBlocks(double length, double t, double s, FaceName lower, FaceName higher, PipelineLogger? logger)
     {
-        var blocks = FingerJointPattern.Build(length, s);
+        var blocks = FingerJointPattern.Build(length, s, t, msg => logger?.Warn($"[edge {lower}-{higher}] {msg}"));
         return blocks
             .Select(block => new FingerBlock(block.Length, block.PrimaryOwns ? lower : higher))
             .ToList();

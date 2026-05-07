@@ -21,8 +21,9 @@ internal static class SharedEdgeGraph
     // shared with edges of other MergedFaces. Each shared sub-range is
     // emitted twice — once from each face's perspective — in local (U, V)
     // start/length coordinates.
-    public static IReadOnlyList<SharedSegment> Build(IReadOnlyList<MergedFace> faces)
+    public static IReadOnlyList<SharedSegment> Build(IReadOnlyList<MergedFace> faces, PipelineLogger? logger = null)
     {
+        logger?.Log($"[merge] Building shared edge graph for {faces.Count} faces");
         // Precompute every outline edge as a 3D axis-aligned segment.
         var edges = new List<Edge3D>();
         for (var fi = 0; fi < faces.Count; fi++)
@@ -75,6 +76,7 @@ internal static class SharedEdgeGraph
         }
 
         return output;
+        logger?.Log($"[merge] Shared edge graph contains {output.Count} segments");
     }
 
     private static SharedSegment MakeSegment(

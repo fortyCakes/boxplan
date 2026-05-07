@@ -10,8 +10,10 @@ internal static class MergedShapeCutter
         IReadOnlyList<MergedFace> faces,
         IReadOnlyList<SharedSegment> sharedSegments,
         BoxPlanSettings settings,
-        List<BoxPlanCuttableShape> output)
+        List<BoxPlanCuttableShape> output,
+        PipelineLogger? logger = null)
     {
+        logger?.Log($"[merge] Emitting merged shapes for {faces.Count} faces");
         var t = settings.MaterialThickness;
         var s = settings.FingerJointSize;
 
@@ -23,13 +25,15 @@ internal static class MergedShapeCutter
         {
             var face = faces[fi];
             var faceName = face.Direction.ToFaceName();
-            var builder = new Cutting.PolygonPanelShapeBuilder(face.Outline);
+            var builder = new Cutting.PolygonPanelShapeBuilder(face.Outline, logger);
             var n = face.Outline.Count;
 
             // Group shared segments by edge index, sorted by start position.
             var byEdge = byFace[fi]
                 .GroupBy(seg => seg.EdgeIndex)
                 .ToDictionary(g => g.Key, g => g.OrderBy(x => x.Start).ToList());
+
+            var cornerOwnership = ComputeCornerOwnership(face, faces, byEdge, faceName);
 
             // Subtract finger-joint notches owned by the neighbour face.
             // The standard joint pattern reserves t at each end of a shared
@@ -51,14 +55,14 @@ internal static class MergedShapeCutter
                     var endAtVertex = Math.Abs(seg.Start + seg.Length - edgeLen) <= Eps;
                     var startVertexIndex = edgeIndex;
                     var endVertexIndex = (edgeIndex + 1) % n;
-                    var reserveStart = !(startAtVertex && IsReflex(face.Outline, startVertexIndex));
-                    var reserveEnd = !(endAtVertex && IsReflex(face.Outline, endVertexIndex));
+                    var reserveStart = startAtVertex && ShouldReserveCornerCube(face.Outline, cornerOwnership, startVertexIndex, faceName);
+                    var reserveEnd = endAtVertex && ShouldReserveCornerCube(face.Outline, cornerOwnership, endVertexIndex, faceName);
 
                     var startInset = reserveStart ? t : 0;
                     var endInset = reserveEnd ? t : 0;
                     var inner = Math.Max(0, seg.Length - startInset - endInset);
                     if (inner <= Eps) continue;
-                    var blocks = FingerJointPattern.Build(inner, s);
+                    var blocks = FingerJointPattern.Build(inner, s, t, msg => logger?.Warn($"[merged {faceName}] {msg}"));
                     var cursor = seg.Start + startInset;
                     foreach (var block in blocks)
                     {
@@ -82,48 +86,20 @@ internal static class MergedShapeCutter
             // must then subtract a notch regardless of priority order.
             for (var vi = 0; vi < n; vi++)
             {
+                if (!IsConvex(face.Outline, vi)) continue;
+                var owns = cornerOwnership[vi];
+                if (owns is not false) continue;
+
                 var prevEdge = (vi + n - 1) % n;
                 var nextEdge = vi;
-                if (!byEdge.TryGetValue(prevEdge, out var prevSegs) || prevSegs.Count == 0) continue;
-                if (!byEdge.TryGetValue(nextEdge, out var nextSegs) || nextSegs.Count == 0) continue;
-
                 var prevEdgeLength = EdgeLength(face, prevEdge);
-
-                // Sub-segments touching this vertex: the LAST of prev edge
-                // (its end is at the corner) and the FIRST of next edge.
-                var prevSeg = prevSegs.LastOrDefault(seg => Math.Abs(seg.Start + seg.Length - prevEdgeLength) < Eps);
-                var nextSeg = nextSegs.FirstOrDefault(seg => Math.Abs(seg.Start) < Eps);
-                if (prevSeg is null || nextSeg is null) continue;
-
-                if (!IsConvex(face.Outline, vi)) continue;
-
-                // If either neighbour face is REFLEX at this world vertex its material
-                // fills the corner cube; this convex face must give up a notch.
-                var worldVertex = face.ToWorld(face.Outline[vi]);
-                var prevNeighbourReflex = FaceIsReflexAt(faces[prevSeg.NeighbourFaceIndex], worldVertex);
-                var nextNeighbourReflex = FaceIsReflexAt(faces[nextSeg.NeighbourFaceIndex], worldVertex);
-
-                bool owns;
-                if (prevNeighbourReflex || nextNeighbourReflex)
-                {
-                    owns = false; // reflex neighbour's material fills the cube; this face does not own it
-                }
-                else
-                {
-                    var prevName = prevSeg.NeighbourDirection.ToFaceName();
-                    var nextName = nextSeg.NeighbourDirection.ToFaceName();
-                    var p = FacePriority.Of(faceName);
-                    owns = FacePriority.Of(prevName) >= p && FacePriority.Of(nextName) >= p;
-                }
-                if (owns) continue;
-
                 builder.SubtractEdgeNotch(prevEdge, prevEdgeLength - t, t, t);
                 builder.SubtractEdgeNotch(nextEdge, 0, t, t);
             }
 
             var polygon = builder.Build();
             if (polygon.Count == 0) continue;
-            var (path, bbMin, bbMax, _) = KerfOffset.OffsetOutwardAndTranslate(polygon, settings.Kerf);
+            var (path, bbMin, bbMax, _) = KerfOffset.OffsetOutwardAndTranslate(polygon, settings.Kerf, logger);
 
             output.Add(new BoxPlanCuttableShape
             {
@@ -134,7 +110,107 @@ internal static class MergedShapeCutter
                 InteriorCuts = Array.Empty<CuttablePath>(),
                 Engravings = Array.Empty<CuttablePath>(),
             });
+            logger?.Log($"[merge] Emitted merged shape {face.Id}");
         }
+    }
+
+    // null => no corner-cube ownership available (missing adjacency data).
+    // true => this face owns the convex corner cube.
+    // false => this face must yield the corner cube.
+    private static bool?[] ComputeCornerOwnership(
+        MergedFace face,
+        IReadOnlyList<MergedFace> faces,
+        IReadOnlyDictionary<int, List<SharedSegment>> byEdge,
+        FaceName faceName)
+    {
+        var n = face.Outline.Count;
+        var ownership = new bool?[n];
+        for (var vi = 0; vi < n; vi++)
+        {
+            if (!IsConvex(face.Outline, vi))
+            {
+                ownership[vi] = null;
+                continue;
+            }
+
+            if (!TryGetCornerSegments(face, byEdge, vi, out var prevSeg, out var nextSeg))
+            {
+                ownership[vi] = null;
+                continue;
+            }
+
+            // If either neighbour is reflex at this world vertex, that neighbour's
+            // material wraps the corner and this convex face cannot own the cube.
+            var worldVertex = face.ToWorld(face.Outline[vi]);
+            var prevNeighbourReflex = FaceIsReflexAt(faces[prevSeg.NeighbourFaceIndex], worldVertex);
+            var nextNeighbourReflex = FaceIsReflexAt(faces[nextSeg.NeighbourFaceIndex], worldVertex);
+            if (prevNeighbourReflex || nextNeighbourReflex)
+            {
+                ownership[vi] = false;
+                continue;
+            }
+
+            var prevName = prevSeg.NeighbourDirection.ToFaceName();
+            var nextName = nextSeg.NeighbourDirection.ToFaceName();
+            var p = FacePriority.Of(faceName);
+            ownership[vi] = FacePriority.Of(prevName) >= p && FacePriority.Of(nextName) >= p;
+        }
+
+        return ownership;
+    }
+
+    private static bool TryGetCornerSegments(
+        MergedFace face,
+        IReadOnlyDictionary<int, List<SharedSegment>> byEdge,
+        int vertexIndex,
+        out SharedSegment prevSeg,
+        out SharedSegment nextSeg)
+    {
+        var n = face.Outline.Count;
+        var prevEdge = (vertexIndex + n - 1) % n;
+        var nextEdge = vertexIndex;
+        prevSeg = null!;
+        nextSeg = null!;
+
+        if (!byEdge.TryGetValue(prevEdge, out var prevSegs) || prevSegs.Count == 0) return false;
+        if (!byEdge.TryGetValue(nextEdge, out var nextSegs) || nextSegs.Count == 0) return false;
+
+        var prevEdgeLength = EdgeLength(face, prevEdge);
+        prevSeg = prevSegs.LastOrDefault(seg => Math.Abs(seg.Start + seg.Length - prevEdgeLength) < Eps)!;
+        nextSeg = nextSegs.FirstOrDefault(seg => Math.Abs(seg.Start) < Eps)!;
+        return prevSeg is not null && nextSeg is not null;
+    }
+
+    private static bool ShouldReserveCornerCube(
+        IReadOnlyList<Vec2> polygon,
+        IReadOnlyList<bool?> cornerOwnership,
+        int vertexIndex,
+        FaceName faceName)
+    {
+        if (IsReflex(polygon, vertexIndex))
+        {
+            return false;
+        }
+
+        var owns = cornerOwnership[vertexIndex];
+        if (owns is bool ownsCorner)
+        {
+            if (!ownsCorner)
+            {
+                return true;
+            }
+
+            // The staircase run/rise issue shows up on front/back merged faces:
+            // allow owned convex tabs to run to the corner there.
+            if (faceName is FaceName.Front or FaceName.Back)
+            {
+                return false;
+            }
+
+            return true;
+        }
+
+        return true;
     }
 
     private static double EdgeLength(MergedFace face, int edgeIndex)

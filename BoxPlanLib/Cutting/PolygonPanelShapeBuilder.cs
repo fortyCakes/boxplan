@@ -15,8 +15,9 @@ internal sealed class PolygonPanelShapeBuilder
     private readonly IReadOnlyList<Vec2> _polygon;
     private readonly List<PathD> _notchClips = new();
 
-    public PolygonPanelShapeBuilder(IReadOnlyList<Vec2> polygon)
+    public PolygonPanelShapeBuilder(IReadOnlyList<Vec2> polygon, PipelineLogger? logger = null)
     {
+        logger?.Log($"[panel] Creating PolygonPanelShapeBuilder with {polygon.Count} vertices");
         _polygon = polygon;
     }
 

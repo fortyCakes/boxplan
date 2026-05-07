@@ -4,8 +4,9 @@ namespace BoxPlanLib.Cutting;
 
 internal static class CutoutBuilder
 {
-    public static Vec2 ResolveCenter(Position? position, double panelU, double panelV)
+    public static Vec2 ResolveCenter(Position? position, double panelU, double panelV, PipelineLogger? logger = null)
     {
+        logger?.Log($"[cutout] Resolving center for panelU={panelU}, panelV={panelV}");
         if (position is null) return new Vec2(panelU / 2, panelV / 2);
         var anchor = position.Anchor switch
         {
@@ -19,8 +20,9 @@ internal static class CutoutBuilder
         return new Vec2(anchor.X + position.Offset.X, anchor.Y + position.Offset.Y);
     }
 
-    public static CuttablePath Build(CutoutFeature feature, Vec2 center, double kerf, Vec2 translation)
+    public static CuttablePath Build(CutoutFeature feature, Vec2 center, double kerf, Vec2 translation, PipelineLogger? logger = null)
     {
+        logger?.Log($"[cutout] Building cutout {feature.Shape} at center=({center.X},{center.Y})");
         var w = Math.Abs(feature.Width) - kerf;
         var h = Math.Abs(feature.Height) - kerf;
         var cx = center.X + translation.X;
@@ -35,8 +37,9 @@ internal static class CutoutBuilder
         };
     }
 
-    public static CuttablePath BuildSlotRectangle(SlotSpec slot, double kerf, Vec2 translation)
+    public static CuttablePath BuildSlotRectangle(SlotSpec slot, double kerf, Vec2 translation, PipelineLogger? logger = null)
     {
+        logger?.Log($"[cutout] Building slot rectangle at ({slot.U},{slot.V}) size=({slot.Width},{slot.Height})");
         var w = Math.Abs(slot.Width) - kerf;
         var h = Math.Abs(slot.Height) - kerf;
         var cx = slot.U + translation.X;

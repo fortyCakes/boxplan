@@ -5,12 +5,12 @@ namespace BoxPlanLib.Tests.CuttingTests;
 
 public class SharedEdgeBlockTests
 {
-    private static IReadOnlyList<(double Length, FaceName Owner)> BuildBlocks(double length, double s)
+    private static IReadOnlyList<(double Length, FaceName Owner)> BuildBlocks(double length, double s, double t = 3.0)
     {
         var assembly = typeof(BoxPlanLib).Assembly;
         var sharedEdgeTable = assembly.GetType("BoxPlanLib.Cutting.SharedEdgeTable")!;
         var buildBlocks = sharedEdgeTable.GetMethod("BuildBlocks", BindingFlags.NonPublic | BindingFlags.Static)!;
-        var rawBlocks = (System.Collections.IEnumerable)buildBlocks.Invoke(null, new object[] { length, s, FaceName.Bottom, FaceName.Top })!;
+        var rawBlocks = (System.Collections.IEnumerable)buildBlocks.Invoke(null, new object?[] { length, t, s, FaceName.Bottom, FaceName.Top, null })!;
 
         var blocks = new List<(double Length, FaceName Owner)>();
         foreach (var rawBlock in rawBlocks)

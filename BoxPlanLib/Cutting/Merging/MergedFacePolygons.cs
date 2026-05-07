@@ -13,8 +13,9 @@ internal static class MergedFacePolygons
     // appears as a min or max of any box on the A axis:
     //   visible(c) = union(boxes with +A face at c) − union(boxes with −A face at c)
     // for the +A direction, and vice versa.
-    public static IReadOnlyList<MergedFace> Compute(BoxGroup group, string idPrefix)
+    public static IReadOnlyList<MergedFace> Compute(BoxGroup group, string idPrefix, PipelineLogger? logger = null)
     {
+        logger?.Log($"[merge] Computing merged face polygons for {idPrefix}");
         var faces = new List<MergedFace>();
         foreach (var dir in FaceDirection.All)
         {
@@ -41,6 +42,7 @@ internal static class MergedFacePolygons
                         : new PathD(((IEnumerable<PointD>)path).Reverse());
                     var outline = RemoveCollinearVertices(ccw.Select(p => new Vec2(p.x, p.y)).ToList());
                     if (outline.Count < 3) continue;
+                    logger?.Log($"[merge] Adding merged face {idPrefix}.{dir.ShortName()}@{Format(plane)}");
                     faces.Add(new MergedFace
                     {
                         Id = $"{idPrefix}.{dir.ShortName()}@{Format(plane)}#{faces.Count}",

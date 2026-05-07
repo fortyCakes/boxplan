@@ -19,8 +19,9 @@ internal sealed class PanelShapeBuilder
     private readonly double _height;
     private readonly List<EdgeNotch>[] _notches;
 
-    public PanelShapeBuilder(double width, double height)
+    public PanelShapeBuilder(double width, double height, PipelineLogger? logger = null)
     {
+        logger?.Log($"[panel] Creating PanelShapeBuilder width={width} height={height}");
         _width = width;
         _height = height;
         _notches = new[] { new List<EdgeNotch>(), new List<EdgeNotch>(), new List<EdgeNotch>(), new List<EdgeNotch>() };

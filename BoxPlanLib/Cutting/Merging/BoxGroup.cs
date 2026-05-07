@@ -10,8 +10,9 @@ internal static class BoxGrouper
 {
     // Partition the list into connected groups of boxes whose AABBs share a
     // face area (or interpenetrate). Singletons go into their own group.
-    public static IReadOnlyList<BoxGroup> Compute(IReadOnlyList<BoxShape> shapes)
+    public static IReadOnlyList<BoxGroup> Compute(IReadOnlyList<BoxShape> shapes, PipelineLogger? logger = null)
     {
+        logger?.Log($"[grouper] Grouping {shapes.Count} boxes");
         var grouped = new List<GroupedBox>();
         foreach (var shape in shapes)
         {
@@ -60,6 +61,8 @@ internal static class BoxGrouper
             list.Add(grouped[i]);
         }
 
-        return groups.Values.Select(members => new BoxGroup(members)).ToList();
+        var result = groups.Values.Select(members => new BoxGroup(members)).ToList();
+        logger?.Log($"[grouper] Created {result.Count} groups");
+        return result;
     }
 }

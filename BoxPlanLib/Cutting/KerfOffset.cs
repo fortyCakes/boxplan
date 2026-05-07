@@ -8,8 +8,9 @@ internal static class KerfOffset
     // outward by k along the bisector of the two adjacent edge normals. This naturally
     // handles closure without needing a separate start/end convention.
     public static (CuttablePath path, Vec2 bbMin, Vec2 bbMax, Vec2 translation) OffsetOutwardAndTranslate(
-        IReadOnlyList<Vec2> polygon, double kerf)
+        IReadOnlyList<Vec2> polygon, double kerf, PipelineLogger? logger = null)
     {
+        logger?.Log($"[kerf] Offsetting polygon with {polygon.Count} vertices by kerf={kerf}");
         var k = kerf / 2.0;
         var n = polygon.Count;
         var offsetPts = new Vec2[n];

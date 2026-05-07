@@ -6,8 +6,9 @@ internal static class CutoutClipper
 {
     private const double Epsilon = 1e-6;
 
-    public static IReadOnlyList<CuttablePath> ClipToOutline(CuttablePath path, CuttablePath outline)
+    public static IReadOnlyList<CuttablePath> ClipToOutline(CuttablePath path, CuttablePath outline, PipelineLogger? logger = null)
     {
+        logger?.Log($"[clipper] Clipping path to outline");
         var polygon = BuildPolygon(outline);
         if (polygon.Count < 3 || PathFullyInside(path, polygon))
         {
