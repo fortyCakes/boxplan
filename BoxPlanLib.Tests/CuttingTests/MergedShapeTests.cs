@@ -378,6 +378,39 @@ public class MergedShapeTests
     }
 
     [Fact]
+    public void Staircase_second_to_last_right_piece_is_3mm_wider_than_last()
+    {
+        var plan = ParseOk("""
+            shapes:
+              - id: "lower"
+                type: "box"
+                dimensions: [30.0, 10.0, 10.0]
+                location: [0.0, 0.0, 0.0]
+              - id: "middle"
+                type: "box"
+                dimensions: [20.0, 10.0, 10.0]
+                location: [0.0, 10.0, 0.0]
+              - id: "upper"
+                type: "box"
+                dimensions: [10.0, 10.0, 10.0]
+                location: [0.0, 20.0, 0.0]
+            """);
+
+        var lib = new BoxPlanLib();
+        var pieces = lib.GetCuttableShapes(plan, Settings(kerf: 0.0, t: 3.0, s: 5.0));
+
+        // In staircase ordering by X+ plane position, the second-to-last right
+        // face is at x=50.8 and the last is at x=71.2.
+        var secondToLast = pieces.Single(p => p.Id.StartsWith("merged-0.x+@50.8"));
+        var last = pieces.Single(p => p.Id.StartsWith("merged-0.x+@71.2"));
+
+        var secondToLastWidth = secondToLast.BoundingBoxMax.X - secondToLast.BoundingBoxMin.X;
+        var lastWidth = last.BoundingBoxMax.X - last.BoundingBoxMin.X;
+
+        Assert.Equal(3.0, secondToLastWidth - lastWidth, 6);
+    }
+
+    [Fact]
     public void Mergeable_check_skips_box_with_open_face()
     {
         // Two stacked boxes but the lower has an open top face.

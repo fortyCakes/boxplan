@@ -35,6 +35,20 @@ internal static class MergedShapeCutter
 
             var cornerOwnership = ComputeCornerOwnership(face, faces, byEdge, faceName);
 
+            // Concave edge joints are interior to the model. The mating tab must
+            // extend outside this face outline by t so the cut part has the
+            // required physical extent.
+            foreach (var (edgeIndex, segs) in byEdge)
+            {
+                foreach (var seg in segs)
+                {
+                    if (faceName != FaceName.Top && IsConcaveSharedSegment(face, seg, faces))
+                    {
+                        builder.AddEdgeExtension(edgeIndex, seg.Start, seg.Length, t);
+                    }
+                }
+            }
+
             // Subtract finger-joint notches owned by the neighbour face.
             // The standard joint pattern reserves t at each end of a shared
                 // segment for the perpendicular face's corner-cube to slot into.
@@ -112,6 +126,55 @@ internal static class MergedShapeCutter
             });
             logger?.Log($"[merge] Emitted merged shape {face.Id}");
         }
+    }
+
+    private static bool IsConcaveSharedSegment(
+        MergedFace face,
+        SharedSegment seg,
+        IReadOnlyList<MergedFace> faces)
+    {
+        if (seg.Length <= Eps) return false;
+
+        var startWorld = PointAlongEdgeWorld(face, seg.EdgeIndex, seg.Start);
+        var endWorld = PointAlongEdgeWorld(face, seg.EdgeIndex, seg.Start + seg.Length);
+
+        var excludeA = seg.FaceIndex;
+        var excludeB = seg.NeighbourFaceIndex;
+        var startReflexFaces = GetOtherReflexFacesAt(faces, startWorld, excludeA, excludeB);
+        var endReflexFaces = GetOtherReflexFacesAt(faces, endWorld, excludeA, excludeB);
+        return startReflexFaces.Overlaps(endReflexFaces);
+    }
+
+    private static Vec3 PointAlongEdgeWorld(MergedFace face, int edgeIndex, double distanceAlong)
+    {
+        var n = face.Outline.Count;
+        var p0 = face.Outline[edgeIndex % n];
+        var p1 = face.Outline[(edgeIndex + 1) % n];
+        var dx = p1.X - p0.X;
+        var dy = p1.Y - p0.Y;
+        var len = Math.Sqrt(dx * dx + dy * dy);
+        if (len <= Eps) return face.ToWorld(p0);
+
+        var t = Math.Clamp(distanceAlong / len, 0, 1);
+        var u = p0.X + dx * t;
+        var v = p0.Y + dy * t;
+        return face.ToWorld(new Vec2(u, v));
+    }
+
+    private static HashSet<int> GetOtherReflexFacesAt(
+        IReadOnlyList<MergedFace> faces,
+        Vec3 worldPt,
+        int excludeFaceA,
+        int excludeFaceB)
+    {
+        var reflexFaces = new HashSet<int>();
+        for (var i = 0; i < faces.Count; i++)
+        {
+            if (i == excludeFaceA || i == excludeFaceB) continue;
+            if (FaceIsReflexAt(faces[i], worldPt)) reflexFaces.Add(i);
+        }
+
+        return reflexFaces;
     }
 
     // null => no corner-cube ownership available (missing adjacency data).

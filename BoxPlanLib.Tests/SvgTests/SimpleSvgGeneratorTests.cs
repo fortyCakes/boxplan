@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Text.RegularExpressions;
 using System.Xml.Linq;
 using BoxPlanLib;
 using BoxPlanLib.Model;
@@ -353,5 +354,113 @@ public class SimpleSvgGeneratorTests
         Assert.Single(pageGroups);
         Assert.Equal("translate(0.000 0.000)", shapeGroups["tall"]);
         Assert.Equal("translate(20.000 0.000) translate(15.000 0) rotate(90)", shapeGroups["wide"]);
+    }
+
+    [Fact]
+    public void Staircase_layout_middle_riser_is_3mm_wider_than_bottom_riser_in_svg_x_dimension()
+    {
+        var lib = new BoxPlanLib();
+        var plan = lib.ParsePlan("""
+            shapes:
+              - id: "lower"
+                type: "box"
+                dimensions: [71.2, 12.7, 25.4]
+                location: [0.0, 0.0, 0.0]
+
+              - id: "middle"
+                type: "box"
+                dimensions: [50.8, 12.7, 25.4]
+                location: [0.0, 12.7, 0.0]
+
+              - id: "upper"
+                type: "box"
+                dimensions: [25.4, 12.7, 25.4]
+                location: [0.0, 25.4, 0.0]
+            """).Value!;
+
+        var settings = new BoxPlanSettings
+        {
+            SheetWidth = 400,
+            SheetHeight = 400,
+            Margin = 5.0,
+            Kerf = 0.1,
+            MaterialThickness = 3.0,
+            FingerJointSize = 5.0,
+            Spacing = 1.0,
+        };
+
+        var pieces = lib.GetCuttableShapes(plan, settings);
+        var svg = lib.GeneratePagedSVG(pieces, settings);
+        var doc = XDocument.Parse(svg);
+
+        var middleRiser = doc.Descendants(Svg + "g")
+            .Single(g => g.Attribute("id")?.Value.StartsWith("merged-0.x+@50.8") == true);
+        var bottomRiser = doc.Descendants(Svg + "g")
+            .Single(g => g.Attribute("id")?.Value.StartsWith("merged-0.x+@71.2") == true);
+
+        var middleWidth = LayoutXWidth(middleRiser);
+        var bottomWidth = LayoutXWidth(bottomRiser);
+
+        Assert.Equal(3.0, middleWidth - bottomWidth, 6);
+    }
+
+    private static double LayoutXWidth(XElement pieceGroup)
+    {
+        var pageGroup = pieceGroup.Parent;
+        Assert.NotNull(pageGroup);
+
+        var pageTransform = pageGroup!.Attribute("transform")?.Value ?? string.Empty;
+        var pieceTransform = pieceGroup.Attribute("transform")?.Value ?? string.Empty;
+
+        var path = pieceGroup.Descendants(Svg + "path").First();
+        var d = path.Attribute("d")!.Value;
+        var points = ParsePathPoints(d);
+
+        var transformedX = points
+            .Select(p => ApplyTransform(ApplyTransform(p, pieceTransform), pageTransform).X)
+            .ToArray();
+
+        return transformedX.Max() - transformedX.Min();
+    }
+
+    private static IReadOnlyList<Vec2> ParsePathPoints(string d)
+    {
+        var matches = Regex.Matches(d, @"(?:M|L)\s+(-?\d+(?:\.\d+)?)\s+(-?\d+(?:\.\d+)?)");
+        return matches
+            .Select(m => new Vec2(
+                double.Parse(m.Groups[1].Value, CultureInfo.InvariantCulture),
+                double.Parse(m.Groups[2].Value, CultureInfo.InvariantCulture)))
+            .ToList();
+    }
+
+    private static Vec2 ApplyTransform(Vec2 p, string transform)
+    {
+        var result = p;
+        var opMatches = Regex.Matches(transform, @"(translate|rotate)\(([^)]*)\)");
+        foreach (Match m in opMatches)
+        {
+            var op = m.Groups[1].Value;
+            var values = m.Groups[2].Value
+                .Split([' ', ','], StringSplitOptions.RemoveEmptyEntries)
+                .Select(v => double.Parse(v, CultureInfo.InvariantCulture))
+                .ToArray();
+
+            if (op == "translate")
+            {
+                var tx = values.Length > 0 ? values[0] : 0.0;
+                var ty = values.Length > 1 ? values[1] : 0.0;
+                result = new Vec2(result.X + tx, result.Y + ty);
+            }
+            else if (op == "rotate")
+            {
+                var deg = values.Length > 0 ? values[0] : 0.0;
+                var rad = deg * Math.PI / 180.0;
+                var c = Math.Cos(rad);
+                var s = Math.Sin(rad);
+                result = new Vec2(result.X * c - result.Y * s, result.X * s + result.Y * c);
+            }
+        }
+
+        return result;
     }
 }
