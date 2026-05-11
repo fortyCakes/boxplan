@@ -11,7 +11,9 @@
       "Bash(ls *)",
       "Read(*)",
       "Bash(grep -E \"\\\\.cs$|^d\")",
-      "Bash(Select-Object FullName)"
+      "Bash(Select-Object FullName)",
+      "Bash(git stash *)",
+      "PowerShell(cd \"c:\\\\Users\\\\Alex.Stuart\\\\source\\\\repos\\\\boxplan\"; dotnet build BoxPlanLib/BoxPlanLib.csproj 2>&1 | Where-Object { $_ -match \"error\" })"
     ]
   }
 }

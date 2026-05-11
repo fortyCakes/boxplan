@@ -36,11 +36,19 @@ public sealed class CuttingPipeline
 
         foreach (var shape in plan.Shapes)
         {
-            if (shape is not BoxShape box || box.Dimensions is not { } dims) continue;
-            if (multiBoxIds.Contains(box.Id)) continue;
-            logger.Log($"[pipeline] Emitting shape {box.Id}");
-            EmitShape(box.Id, box, dims, output, settings, logger);
-            EmitInserts(box.Id, box, output, settings, logger);
+            switch (shape)
+            {
+                case BoxShape box when box.Dimensions is { } dims:
+                    if (multiBoxIds.Contains(box.Id)) continue;
+                    logger.Log($"[pipeline] Emitting shape {box.Id}");
+                    EmitShape(box.Id, box, dims, output, settings, logger);
+                    EmitInserts(box.Id, box, output, settings, logger);
+                    break;
+                case PrismShape prism when prism.Depth is { } prismDepth:
+                    logger.Log($"[pipeline] Emitting prism {prism.Id}");
+                    output.AddRange(PrismFaceBuilder.Build(prism.Id, prism, prismDepth, settings, logger));
+                    break;
+            }
         }
         logger.Log($"[pipeline] Pipeline run complete");
         return output.ToArray();

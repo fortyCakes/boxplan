@@ -22,6 +22,14 @@ public sealed class PlanParser
                     new Dictionary<string, Type>
                     {
                         { "box", typeof(RawBoxShape) },
+                        { "prism", typeof(RawPrismShape) },
+                        { "triangle", typeof(RawNamedPolygonShape) },
+                        { "pentagon", typeof(RawNamedPolygonShape) },
+                        { "hexagon", typeof(RawNamedPolygonShape) },
+                        { "regular-polygon", typeof(RawRegularPolygonShape) },
+                        { "circle", typeof(RawCircleShape) },
+                        { "semicircle", typeof(RawSemicircleShape) },
+                        { "quarter-circle", typeof(RawQuarterCircleShape) },
                     });
                 o.AddKeyValueTypeDiscriminator<RawFeature>(
                     "type",

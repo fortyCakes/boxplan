@@ -165,6 +165,9 @@ internal static class CliSettings
         UseOrToolsSequenceOptimization = true,
         LayoutSearchIterations = 32,
         LayoutRandomSeed = Random.Shared.Next(),
+        FlexLineSpacing = 0.8,
+        FlexLineLengthFraction = 0.1,
+        FlexLengthCompensationFactor = 1.0,
     };
 
     public static string BuildHelpText()

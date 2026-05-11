@@ -144,6 +144,9 @@ public class FitResolverTests
               - id: "frame"
                 type: "box"
                 dimensions: [200.0, 100.0, 200.0]
+                faces:
+                  - name: "top"
+                    type: "open"
                 inserts:
                   - fill: "entire-face"
                     ref: "insert"

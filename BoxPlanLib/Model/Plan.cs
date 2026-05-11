@@ -88,6 +88,9 @@ public sealed class Insert
     public Shape Target { get; internal set; } = null!;
     public Vec3? ResolvedDimensions { get; internal set; }
     public Vec3? ResolvedLocation { get; internal set; }
+    // Entry axis for entire-face inserts: the axis perpendicular to the open face.
+    // null = default (Z, same as all-cells).  Remaps fit.Depth to the stated axis.
+    public Axis? EntryAxis { get; init; }
 }
 
 public abstract class Feature
@@ -154,4 +157,54 @@ public abstract record FitDimension
     public sealed record AutoOffset(double Offset) : FitDimension;
 
     public sealed record Fixed(double Value) : FitDimension;
+}
+
+public sealed class PrismShape : Shape
+{
+    public required PrismProfile Profile { get; init; }
+    public double? Depth { get; init; }
+    public required IReadOnlyList<PrismLateralFace> LateralFaces { get; init; }
+}
+
+public sealed class PrismProfile
+{
+    // Closed polygon in the X-Z plane. StartPoint is vertex 0; Segments define
+    // subsequent vertices (and optional curves). The polygon is implicitly closed:
+    // the last segment's endpoint should equal StartPoint.
+    public required Vec2 StartPoint { get; init; }
+    public required IReadOnlyList<ProfileSegment> Segments { get; init; }
+}
+
+public abstract record ProfileSegment
+{
+    public abstract Vec2 EndPoint { get; }
+
+    public sealed record Line(Vec2 To) : ProfileSegment
+    {
+        public override Vec2 EndPoint => To;
+    }
+
+    public sealed record Bezier(Vec2 To, Vec2 Control1, Vec2 Control2) : ProfileSegment
+    {
+        public override Vec2 EndPoint => To;
+    }
+
+    public sealed record Arc(Vec2 To, double Radius, bool Clockwise) : ProfileSegment
+    {
+        public override Vec2 EndPoint => To;
+    }
+}
+
+public sealed class PrismLateralFace
+{
+    public required int EdgeIndex { get; init; }
+    public FaceType Type { get; init; } = FaceType.Closed;
+    // Interior dihedral angle (degrees) between this lateral face and the NEXT one
+    // at their shared vertical edge. Used to calculate adjusted slot depths.
+    // 90.0 for the last face's edge back to the first (if all are right angles).
+    public double DihedralAngleToNext { get; init; } = 90.0;
+    // True for Arc or Bezier segments — signals the cutting pipeline to add flex cuts.
+    public bool IsCurved { get; init; }
+    // Pre-computed length of this edge in the X-Z plane (profile segment chord/arc length).
+    public required double EdgeLength { get; init; }
 }

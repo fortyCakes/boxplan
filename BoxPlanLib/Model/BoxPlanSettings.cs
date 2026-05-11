@@ -16,6 +16,13 @@ public class BoxPlanSettings
     public int LayoutSearchIterations { get; set; }
     public int LayoutRandomSeed { get; set; }
 
+    // Flex cut pattern settings (used for curved prism faces)
+    public double FlexLineSpacing { get; set; }
+    public double FlexLineLengthFraction { get; set; }
+    // Multiplier applied to arc length when sizing a curved face panel.
+    // Values < 1.0 compensate for the material shortening caused by flex cuts.
+    public double FlexLengthCompensationFactor { get; set; }
+
     public BoxPlanSettings Default => new BoxPlanSettings
     {
         SheetWidth = 300.0,
@@ -31,5 +38,8 @@ public class BoxPlanSettings
         UseOrToolsSequenceOptimization = false,
         LayoutSearchIterations = 24,
         LayoutRandomSeed = 1337,
+        FlexLineSpacing = 3.0,
+        FlexLineLengthFraction = 0.75,
+        FlexLengthCompensationFactor = 1.0,
     };
 }

@@ -148,3 +148,90 @@ public readonly record struct RawFitDimension(bool IsAuto, double Value, double 
     public static RawFitDimension AutoWithOffset(double offset) => new(true, 0, offset);
     public static RawFitDimension Fixed(double value) => new(false, value, 0);
 }
+
+// ── Prism shapes ────────────────────────────────────────────────────────────
+
+// Abstract base shared by all prism-like shape types.
+public abstract class RawPrismShapeBase : RawShape
+{
+    public double? Depth { get; set; }
+
+    [YamlMember(Alias = "lateral-faces")]
+    public List<RawLateralFace>? LateralFaces { get; set; }
+}
+
+// type: "prism" — explicit polygon via points list OR segment list.
+public sealed class RawPrismShape : RawPrismShapeBase
+{
+    // Simple polygon: list of [x, z] pairs.
+    public List<double[]>? Points { get; set; }
+
+    // Segment-based polygon (supports arcs and bezier curves).
+    public List<RawProfileSegment>? Segments { get; set; }
+}
+
+// type: "triangle" | "pentagon" | "hexagon" — regular polygon fitted to a bounding box.
+public sealed class RawNamedPolygonShape : RawPrismShapeBase
+{
+    public double? Width { get; set; }
+    public double? Height { get; set; }
+}
+
+// type: "regular-polygon" — N-sided regular polygon fitted to a bounding box.
+public sealed class RawRegularPolygonShape : RawPrismShapeBase
+{
+    public int? Sides { get; set; }
+    public double? Width { get; set; }
+    public double? Height { get; set; }
+}
+
+// type: "circle"
+public sealed class RawCircleShape : RawPrismShapeBase
+{
+    public double? Diameter { get; set; }
+}
+
+// type: "semicircle"
+public sealed class RawSemicircleShape : RawPrismShapeBase
+{
+    public double? Diameter { get; set; }
+}
+
+// type: "quarter-circle"
+public sealed class RawQuarterCircleShape : RawPrismShapeBase
+{
+    public double? Radius { get; set; }
+}
+
+// One entry in a segments list. Exactly one of LineTo / ArcTo / BezierTo will be set.
+public sealed class RawProfileSegment : IRawLocated
+{
+    [YamlMember(Alias = "line-to")]
+    public double[]? LineTo { get; set; }
+
+    [YamlMember(Alias = "arc-to")]
+    public double[]? ArcTo { get; set; }
+
+    [YamlMember(Alias = "bezier-to")]
+    public double[]? BezierTo { get; set; }
+
+    public double? Radius { get; set; }
+    public bool? Clockwise { get; set; }
+
+    [YamlMember(Alias = "control-1")]
+    public double[]? Control1 { get; set; }
+
+    [YamlMember(Alias = "control-2")]
+    public double[]? Control2 { get; set; }
+
+    [YamlIgnore] public RawLocation? SourceLocation { get; set; }
+}
+
+// Lateral face override (open/closed) for prism shapes.
+public sealed class RawLateralFace : IRawLocated
+{
+    public int? Index { get; set; }
+    public string? Type { get; set; }
+
+    [YamlIgnore] public RawLocation? SourceLocation { get; set; }
+}

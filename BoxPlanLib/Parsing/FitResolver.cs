@@ -99,9 +99,25 @@ public sealed class FitResolver
         }
 
         var clearance = fit.Clearance;
-        var (rx, ox, okX) = ResolveAxis(fit.Width, cellSize.X, cellOrigin.X, clearance, materialThickness, "width", path, errors);
-        var (ry, oy, okY) = ResolveAxis(fit.Height, cellSize.Y, cellOrigin.Y, clearance, materialThickness, "height", path, errors);
-        var (rz, oz, okZ) = ResolveAxis(fit.Depth, cellSize.Z, cellOrigin.Z, clearance, materialThickness, "depth", path, errors);
+        // Remap cell axes so fit.Depth always points in the insertion direction.
+        // Top/Bottom open (entry along Y): Width→X, Height→Z, Depth→Y
+        // Left/Right open (entry along X): Width→Z, Height→Y, Depth→X
+        // Front/Back or default  (entry along Z): Width→X, Height→Y, Depth→Z  (unchanged)
+        var (szX, szY, szZ) = insert.EntryAxis switch
+        {
+            Axis.Y => (cellSize.X, cellSize.Z, cellSize.Y),
+            Axis.X => (cellSize.Z, cellSize.Y, cellSize.X),
+            _      => (cellSize.X, cellSize.Y, cellSize.Z),
+        };
+        var (soX, soY, soZ) = insert.EntryAxis switch
+        {
+            Axis.Y => (cellOrigin.X, cellOrigin.Z, cellOrigin.Y),
+            Axis.X => (cellOrigin.Z, cellOrigin.Y, cellOrigin.X),
+            _      => (cellOrigin.X, cellOrigin.Y, cellOrigin.Z),
+        };
+        var (rx, ox, okX) = ResolveAxis(fit.Width,  szX, soX, clearance, materialThickness, "width",  path, errors);
+        var (ry, oy, okY) = ResolveAxis(fit.Height, szY, soY, clearance, materialThickness, "height", path, errors);
+        var (rz, oz, okZ) = ResolveAxis(fit.Depth,  szZ, soZ, clearance, materialThickness, "depth",  path, errors);
 
         if (!okX || !okY || !okZ)
         {

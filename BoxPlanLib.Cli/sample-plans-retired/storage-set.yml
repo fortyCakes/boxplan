@@ -1,0 +1,128 @@
+shapes:
+- id: "box-1"
+  type: "box"
+  dimensions: [76.0, 220.0, 98.0]
+  location: [0.0, 0.0, 0.0]
+  faces:
+  - name: "top"
+    type: "open"
+
+- id: "box-2"
+  type: "box"
+  dimensions: [76.0, 220.0, 98.0]
+  location: [86.0, 0.0, 0.0]
+  faces:
+  - name: "top"
+    type: "open"
+
+- id: "box-3"
+  type: "box"
+  dimensions: [76.0, 220.0, 98.0]
+  location: [172.0, 0.0, 0.0]
+  faces:
+  - name: "top"
+    type: "open"
+
+- id: "box-4"
+  type: "box"
+  dimensions: [76.0, 105.0, 98.0]
+  location: [258.0, 0.0, 0.0]
+  faces:
+  - name: "top"
+    type: "open"
+
+- id: "box-5"
+  type: "box"
+  dimensions: [76.0, 105.0, 98.0]
+  location: [344.0, 0.0, 0.0]
+  faces:
+  - name: "top"
+    type: "open"
+
+- id: "box-6"
+  type: "box"
+  dimensions: [76.0, 105.0, 98.0]
+  location: [430.0, 0.0, 0.0]
+  faces:
+  - name: "top"
+    type: "open"
+
+- id: "box-7"
+  type: "box"
+  dimensions: [76.0, 140.0, 98.0]
+  location: [516.0, 0.0, 0.0]
+  faces:
+  - name: "top"
+    type: "open"
+
+- id: "box-8"
+  type: "box"
+  dimensions: [76.0, 140.0, 98.0]
+  location: [602.0, 0.0, 0.0]
+  faces:
+  - name: "top"
+    type: "open"
+
+- id: "box-9"
+  type: "box"
+  dimensions: [76.0, 140.0, 98.0]
+  location: [688.0, 0.0, 0.0]
+  faces:
+  - name: "top"
+    type: "open"
+
+- id: "box-10"
+  type: "box"
+  dimensions: [76.0, 185.0, 98.0]
+  location: [774.0, 0.0, 0.0]
+  faces:
+  - name: "top"
+    type: "open"
+
+- id: "box-11"
+  type: "box"
+  dimensions: [76.0, 145.0, 98.0]
+  location: [860.0, 0.0, 0.0]
+  faces:
+  - name: "top"
+    type: "open"
+
+- id: "box-12"
+  type: "box"
+  dimensions: [76.0, 145.0, 98.0]
+  location: [946.0, 0.0, 0.0]
+  faces:
+  - name: "top"
+    type: "open"
+
+- id: "box-13"
+  type: "box"
+  dimensions: [153.0, 40.0, 98.0]
+  location: [1032.0, 0.0, 0.0]
+  faces:
+  - name: "top"
+    type: "open"
+
+- id: "inner-container"
+  type: "box"
+  dimensions: [237.0, 333.0, 206.0]
+  location: [1195.0, 0.0, 0.0]
+  faces:
+  - name: "top"
+    type: "open"
+
+- id: "outer-bottom"
+  type: "box"
+  dimensions: [243.0, 339.0, 53.0]
+  location: [1442.0, 0.0, 0.0]
+  faces:
+  - name: "top"
+    type: "open"
+
+- id: "outer-lid"
+  type: "box"
+  dimensions: [243.0, 339.0, 159.0]
+  location: [1695.0, 0.0, 0.0]
+  faces:
+  - name: "bottom"
+    type: "open"

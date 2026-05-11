@@ -1,0 +1,8 @@
+shapes:
+  - id: "hex-holder"
+    type: "hexagon"
+    width: 80.0
+    depth: 120.0
+    faces:
+      - name: "front"
+        type: "open"
