@@ -163,8 +163,8 @@ internal static class CliSettings
         Labels = false,
         UseAdvancedLayoutOptimizer = true,
         UseOrToolsSequenceOptimization = true,
-        LayoutSearchIterations = 320,
-        LayoutRandomSeed = 1337,
+        LayoutSearchIterations = 32,
+        LayoutRandomSeed = Random.Shared.Next(),
     };
 
     public static string BuildHelpText()

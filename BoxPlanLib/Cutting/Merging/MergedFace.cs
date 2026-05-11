@@ -13,6 +13,10 @@ internal sealed class MergedFace
     public required IReadOnlyList<Vec2> Outline { get; init; }
     public required FaceBasis Basis { get; init; }
 
+    // True for faces generated at the contact plane between two hollow boxes;
+    // these become internal divider walls, not outer skin panels.
+    public bool IsInternalDivider { get; init; }
+
     // Lift a local 2D point on the outline back to a world 3D coordinate on
     // the face plane.
     public Vec3 ToWorld(Vec2 uv) => Basis.Lift(uv, Plane);

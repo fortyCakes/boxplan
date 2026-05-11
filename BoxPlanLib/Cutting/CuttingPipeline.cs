@@ -67,8 +67,7 @@ public sealed class CuttingPipeline
     private static bool IsMergeCandidate(BoxShape box) =>
         box.Dividers.Count == 0
         && box.Inserts.Count == 0
-        && box.Features.Count == 0
-        && box.Faces.All(f => f.Type == FaceType.Closed);
+        && box.Features.Count == 0;
 
     private static void EmitDividerPanels(
         string parentId,
@@ -263,48 +262,7 @@ public sealed class CuttingPipeline
     }
 
     private static IReadOnlyList<DividerJointSpan> BuildDividerJointSpans(double length, double t, double s, bool joined, bool dividerOwnsPrimary)
-    {
-        if (!joined || length <= 0)
-        {
-            return new[] { new DividerJointSpan(length, DividerJointSpanKind.Smooth) };
-        }
-
-        var edgeInset = t * 1.5;
-        var innerLength = Math.Max(0, length - 2 * edgeInset);
-        var blocks = FingerJointPattern.Build(innerLength, s, t);
-        if (!blocks.Any(block => !block.PrimaryOwns))
-        {
-            return new[] { new DividerJointSpan(length, DividerJointSpanKind.Smooth) };
-        }
-
-        var spans = new List<DividerJointSpan>();
-
-        void Add(double spanLength, DividerJointSpanKind kind)
-        {
-            if (spanLength <= 0)
-            {
-                return;
-            }
-
-            if (spans.Count > 0 && spans[^1].Kind == kind)
-            {
-                spans[^1] = spans[^1] with { Length = spans[^1].Length + spanLength };
-                return;
-            }
-
-            spans.Add(new DividerJointSpan(spanLength, kind));
-        }
-
-        Add(edgeInset, DividerJointSpanKind.EndInset);
-        foreach (var block in blocks)
-        {
-            var dividerOwnsBlock = block.PrimaryOwns == dividerOwnsPrimary;
-            Add(block.Length, dividerOwnsBlock ? DividerJointSpanKind.FaceSlot : DividerJointSpanKind.DividerTab);
-        }
-        Add(edgeInset, DividerJointSpanKind.EndInset);
-
-        return spans;
-    }
+        => DividerJointBuilder.BuildSpans(length, t, s, joined, dividerOwnsPrimary);
 
     private static void EmitInserts(
         string parentId,
@@ -424,31 +382,7 @@ public sealed class CuttingPipeline
     }
 
     private static IReadOnlyList<SlotSpec> BuildFingerSlots(double u, double v, double w, double h, double t, double s, bool dividerOwnsPrimary)
-    {
-        var slots = new List<SlotSpec>();
-        var vertical = h >= w;
-        var length = vertical ? h : w;
-        var spans = BuildDividerJointSpans(length, t, s, joined: true, dividerOwnsPrimary);
-        var cursor = -length / 2.0;
-        foreach (var span in spans)
-        {
-            if (span.Kind == DividerJointSpanKind.FaceSlot)
-            {
-                if (vertical)
-                {
-                    slots.Add(new SlotSpec(u, v + cursor + span.Length / 2.0, w, span.Length));
-                }
-                else
-                {
-                    slots.Add(new SlotSpec(u + cursor + span.Length / 2.0, v, span.Length, h));
-                }
-            }
-
-            cursor += span.Length;
-        }
-
-        return slots;
-    }
+        => DividerJointBuilder.BuildFingerSlots(u, v, w, h, t, s, dividerOwnsPrimary);
 
     // True when `face` is the lowest-priority of the present faces meeting at this
     // panel corner. Open neighbors are treated as absent — they don't contribute a

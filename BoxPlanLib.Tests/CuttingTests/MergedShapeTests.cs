@@ -422,10 +422,141 @@ public class MergedShapeTests
     }
 
     [Fact]
-    public void Mergeable_check_skips_box_with_open_face()
+    public void Two_touching_open_top_boxes_merge_into_divided_tray()
     {
-        // Two stacked boxes but the lower has an open top face.
-        // Without merge eligibility, both boxes go through the per-box pipeline.
+        // Two open-top boxes sharing a face should merge into one combined tray
+        // with the shared face becoming an internal divider wall, not two
+        // separate independent box sets.
+        var plan = ParseOk("""
+            shapes:
+              - id: "box-1"
+                type: "box"
+                dimensions: [60.0, 30.0, 30.0]
+                location: [0.0, 0.0, 0.0]
+                origin: "bottom-left-front"
+                faces:
+                  - name: "top"
+                    type: "open"
+              - id: "box-2"
+                type: "box"
+                dimensions: [60.0, 30.0, 30.0]
+                location: [0.0, 0.0, 30.0]
+                origin: "bottom-left-front"
+                faces:
+                  - name: "top"
+                    type: "open"
+            """);
+
+        var lib = new BoxPlanLib();
+        var pieces = lib.GetCuttableShapes(plan, Settings());
+        var ids = pieces.Select(p => p.Id).ToHashSet();
+
+        // Pieces should be merged, not emitted as two separate box sets.
+        Assert.Contains(ids, id => id.StartsWith("merged-"));
+        Assert.DoesNotContain("box-1.front", ids);
+        Assert.DoesNotContain("box-2.front", ids);
+
+        // The combined 60×30×60 tray (open top) has 5 outer faces + 1 divider = 6 pieces.
+        Assert.Equal(6, pieces.Length);
+    }
+
+    [Fact]
+    public void Divided_tray_outer_walls_have_divider_slots()
+    {
+        // The bottom, left, and right outer walls of the divided tray must have
+        // interior slot cuts where the internal divider meets them. The divider
+        // edge that meets the open-top face has no wall, so only 3 walls get slots.
+        var plan = ParseOk("""
+            shapes:
+              - id: "box-1"
+                type: "box"
+                dimensions: [60.0, 30.0, 30.0]
+                location: [0.0, 0.0, 0.0]
+                origin: "bottom-left-front"
+                faces:
+                  - name: "top"
+                    type: "open"
+              - id: "box-2"
+                type: "box"
+                dimensions: [60.0, 30.0, 30.0]
+                location: [0.0, 0.0, 30.0]
+                origin: "bottom-left-front"
+                faces:
+                  - name: "top"
+                    type: "open"
+            """);
+
+        var lib = new BoxPlanLib();
+        var pieces = lib.GetCuttableShapes(plan, Settings(t: 3.0, s: 10.0));
+
+        // Divider panel must have interior cuts (cross-divider slots, if any) and
+        // tabbed outline (notches cut from plain rectangle → more than 4 vertices).
+        var divider = pieces.Single(p => p.Id.Contains("z+@30"));
+        var pts = Points(divider);
+        Assert.True(pts.GroupBy(p => (Math.Round(p.X, 3), Math.Round(p.Y, 3))).Count() > 4,
+            "Divider panel should have tab notches (more than 4 distinct vertices)");
+
+        // Each outer wall that meets the divider should have at least one interior cut (slot).
+        var bottom = pieces.Single(p => p.Id.Contains("y-@"));
+        var left   = pieces.Single(p => p.Id.Contains("x-@"));
+        var right  = pieces.Single(p => p.Id.Contains("x+@"));
+        Assert.True(bottom.InteriorCuts.Count > 0, "Bottom wall must have a divider slot");
+        Assert.True(left.InteriorCuts.Count > 0,   "Left wall must have a divider slot");
+        Assert.True(right.InteriorCuts.Count > 0,  "Right wall must have a divider slot");
+    }
+
+    [Fact]
+    public void Two_by_two_grid_of_open_top_boxes_emits_two_crossing_dividers_with_halflap_slots()
+    {
+        // 2×2 grid: four 30×30×30 open-top boxes. The merged group should produce
+        // one X-axis divider and one Z-axis divider that cross at the centre.
+        // Each divider must have a half-lap interior slot where it meets the other.
+        var plan = ParseOk("""
+            shapes:
+              - id: "fl"
+                type: "box"
+                dimensions: [30.0, 30.0, 30.0]
+                location: [0.0, 0.0, 0.0]
+                faces: [{name: "top", type: "open"}]
+              - id: "fr"
+                type: "box"
+                dimensions: [30.0, 30.0, 30.0]
+                location: [30.0, 0.0, 0.0]
+                faces: [{name: "top", type: "open"}]
+              - id: "bl"
+                type: "box"
+                dimensions: [30.0, 30.0, 30.0]
+                location: [0.0, 0.0, 30.0]
+                faces: [{name: "top", type: "open"}]
+              - id: "br"
+                type: "box"
+                dimensions: [30.0, 30.0, 30.0]
+                location: [30.0, 0.0, 30.0]
+                faces: [{name: "top", type: "open"}]
+            """);
+
+        var lib = new BoxPlanLib();
+        var pieces = lib.GetCuttableShapes(plan, Settings(t: 3.0, s: 10.0));
+
+        // Two dividers: one at X=30 (x+ direction), one at Z=30 (z+ direction).
+        var xDiv = pieces.Single(p => p.Id.Contains("x+@30"));
+        var zDiv = pieces.Single(p => p.Id.Contains("z+@30"));
+
+        // Each divider must have exactly one half-lap interior slot (where they cross).
+        Assert.Equal(1, xDiv.InteriorCuts.Count);
+        Assert.Equal(1, zDiv.InteriorCuts.Count);
+
+        // Total piece count: 5 outer walls (open top) + 2 dividers = 7.
+        Assert.Equal(7, pieces.Length);
+    }
+
+    [Fact]
+    public void Stacked_open_top_and_closed_box_merge_without_divider()
+    {
+        // Lower has an open top; upper is fully closed. They touch at Y=30.
+        // Both are now merge candidates — the open face is suppressed rather
+        // than blocking the merge. No divider is emitted because the upper box
+        // is solid (not hollow), so only one side of the contact plane is hollow.
         var plan = ParseOk("""
             shapes:
               - id: "lower"
@@ -444,8 +575,12 @@ public class MergedShapeTests
         var lib = new BoxPlanLib();
         var pieces = lib.GetCuttableShapes(plan, Settings());
         var ids = pieces.Select(p => p.Id).ToHashSet();
-        Assert.DoesNotContain(ids, id => id.StartsWith("merged-"));
-        Assert.Contains("lower.front", ids);
-        Assert.Contains("upper.bottom", ids);
+
+        Assert.Contains(ids, id => id.StartsWith("merged-"));
+        Assert.DoesNotContain("lower.front", ids);
+        Assert.DoesNotContain("upper.bottom", ids);
+        // 30×60×30 merged solid: bottom + top (from upper) + 4 sides = 6 pieces.
+        // Lower's open top is suppressed; no divider at Y=30.
+        Assert.Equal(6, pieces.Length);
     }
 }
