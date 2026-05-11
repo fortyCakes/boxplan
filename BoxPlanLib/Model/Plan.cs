@@ -151,5 +151,7 @@ public abstract record FitDimension
         private Auto() { }
     }
 
+    public sealed record AutoOffset(double Offset) : FitDimension;
+
     public sealed record Fixed(double Value) : FitDimension;
 }

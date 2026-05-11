@@ -137,6 +137,30 @@ public class FitResolverTests
     }
 
     [Fact]
+    public void Auto_offset_adds_to_resolved_auto_size()
+    {
+        var plan = ParseOk("""
+            shapes:
+              - id: "frame"
+                type: "box"
+                dimensions: [200.0, 100.0, 200.0]
+                inserts:
+                  - fill: "entire-face"
+                    ref: "insert"
+              - id: "insert"
+                type: "box"
+                fit:
+                  mode: "cell"
+                  clearance: 0.1
+                  depth: auto+10
+            """, Settings(materialThickness: 3.0));
+
+        var insert = plan.ShapesById["frame"].Inserts.Single();
+        // depth auto: 100 - 2*0.1 - 3 + 10 = 106.8
+        Assert.Equal(106.8, insert.ResolvedDimensions!.Value.Z, precision: 10);
+    }
+
+    [Fact]
     public void Insert_with_fixed_dimension_target_uses_target_dimensions_at_cell_origin()
     {
         var plan = ParseOk("""

@@ -142,8 +142,9 @@ public sealed class RawFit : IRawLocated
     [YamlIgnore] public RawLocation? SourceLocation { get; set; }
 }
 
-public readonly record struct RawFitDimension(bool IsAuto, double Value)
+public readonly record struct RawFitDimension(bool IsAuto, double Value, double Offset = 0)
 {
-    public static RawFitDimension Auto => new(true, 0);
-    public static RawFitDimension Fixed(double value) => new(false, value);
+    public static RawFitDimension Auto => new(true, 0, 0);
+    public static RawFitDimension AutoWithOffset(double offset) => new(true, 0, offset);
+    public static RawFitDimension Fixed(double value) => new(false, value, 0);
 }

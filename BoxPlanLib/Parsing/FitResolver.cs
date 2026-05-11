@@ -127,7 +127,9 @@ public sealed class FitResolver
             case FitDimension.Fixed f:
                 return (f.Value, cellOrigin, true);
             case FitDimension.Auto:
-                var size = cellSize - 2 * clearance - materialThickness;
+            case FitDimension.AutoOffset:
+                var offset = dim is FitDimension.AutoOffset ao ? ao.Offset : 0;
+                var size = cellSize - 2 * clearance - materialThickness + offset;
                 if (size <= 0)
                 {
                     errors.Add(new PlanError(

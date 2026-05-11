@@ -140,6 +140,28 @@ public class ParserTests
         Assert.Equal(145.5, depth.Value);
     }
 
+    [Theory]
+    [InlineData("auto+10", 10.0)]
+    [InlineData("auto + 15.5", 15.5)]
+    [InlineData("auto - 5.0", -5.0)]
+    [InlineData("auto-3", -3.0)]
+    public void Parses_fit_with_auto_offset_depth(string depthValue, double expectedOffset)
+    {
+        var yaml = $"""
+            shapes:
+              - id: "d"
+                type: "box"
+                fit:
+                  mode: "cell"
+                  depth: {depthValue}
+            """;
+
+        var raw = ParseOk(yaml);
+        var depth = Assert.Single(raw.Shapes).Fit!.Depth!.Value;
+        Assert.True(depth.IsAuto);
+        Assert.Equal(expectedOffset, depth.Offset);
+    }
+
     [Fact]
     public void Reports_error_for_unknown_key_with_line_number()
     {

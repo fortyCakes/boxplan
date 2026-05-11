@@ -634,10 +634,14 @@ public sealed class PlanResolver
         };
     }
 
-    private static FitDimension ToFitDimension(RawFitDimension? raw) =>
-        raw is null || raw.Value.IsAuto
-            ? FitDimension.Auto.Instance
-            : new FitDimension.Fixed(raw.Value.Value);
+    private static FitDimension ToFitDimension(RawFitDimension? raw)
+    {
+        if (raw is null) return FitDimension.Auto.Instance;
+        var r = raw.Value;
+        if (!r.IsAuto) return new FitDimension.Fixed(r.Value);
+        if (r.Offset != 0) return new FitDimension.AutoOffset(r.Offset);
+        return FitDimension.Auto.Instance;
+    }
 
     private static double AxisLength(Axis axis, Vec3 dims) => axis switch
     {

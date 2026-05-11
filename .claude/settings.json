@@ -10,7 +10,8 @@
       "Bash(dotnet run *)",
       "Bash(ls *)",
       "Read(*)",
-      "Bash(grep -E \"\\\\.cs$|^d\")"
+      "Bash(grep -E \"\\\\.cs$|^d\")",
+      "Bash(Select-Object FullName)"
     ]
   }
 }
