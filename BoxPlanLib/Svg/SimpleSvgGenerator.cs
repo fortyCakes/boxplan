@@ -128,6 +128,95 @@ internal sealed class SvgGenerator
 
     private static LayoutResult LayoutPages(BoxPlanCuttableShape[] shapes, BoxPlanSettings settings)
     {
+        var legacy = LayoutPagesLegacy(shapes, settings);
+
+        if (settings.UseAdvancedLayoutOptimizer)
+        {
+            var optimizer = new AdvancedLayoutOptimizer(settings);
+            var optimized = optimizer.Optimize(shapes);
+            if (optimized is not null)
+            {
+                var advanced = new LayoutResult(
+                    optimized.Items
+                    .Select(item => new ShapePlacement(item.Shape, item.PageIndex, item.X, item.Y, item.Rotated))
+                    .ToList(),
+                    optimized.PageCount);
+
+                if (IsLayoutBetter(advanced, legacy, settings))
+                {
+                    return advanced;
+                }
+            }
+        }
+
+        return legacy;
+    }
+
+    private static bool IsLayoutBetter(LayoutResult candidate, LayoutResult baseline, BoxPlanSettings settings)
+    {
+        var candidateScore = ScoreLayout(candidate, settings);
+        var baselineScore = ScoreLayout(baseline, settings);
+
+        if (candidateScore.PageCount != baselineScore.PageCount)
+        {
+            return candidateScore.PageCount < baselineScore.PageCount;
+        }
+
+        if (Math.Abs(candidateScore.BoundingAreaWithMargins - baselineScore.BoundingAreaWithMargins) > 1e-6)
+        {
+            return candidateScore.BoundingAreaWithMargins < baselineScore.BoundingAreaWithMargins;
+        }
+
+        return candidateScore.AggregateUsedArea <= baselineScore.AggregateUsedArea + 1e-6;
+    }
+
+    private static (int PageCount, double BoundingAreaWithMargins, double AggregateUsedArea) ScoreLayout(LayoutResult layout, BoxPlanSettings settings)
+    {
+        if (layout.PageCount == 0)
+        {
+            return (0, 0.0, 0.0);
+        }
+
+        var pageWidths = new double[layout.PageCount];
+        var pageHeights = new double[layout.PageCount];
+
+        foreach (var placement in layout.Items)
+        {
+            var width = placement.Rotated ? Height(placement.Shape) : Width(placement.Shape);
+            var height = placement.Rotated ? Width(placement.Shape) : Height(placement.Shape);
+
+            var right = placement.X + width;
+            var top = placement.Y + height;
+            if (right > pageWidths[placement.PageIndex])
+            {
+                pageWidths[placement.PageIndex] = right;
+            }
+
+            if (top > pageHeights[placement.PageIndex])
+            {
+                pageHeights[placement.PageIndex] = top;
+            }
+        }
+
+        var totalWidth = pageWidths.Sum(w => w + (2 * settings.Margin));
+        if (layout.PageCount > 1)
+        {
+            totalWidth += settings.Spacing * (layout.PageCount - 1);
+        }
+
+        var maxHeight = pageHeights.Max(h => h + (2 * settings.Margin));
+        var boundingAreaWithMargins = totalWidth * maxHeight;
+        var aggregateUsedArea = 0.0;
+        for (var i = 0; i < layout.PageCount; i++)
+        {
+            aggregateUsedArea += pageWidths[i] * pageHeights[i];
+        }
+
+        return (layout.PageCount, boundingAreaWithMargins, aggregateUsedArea);
+    }
+
+    private static LayoutResult LayoutPagesLegacy(BoxPlanCuttableShape[] shapes, BoxPlanSettings settings)
+    {
         double usableWidth = settings.SheetWidth - (2 * settings.Margin);
         double usableHeight = settings.SheetHeight - (2 * settings.Margin);
         var orderedShapes = shapes

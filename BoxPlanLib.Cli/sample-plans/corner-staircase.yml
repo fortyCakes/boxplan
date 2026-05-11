@@ -1,0 +1,26 @@
+
+shapes:
+  - id: "lower"
+    type: "box"
+    dimensions: [71.2, 12.7, 25.4]
+    location: [0.0, 0.0, 0.0]
+
+  - id: "middle"
+    type: "box"
+    dimensions: [50.8, 12.7, 25.4]
+    location: [0.0, 12.7, 0.0]
+
+  - id: "upper"
+    type: "box"
+    dimensions: [25.4, 12.7, 25.4]
+    location: [0.0, 25.4, 0.0]
+
+  - id: "side1"
+    type: "box"
+    dimensions: [25.4, 50.8, 25.4]
+    location: [0.0, 0.0, 25.4]
+
+  - id: "side2"
+    type: "box"
+    dimensions: [25.4, 63.5, 25.4]
+    location: [0.0, 0.0, 50.8]

@@ -1,20 +1,41 @@
 using BoxPlanLib;
+using BoxPlanLib.Cli;
 
 var lib = new BoxPlanLib.BoxPlanLib();
-var settings = new BoxPlanSettings
-{
-    SheetWidth = 400,
-    SheetHeight = 400,
-    Margin = 5.0,
-    Kerf = 0.1,
-    MaterialThickness = 3.0,
-    FingerJointSize = 5.0,
-    Spacing = 1.0,
-    Debug = true,
-    Labels = false
-};
 
-if (args.Length == 0)
+CliSettings.Resolved resolved;
+try
+{
+    resolved = CliSettings.Resolve(args, Directory.GetCurrentDirectory());
+}
+catch (Exception ex) when (ex is ArgumentException or FormatException or InvalidDataException or FileNotFoundException)
+{
+    Console.Error.WriteLine($"Error: {ex.Message}");
+    Console.Error.WriteLine("Use --help for usage.");
+    return 2;
+}
+
+if (resolved.HelpRequested)
+{
+    Console.WriteLine(CliSettings.BuildHelpText());
+    return 0;
+}
+
+if (resolved.LoadedSettingsPath is not null)
+{
+    Console.WriteLine($"Loaded settings from {resolved.LoadedSettingsPath}");
+}
+
+if (resolved.SaveSettingsRequested)
+{
+    CliSettings.WriteSettingsFile(resolved.Settings, resolved.SaveSettingsPath);
+    Console.WriteLine($"Saved settings to {resolved.SaveSettingsPath}");
+}
+
+var settings = resolved.Settings;
+var positional = resolved.Positional;
+
+if (positional.Count == 0)
 {
     var sampleDir = ResolveSamplePlansDirectory();
     var outputDir = ResolveDefaultOutputDirectory();
@@ -42,9 +63,9 @@ if (args.Length == 0)
     return anyFailed ? 1 : 0;
 }
 
-var inputPath = args[0];
-var outputPath = args.Length > 1
-    ? args[1]
+var inputPath = positional[0];
+var outputPath = positional.Count > 1
+    ? positional[1]
     : Path.Combine(ResolveDefaultOutputDirectory(), Path.ChangeExtension(Path.GetFileName(inputPath), ".svg"));
 
 return ProcessPlan(lib, settings, inputPath, outputPath) ? 0 : 1;
@@ -100,8 +121,6 @@ static string ResolveDefaultOutputDirectory()
 
 static string ResolveSamplePlansDirectory()
 {
-    // Prefer copied content next to the executable, then search parent directories
-    // for either sample-plans or BoxPlanLib/sample-plans in source tree layouts.
     var roots = EnumerateSearchRoots();
 
     foreach (var root in roots)

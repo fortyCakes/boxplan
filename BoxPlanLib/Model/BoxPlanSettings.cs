@@ -11,6 +11,10 @@ public class BoxPlanSettings
     public double Spacing { get; set; }
     public bool Debug { get; set; }
     public bool Labels { get; set; }
+    public bool UseAdvancedLayoutOptimizer { get; set; }
+    public bool UseOrToolsSequenceOptimization { get; set; }
+    public int LayoutSearchIterations { get; set; }
+    public int LayoutRandomSeed { get; set; }
 
     public BoxPlanSettings Default => new BoxPlanSettings
     {
@@ -23,5 +27,9 @@ public class BoxPlanSettings
         Spacing = 5.0,
         Debug = false,
         Labels = false,
+        UseAdvancedLayoutOptimizer = false,
+        UseOrToolsSequenceOptimization = false,
+        LayoutSearchIterations = 24,
+        LayoutRandomSeed = 1337,
     };
 }

@@ -3,6 +3,7 @@ using System.Text.RegularExpressions;
 using System.Xml.Linq;
 using BoxPlanLib;
 using BoxPlanLib.Model;
+using Clipper2Lib;
 
 namespace BoxPlanLib.Tests.SvgTests;
 
@@ -357,6 +358,208 @@ public class SimpleSvgGeneratorTests
     }
 
     [Fact]
+    public void Advanced_layout_optimizer_does_not_regress_corner_staircase_used_area()
+    {
+        var lib = new BoxPlanLib();
+        var parsed = lib.ParsePlan("""
+            shapes:
+              - id: "lower"
+                type: "box"
+                dimensions: [71.2, 12.7, 25.4]
+                location: [0.0, 0.0, 0.0]
+
+              - id: "middle"
+                type: "box"
+                dimensions: [50.8, 12.7, 25.4]
+                location: [0.0, 12.7, 0.0]
+
+              - id: "upper"
+                type: "box"
+                dimensions: [25.4, 12.7, 25.4]
+                location: [0.0, 25.4, 0.0]
+
+              - id: "side1"
+                type: "box"
+                dimensions: [25.4, 50.8, 25.4]
+                location: [0.0, 0.0, 25.4]
+
+              - id: "side2"
+                type: "box"
+                dimensions: [25.4, 63.5, 25.4]
+                location: [0.0, 0.0, 50.8]
+            """);
+        Assert.True(parsed.Success, string.Join("; ", parsed.Errors));
+        var plan = parsed.Value!;
+
+        var legacySettings = new BoxPlanSettings
+        {
+            SheetWidth = 400,
+            SheetHeight = 400,
+            Margin = 5.0,
+            Kerf = 0.1,
+            MaterialThickness = 3.0,
+            FingerJointSize = 5.0,
+            Spacing = 1.0,
+            UseAdvancedLayoutOptimizer = false,
+        };
+
+        var advancedSettings = new BoxPlanSettings
+        {
+            SheetWidth = 400,
+            SheetHeight = 400,
+            Margin = 5.0,
+            Kerf = 0.1,
+            MaterialThickness = 3.0,
+            FingerJointSize = 5.0,
+            Spacing = 1.0,
+            UseAdvancedLayoutOptimizer = true,
+            UseOrToolsSequenceOptimization = true,
+            LayoutSearchIterations = 20,
+            LayoutRandomSeed = 1337,
+        };
+
+        var pieces = lib.GetCuttableShapes(plan, legacySettings);
+        var legacySvg = lib.GeneratePagedSVG(pieces, legacySettings);
+        var advancedSvg = lib.GeneratePagedSVG(pieces, advancedSettings);
+
+        var legacyDoc = XDocument.Parse(legacySvg);
+        var advancedDoc = XDocument.Parse(advancedSvg);
+
+        var legacyPages = legacyDoc.Descendants(Svg + "g")
+            .Count(g => g.Attribute("id")?.Value.StartsWith("page-") == true);
+        var advancedPages = advancedDoc.Descendants(Svg + "g")
+            .Count(g => g.Attribute("id")?.Value.StartsWith("page-") == true);
+
+        var advancedShapes = advancedDoc.Descendants(Svg + "g")
+            .Where(g => g.Attribute("id") is not null && !g.Attribute("id")!.Value.StartsWith("page-"))
+            .ToArray();
+
+        Assert.True(advancedPages <= legacyPages);
+        Assert.Equal(pieces.Length, advancedShapes.Length);
+        Assert.True(UsedBoundingArea(advancedSvg, margin: advancedSettings.Margin) > 0.0);
+    }
+
+    [Fact]
+    public void Advanced_layout_respects_spacing_parameter()
+    {
+        var lib = new BoxPlanLib();
+        var pieces = new[]
+        {
+            Rectangle("a", 20, 10),
+            Rectangle("b", 20, 10),
+            Rectangle("c", 8, 8),
+        };
+
+        var settings = new BoxPlanSettings
+        {
+            SheetWidth = 120,
+            SheetHeight = 60,
+            Margin = 0,
+            Kerf = 0,
+            MaterialThickness = 3,
+            FingerJointSize = 5,
+            Spacing = 7,
+            UseAdvancedLayoutOptimizer = true,
+            UseOrToolsSequenceOptimization = true,
+            LayoutSearchIterations = 20,
+            LayoutRandomSeed = 1337,
+        };
+
+        var svg = lib.GeneratePagedSVG(pieces, settings);
+        var bounds = ShapeBounds(svg);
+
+        Assert.Equal(3, bounds.Count);
+
+        var pairGaps = new[]
+        {
+            BoundsGap(bounds["a"], bounds["b"]),
+            BoundsGap(bounds["a"], bounds["c"]),
+            BoundsGap(bounds["b"], bounds["c"]),
+        };
+
+        Assert.All(pairGaps, gap =>
+            Assert.True(gap >= settings.Spacing - 1e-3, $"Expected gap >= {settings.Spacing:0.###}mm but got {gap:0.###}mm"));
+    }
+
+    [Fact]
+    public void Advanced_layout_corner_staircase_has_no_overlap_and_respects_spacing_clearance()
+    {
+        var lib = new BoxPlanLib();
+        var parsed = lib.ParsePlan("""
+            shapes:
+              - id: "lower"
+                type: "box"
+                dimensions: [71.2, 12.7, 25.4]
+                location: [0.0, 0.0, 0.0]
+
+              - id: "middle"
+                type: "box"
+                dimensions: [50.8, 12.7, 25.4]
+                location: [0.0, 12.7, 0.0]
+
+              - id: "upper"
+                type: "box"
+                dimensions: [25.4, 12.7, 25.4]
+                location: [0.0, 25.4, 0.0]
+
+              - id: "side1"
+                type: "box"
+                dimensions: [25.4, 50.8, 25.4]
+                location: [0.0, 0.0, 25.4]
+
+              - id: "side2"
+                type: "box"
+                dimensions: [25.4, 63.5, 25.4]
+                location: [0.0, 0.0, 50.8]
+            """);
+        Assert.True(parsed.Success, string.Join("; ", parsed.Errors));
+
+        var settings = new BoxPlanSettings
+        {
+            SheetWidth = 400,
+            SheetHeight = 400,
+            Margin = 5.0,
+            Kerf = 0.1,
+            MaterialThickness = 3.0,
+            FingerJointSize = 5.0,
+            Spacing = 1.0,
+            UseAdvancedLayoutOptimizer = true,
+            UseOrToolsSequenceOptimization = true,
+            LayoutSearchIterations = 24,
+            LayoutRandomSeed = 1337,
+        };
+
+        var pieces = lib.GetCuttableShapes(parsed.Value!, settings);
+        var svg = lib.GeneratePagedSVG(pieces, settings);
+        var polygons = ShapePolygons(svg);
+
+        Assert.Equal(pieces.Length, polygons.Count);
+
+        var ids = polygons.Keys.OrderBy(id => id, StringComparer.Ordinal).ToArray();
+        for (var i = 0; i < ids.Length; i++)
+        {
+            for (var j = i + 1; j < ids.Length; j++)
+            {
+                var a = polygons[ids[i]];
+                var b = polygons[ids[j]];
+
+                var overlap = Clipper.Intersect(new PathsD { a }, new PathsD { b }, FillRule.NonZero);
+                var overlapArea = overlap.Sum(path => Math.Abs(Clipper.Area(path)));
+                Assert.True(overlapArea <= 1e-4, $"Expected no polygon overlap between '{ids[i]}' and '{ids[j]}', but area={overlapArea:0.######}");
+
+                var clearanceDelta = settings.Spacing * 0.5;
+                var aClearance = Clipper.InflatePaths(new PathsD { a }, clearanceDelta, JoinType.Round, EndType.Polygon);
+                var bClearance = Clipper.InflatePaths(new PathsD { b }, clearanceDelta, JoinType.Round, EndType.Polygon);
+                var clearanceOverlap = Clipper.Intersect(aClearance, bClearance, FillRule.NonZero);
+                var clearanceArea = clearanceOverlap.Sum(path => Math.Abs(Clipper.Area(path)));
+
+                Assert.True(clearanceArea <= 1e-4,
+                    $"Expected spacing clearance between '{ids[i]}' and '{ids[j]}' with spacing={settings.Spacing:0.###}, but overlap area={clearanceArea:0.######}");
+            }
+        }
+    }
+
+    [Fact]
     public void Staircase_layout_middle_riser_is_3mm_wider_than_bottom_riser_in_svg_x_dimension()
     {
         var lib = new BoxPlanLib();
@@ -553,8 +756,9 @@ public class SimpleSvgGeneratorTests
     {
         var result = p;
         var opMatches = Regex.Matches(transform, @"(translate|rotate)\(([^)]*)\)");
-        foreach (Match m in opMatches)
+        for (var index = opMatches.Count - 1; index >= 0; index--)
         {
+            var m = opMatches[index];
             var op = m.Groups[1].Value;
             var values = m.Groups[2].Value
                 .Split([' ', ','], StringSplitOptions.RemoveEmptyEntries)
@@ -574,6 +778,167 @@ public class SimpleSvgGeneratorTests
                 var c = Math.Cos(rad);
                 var s = Math.Sin(rad);
                 result = new Vec2(result.X * c - result.Y * s, result.X * s + result.Y * c);
+            }
+        }
+
+        return result;
+    }
+
+    private static double UsedBoundingArea(string svg, double margin = 0.0)
+    {
+        var doc = XDocument.Parse(svg);
+
+        var points = new List<Vec2>();
+        var pageGroups = doc.Descendants(Svg + "g")
+            .Where(g => g.Attribute("id")?.Value.StartsWith("page-") == true)
+            .ToArray();
+
+        foreach (var page in pageGroups)
+        {
+            var pageTransform = page.Attribute("transform")?.Value ?? string.Empty;
+            var pieces = page.Elements(Svg + "g")
+                .Where(g => g.Attribute("id") is not null && !g.Attribute("id")!.Value.StartsWith("page-"));
+
+            foreach (var piece in pieces)
+            {
+                var pieceTransform = piece.Attribute("transform")?.Value ?? string.Empty;
+                var path = piece.Descendants(Svg + "path").FirstOrDefault();
+                if (path is null)
+                {
+                    continue;
+                }
+
+                var d = path.Attribute("d")?.Value;
+                if (string.IsNullOrWhiteSpace(d))
+                {
+                    continue;
+                }
+
+                foreach (var p in ParsePathPoints(d))
+                {
+                    var transformed = ApplyTransform(ApplyTransform(p, pieceTransform), pageTransform);
+                    points.Add(transformed);
+                }
+            }
+        }
+
+        Assert.NotEmpty(points);
+        var minX = points.Min(p => p.X);
+        var maxX = points.Max(p => p.X);
+        var minY = points.Min(p => p.Y);
+        var maxY = points.Max(p => p.Y);
+        var width = maxX - minX;
+        var height = maxY - minY;
+        return (width + (2 * margin)) * (height + (2 * margin));
+    }
+
+    private static Dictionary<string, (double MinX, double MinY, double MaxX, double MaxY)> ShapeBounds(string svg)
+    {
+        var doc = XDocument.Parse(svg);
+        var result = new Dictionary<string, (double MinX, double MinY, double MaxX, double MaxY)>();
+
+        var pageGroups = doc.Descendants(Svg + "g")
+            .Where(g => g.Attribute("id")?.Value.StartsWith("page-") == true)
+            .ToArray();
+
+        foreach (var page in pageGroups)
+        {
+            var pageTransform = page.Attribute("transform")?.Value ?? string.Empty;
+            var pieces = page.Elements(Svg + "g")
+                .Where(g => g.Attribute("id") is not null && !g.Attribute("id")!.Value.StartsWith("page-"));
+
+            foreach (var piece in pieces)
+            {
+                var id = piece.Attribute("id")!.Value;
+                var pieceTransform = piece.Attribute("transform")?.Value ?? string.Empty;
+                var path = piece.Descendants(Svg + "path").FirstOrDefault();
+                if (path is null)
+                {
+                    continue;
+                }
+
+                var d = path.Attribute("d")?.Value;
+                if (string.IsNullOrWhiteSpace(d))
+                {
+                    continue;
+                }
+
+                var points = ParsePathPoints(d)
+                    .Select(p => ApplyTransform(ApplyTransform(p, pieceTransform), pageTransform))
+                    .ToArray();
+                if (points.Length == 0)
+                {
+                    continue;
+                }
+
+                result[id] = (points.Min(p => p.X), points.Min(p => p.Y), points.Max(p => p.X), points.Max(p => p.Y));
+            }
+        }
+
+        return result;
+    }
+
+    private static double BoundsGap(
+        (double MinX, double MinY, double MaxX, double MaxY) a,
+        (double MinX, double MinY, double MaxX, double MaxY) b)
+    {
+        var dx = Math.Max(0.0, Math.Max(a.MinX - b.MaxX, b.MinX - a.MaxX));
+        var dy = Math.Max(0.0, Math.Max(a.MinY - b.MaxY, b.MinY - a.MaxY));
+        return Math.Sqrt((dx * dx) + (dy * dy));
+    }
+
+    private static Dictionary<string, PathD> ShapePolygons(string svg)
+    {
+        var doc = XDocument.Parse(svg);
+        var result = new Dictionary<string, PathD>();
+
+        var pageGroups = doc.Descendants(Svg + "g")
+            .Where(g => g.Attribute("id")?.Value.StartsWith("page-") == true)
+            .ToArray();
+
+        foreach (var page in pageGroups)
+        {
+            var pageTransform = page.Attribute("transform")?.Value ?? string.Empty;
+            var pieces = page.Elements(Svg + "g")
+                .Where(g => g.Attribute("id") is not null && !g.Attribute("id")!.Value.StartsWith("page-"));
+
+            foreach (var piece in pieces)
+            {
+                var id = piece.Attribute("id")!.Value;
+                var pieceTransform = piece.Attribute("transform")?.Value ?? string.Empty;
+                var path = piece.Descendants(Svg + "path").FirstOrDefault();
+                if (path is null)
+                {
+                    continue;
+                }
+
+                var d = path.Attribute("d")?.Value;
+                if (string.IsNullOrWhiteSpace(d))
+                {
+                    continue;
+                }
+
+                var points = ParsePathPoints(d)
+                    .Select(p => ApplyTransform(ApplyTransform(p, pieceTransform), pageTransform))
+                    .ToList();
+
+                if (points.Count > 1)
+                {
+                    var first = points[0];
+                    var last = points[^1];
+                    if (Math.Abs(first.X - last.X) < 1e-6 && Math.Abs(first.Y - last.Y) < 1e-6)
+                    {
+                        points.RemoveAt(points.Count - 1);
+                    }
+                }
+
+                if (points.Count < 3)
+                {
+                    continue;
+                }
+
+                var polygon = points.Select(p => new PointD(p.X, p.Y)).ToList();
+                result[id] = new PathD(polygon);
             }
         }
 
