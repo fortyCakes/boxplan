@@ -540,10 +540,12 @@ internal static class PrismFaceBuilder
             nz = -nz;
         }
 
-        var p0 = new PointD(ax, az);
-        var p1 = new PointD(bx, bz);
-        var p2 = new PointD(bx + nx * depth, bz + nz * depth);
-        var p3 = new PointD(ax + nx * depth, az + nz * depth);
+        const double boundaryOverlap = 1e-4;
+
+        var p0 = new PointD(ax - nx * boundaryOverlap, az - nz * boundaryOverlap);
+        var p1 = new PointD(bx - nx * boundaryOverlap, bz - nz * boundaryOverlap);
+        var p2 = new PointD(bx + nx * (depth + boundaryOverlap), bz + nz * (depth + boundaryOverlap));
+        var p3 = new PointD(ax + nx * (depth + boundaryOverlap), az + nz * (depth + boundaryOverlap));
 
         var clip = new PathD { p0, p1, p2, p3 };
         if (Clipper.Area(clip) < 0)
