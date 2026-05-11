@@ -335,7 +335,7 @@ internal static class PrismFaceBuilder
                 foreach (var block in blocks)
                 {
                     if (!block.PrimaryOwns)
-                        clips.Add(OrientedNotch(edgeStart, edgeEnd, cursor, block.Length, t, edgeLen));
+                        clips.Add(OrientedNotch(edgeStart, edgeEnd, cursor, block.Length, t, poly));
                     cursor += block.Length;
                 }
             }
@@ -505,7 +505,13 @@ internal static class PrismFaceBuilder
     // Builds a clip polygon for a notch along an edge, properly oriented along the edge direction.
     // The notch is cut inward (into the polygon interior) perpendicular to the edge.
     // For a CCW polygon, the inward normal is the left-perpendicular of the edge direction.
-    private static PathD OrientedNotch(Vec2 edgeStart, Vec2 edgeEnd, double pos, double len, double depth, double edgeLen)
+    private static PathD OrientedNotch(
+        Vec2 edgeStart,
+        Vec2 edgeEnd,
+        double pos,
+        double len,
+        double depth,
+        IReadOnlyList<Vec2> polygon)
     {
         var dx = edgeEnd.X - edgeStart.X;
         var dz = edgeEnd.Y - edgeStart.Y;
@@ -523,13 +529,43 @@ internal static class PrismFaceBuilder
         var bx = edgeStart.X + ux * (pos + len);
         var bz = edgeStart.Y + uz * (pos + len);
 
-        return new PathD
+        // Pick the notch normal that actually points into the polygon. This avoids
+        // losing notches on sloped edges when the profile winding does not match the
+        // fixed left-perpendicular assumption.
+        var mid = new Vec2((ax + bx) / 2.0, (az + bz) / 2.0);
+        var probe = new Vec2(mid.X + nx * (depth / 2.0), mid.Y + nz * (depth / 2.0));
+        if (!PointInPolygon(probe, polygon))
         {
-            new PointD(ax, az),
-            new PointD(bx, bz),
-            new PointD(bx + nx * depth, bz + nz * depth),
-            new PointD(ax + nx * depth, az + nz * depth),
-        };
+            nx = -nx;
+            nz = -nz;
+        }
+
+        var p0 = new PointD(ax, az);
+        var p1 = new PointD(bx, bz);
+        var p2 = new PointD(bx + nx * depth, bz + nz * depth);
+        var p3 = new PointD(ax + nx * depth, az + nz * depth);
+
+        var clip = new PathD { p0, p1, p2, p3 };
+        if (Clipper.Area(clip) < 0)
+            clip.Reverse();
+
+        return clip;
+    }
+
+    private static bool PointInPolygon(Vec2 point, IReadOnlyList<Vec2> polygon)
+    {
+        var inside = false;
+        for (var i = 0; i < polygon.Count; i++)
+        {
+            var a = polygon[i];
+            var b = polygon[(i + 1) % polygon.Count];
+            var intersects = ((a.Y > point.Y) != (b.Y > point.Y)) &&
+                (point.X < (b.X - a.X) * (point.Y - a.Y) / ((b.Y - a.Y) + 1e-12) + a.X);
+            if (intersects)
+                inside = !inside;
+        }
+
+        return inside;
     }
 
     private static PathD ToClipperPath(Vec2[] verts, int count)

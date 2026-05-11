@@ -30,6 +30,73 @@ public class PrismFaceTests
         return lib.GetCuttableShapes(plan, settings ?? Settings());
     }
 
+    private static IReadOnlyList<Vec2> OutlinePoints(CuttablePath path)
+    {
+        var points = new List<Vec2> { path.Start };
+        foreach (var segment in path.Segments)
+        {
+            var line = Assert.IsType<LineSegment>(segment);
+            points.Add(line.To);
+        }
+
+        return points;
+    }
+
+    private static Vec2[] ProfileVertices(PrismProfile profile)
+    {
+        var vertices = new Vec2[profile.Segments.Count + 1];
+        vertices[0] = profile.StartPoint;
+        for (var i = 0; i < profile.Segments.Count; i++)
+            vertices[i + 1] = profile.Segments[i].EndPoint;
+        return vertices;
+    }
+
+    private static int CountInsetParallelSegments(CuttablePath path, Vec2 edgeStart, Vec2 edgeEnd, double inset)
+    {
+        const double minSegmentLength = 2.0;
+        const double angleTolerance = 0.02;
+        const double distanceTolerance = 0.25;
+        const double endpointMargin = 3.0;
+
+        var counts = 0;
+        var edgeDx = edgeEnd.X - edgeStart.X;
+        var edgeDy = edgeEnd.Y - edgeStart.Y;
+        var edgeLength = Math.Sqrt(edgeDx * edgeDx + edgeDy * edgeDy);
+        Assert.True(edgeLength > 0.0);
+
+        var ux = edgeDx / edgeLength;
+        var uy = edgeDy / edgeLength;
+        var nx = -uy;
+        var ny = ux;
+
+        var points = OutlinePoints(path);
+        for (var i = 0; i + 1 < points.Count; i++)
+        {
+            var start = points[i];
+            var end = points[i + 1];
+            var dx = end.X - start.X;
+            var dy = end.Y - start.Y;
+            var length = Math.Sqrt(dx * dx + dy * dy);
+            if (length < minSegmentLength)
+                continue;
+
+            var parallelError = Math.Abs(dx * uy - dy * ux) / length;
+            if (parallelError > angleTolerance)
+                continue;
+
+            var mid = new Vec2((start.X + end.X) / 2.0, (start.Y + end.Y) / 2.0);
+            var along = (mid.X - edgeStart.X) * ux + (mid.Y - edgeStart.Y) * uy;
+            if (along <= endpointMargin || along >= edgeLength - endpointMargin)
+                continue;
+
+            var distance = Math.Abs((mid.X - edgeStart.X) * nx + (mid.Y - edgeStart.Y) * ny);
+            if (Math.Abs(distance - inset) <= distanceTolerance)
+                counts++;
+        }
+
+        return counts;
+    }
+
     // ── Shape count ───────────────────────────────────────────────────────────
 
     [Fact]
@@ -78,6 +145,72 @@ public class PrismFaceTests
 
         // 3 lateral + 1 cap (back only)
         Assert.Equal(4, shapes.Length);
+    }
+
+    [Fact]
+    public void Triangle_back_cap_edges_match_mated_lateral_long_edges()
+    {
+        var yaml = """
+            shapes:
+              - id: "tri"
+                type: "triangle"
+                width: 120.0
+                depth: 40.0
+                faces:
+                  - name: "front"
+                    type: "open"
+            """;
+        var settings = new BoxPlanSettings
+        {
+            Kerf = 0.0,
+            MaterialThickness = 3.0,
+            FingerJointSize = 5.0,
+            SheetWidth = 1000,
+            SheetHeight = 1000,
+        };
+
+        var plan = ParseOk(yaml);
+        var prism = Assert.IsType<PrismShape>(plan.ShapesById["tri"]);
+        var shapes = new BoxPlanLib().GetCuttableShapes(plan, settings);
+        var back = shapes.First(s => s.Id == "tri.back");
+
+        var rawVertices = ProfileVertices(prism.Profile);
+        var minX = rawVertices.Min(v => v.X);
+        var minY = rawVertices.Min(v => v.Y);
+        var translatedVertices = rawVertices
+            .Take(prism.Profile.Segments.Count)
+            .Select(v => new Vec2(v.X - minX, v.Y - minY))
+            .ToArray();
+
+        var capCounts = new List<int>();
+        var lateralCounts = new List<int>();
+
+        for (var i = 0; i < prism.Profile.Segments.Count; i++)
+        {
+            var edgeStart = translatedVertices[i];
+            var edgeEnd = translatedVertices[(i + 1) % translatedVertices.Length];
+            capCounts.Add(CountInsetParallelSegments(back.Outline, edgeStart, edgeEnd, settings.MaterialThickness));
+
+            var lateral = shapes.First(s => s.Id == $"tri.lateral-{i}");
+            var lateralWidth = lateral.BoundingBoxMax.X - lateral.BoundingBoxMin.X;
+            lateralCounts.Add(CountInsetParallelSegments(
+                lateral.Outline,
+                new Vec2(0, 0),
+                new Vec2(lateralWidth, 0),
+                settings.MaterialThickness));
+        }
+
+        Assert.True(capCounts.Min() > 0, $"Expected every cap edge to have notch floors, got [{string.Join(", ", capCounts)}]");
+        Assert.True(capCounts.Max() - capCounts.Min() <= 1, $"Expected cap edge counts to match within 1, got [{string.Join(", ", capCounts)}]");
+        Assert.True(lateralCounts.Max() - lateralCounts.Min() <= 1, $"Expected lateral long-edge counts to match within 1, got [{string.Join(", ", lateralCounts)}]");
+
+        for (var i = 0; i < capCounts.Count; i++)
+        {
+            Assert.InRange(
+                Math.Abs(capCounts[i] - lateralCounts[i]),
+                0,
+                1);
+        }
     }
 
     [Fact]
