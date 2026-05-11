@@ -2,14 +2,11 @@
 # Each box rests on the one below it, sharing a face. The cutting pipeline
 # detects the contact areas, fuses the three boxes into a single solid, and
 # emits face panels with all internal contact regions culled.
-#
-# Lower step:  300 wide x 100 tall x 100 deep (mm), origin at (0,0,0)
-# Middle step: 200 wide x 100 tall x 100 deep, sitting on top of the lower
-# Upper step:  100 wide x 100 tall x 100 deep, sitting on top of the middle
+
 shapes:
   - id: "lower"
     type: "box"
-    dimensions: [71.2, 12.7, 25.4]
+    dimensions: [76.2, 12.7, 25.4]
     location: [0.0, 0.0, 0.0]
 
   - id: "middle"

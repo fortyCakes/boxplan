@@ -1,5 +1,6 @@
 {
     "chat.tools.terminal.autoApprove": {
-        "dotnet run": true
+        "dotnet run": true,
+        "git add": true
     }
 }

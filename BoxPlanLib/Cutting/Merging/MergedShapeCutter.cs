@@ -33,7 +33,7 @@ internal static class MergedShapeCutter
         {
             var face = faces[fi];
             var faceName = face.Direction.ToFaceName();
-            var panelOutline = GrowBasePanelOutline(face, faces, t);
+            var panelOutline = GrowBasePanelOutline(face, faces, byFace[fi], t);
             var builder = new Cutting.PolygonPanelShapeBuilder(panelOutline, logger);
             var n = face.Outline.Count;
 
@@ -535,50 +535,82 @@ internal static class MergedShapeCutter
         return true;
     }
 
-    // Apply base-size growth only to the emitted panel geometry for interior
-    // side faces (non-Y), without mutating the topological face graph used for shared
-    // edge and corner ownership calculations.
-    private static IReadOnlyList<Vec2> GrowBasePanelOutline(MergedFace face, IReadOnlyList<MergedFace> allFaces, double t)
+    // At a CONCAVE 3D edge of the merged solid (an inner step corner where
+    // three of the four perpendicular quadrants are filled with material),
+    // both meeting face panels must extend into the joint cube by t so the
+    // finger-joint material has somewhere to interlock. Detection is purely
+    // topological: project the neighbour face's outward 3D normal into this
+    // face's 2D basis; if it points opposite to the polygon edge's outward
+    // normal (i.e. *into* the polygon interior), the 3D edge is concave.
+    // Convex 3D edges, where the neighbour normal points outward alongside
+    // the edge normal, get no growth - the corner-cube notch logic handles
+    // those joints instead.
+    private static IReadOnlyList<Vec2> GrowBasePanelOutline(
+        MergedFace face,
+        IReadOnlyList<MergedFace> allFaces,
+        IReadOnlyList<SharedSegment> faceSegments,
+        double t)
     {
         if (t <= 0 || face.Direction.Axis == Axis.Y || face.IsInternalDivider)
         {
             return face.Outline;
         }
 
-        if (!IsInteriorSideFace(face, allFaces))
+        var n = face.Outline.Count;
+        var growEdge = new bool[n];
+        foreach (var seg in faceSegments)
         {
-            return face.Outline;
+            if (IsConcaveSharedEdge(face, seg.EdgeIndex, allFaces[seg.NeighbourFaceIndex]))
+            {
+                growEdge[seg.EdgeIndex] = true;
+            }
         }
 
-        const double eps = 1e-6;
-        var sign = face.Direction.Sign;
-        var minU = face.Outline.Min(p => p.X);
-        var maxU = face.Outline.Max(p => p.X);
-        return face.Outline
-            .Select(p =>
+        if (!growEdge.Any(g => g)) return face.Outline;
+
+        var grown = new List<Vec2>(n);
+        for (var vi = 0; vi < n; vi++)
+        {
+            var prevEdge = (vi + n - 1) % n;
+            var nextEdge = vi;
+            var p = face.Outline[vi];
+            double dx = 0, dy = 0;
+            if (growEdge[prevEdge])
             {
-                if (sign > 0 && Math.Abs(p.X - minU) <= eps) return new Vec2(p.X - t, p.Y);
-                if (sign < 0 && Math.Abs(p.X - maxU) <= eps) return new Vec2(p.X + t, p.Y);
-                return p;
-            })
-            .ToList();
+                var (nx, ny) = OutwardNormal(face.Outline, prevEdge);
+                dx += nx * t;
+                dy += ny * t;
+            }
+            if (growEdge[nextEdge])
+            {
+                var (nx, ny) = OutwardNormal(face.Outline, nextEdge);
+                dx += nx * t;
+                dy += ny * t;
+            }
+            grown.Add(new Vec2(p.X + dx, p.Y + dy));
+        }
+        return grown;
     }
 
-    private static bool IsInteriorSideFace(MergedFace face, IReadOnlyList<MergedFace> allFaces)
+    private static bool IsConcaveSharedEdge(MergedFace face, int edgeIndex, MergedFace neighbour)
     {
-        if (face.Direction.Axis == Axis.Y) return false;
+        var (ox, oy) = OutwardNormal(face.Outline, edgeIndex);
+        var nx = neighbour.Direction.Axis == face.Basis.UAxis ? neighbour.Direction.Sign : 0;
+        var ny = neighbour.Direction.Axis == face.Basis.VAxis ? neighbour.Direction.Sign : 0;
+        var dot = ox * nx + oy * ny;
+        return dot < -Eps;
+    }
 
-        const double eps = 1e-6;
-        var sign = face.Direction.Sign;
-        var axis = face.Direction.Axis;
-        var peers = allFaces
-            .Where(f => f.Direction.Axis == axis && f.Direction.Sign == sign)
-            .ToList();
-        if (peers.Count <= 1) return false;
-
-        return sign > 0
-            ? face.Plane < peers.Max(f => f.Plane) - eps
-            : face.Plane > peers.Min(f => f.Plane) + eps;
+    private static (double X, double Y) OutwardNormal(IReadOnlyList<Vec2> outline, int edgeIndex)
+    {
+        var n = outline.Count;
+        var p0 = outline[edgeIndex];
+        var p1 = outline[(edgeIndex + 1) % n];
+        var dx = p1.X - p0.X;
+        var dy = p1.Y - p0.Y;
+        var len = Math.Sqrt(dx * dx + dy * dy);
+        if (len <= Eps) return (0, 0);
+        return (dy / len, -dx / len);
     }
 
     private static double EdgeLength(MergedFace face, int edgeIndex)
