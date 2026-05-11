@@ -28,6 +28,9 @@ public sealed class PlanParser
                     new Dictionary<string, Type>
                     {
                         { "cutout", typeof(RawCutoutFeature) },
+                        { "engraving", typeof(RawEngravingFeature) },
+                        { "line-engraving", typeof(RawLineEngravingFeature) },
+                        { "engraving-grid", typeof(RawEngravingGridFeature) },
                     });
             })
             .WithNodeDeserializer(

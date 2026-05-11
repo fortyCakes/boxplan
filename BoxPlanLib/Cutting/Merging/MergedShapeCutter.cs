@@ -121,6 +121,7 @@ internal static class MergedShapeCutter
                 Outline = path,
                 InteriorCuts = Array.Empty<CuttablePath>(),
                 Engravings = Array.Empty<CuttablePath>(),
+                TextEngravings = Array.Empty<TextEngraving>(),
             });
             logger?.Log($"[merge] Emitted merged shape {face.Id}");
         }

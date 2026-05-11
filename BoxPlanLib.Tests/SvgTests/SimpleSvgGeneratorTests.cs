@@ -61,6 +61,7 @@ public class SimpleSvgGeneratorTests
         Outline = ClosedRect(new Vec2(0, 0), width, height),
         InteriorCuts = interior ?? Array.Empty<CuttablePath>(),
         Engravings = engravings ?? Array.Empty<CuttablePath>(),
+        TextEngravings = Array.Empty<TextEngraving>(),
     };
 
     [Fact]
@@ -131,6 +132,7 @@ public class SimpleSvgGeneratorTests
             Outline = arcPath,
             InteriorCuts = Array.Empty<CuttablePath>(),
             Engravings = Array.Empty<CuttablePath>(),
+            TextEngravings = Array.Empty<TextEngraving>(),
         };
 
         var lib = new BoxPlanLib();
@@ -156,6 +158,7 @@ public class SimpleSvgGeneratorTests
                 Outline = ClosedRect(new Vec2(0, 0), 1.5, 1.5),
                 InteriorCuts = Array.Empty<CuttablePath>(),
                 Engravings = Array.Empty<CuttablePath>(),
+                TextEngravings = Array.Empty<TextEngraving>(),
             };
             var lib = new BoxPlanLib();
             var svg = lib.GenerateSimpleSVG(new[] { shape }, Settings());
@@ -226,6 +229,7 @@ public class SimpleSvgGeneratorTests
             Outline = ClosedRect(origin, 10, 10),
             InteriorCuts = Array.Empty<CuttablePath>(),
             Engravings = Array.Empty<CuttablePath>(),
+            TextEngravings = Array.Empty<TextEngraving>(),
         };
 
         var lib = new BoxPlanLib();

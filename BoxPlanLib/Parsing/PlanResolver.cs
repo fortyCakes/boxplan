@@ -403,6 +403,18 @@ public sealed class PlanResolver
                     var feature = ResolveCutout(cutout, face.Value, position, fpath, errors);
                     if (feature is not null) result.Add(feature);
                     break;
+                case RawEngravingFeature engraving:
+                    var engravingFeature = ResolveEngraving(engraving, face.Value, position, fpath, errors);
+                    if (engravingFeature is not null) result.Add(engravingFeature);
+                    break;
+                case RawLineEngravingFeature lineEngraving:
+                    var lineEngravingFeature = ResolveLineEngraving(lineEngraving, face.Value, position, fpath, errors);
+                    if (lineEngravingFeature is not null) result.Add(lineEngravingFeature);
+                    break;
+                case RawEngravingGridFeature grid:
+                    var gridFeature = ResolveEngravingGrid(grid, face.Value, fpath, errors);
+                    if (gridFeature is not null) result.Add(gridFeature);
+                    break;
                 default:
                     errors.Add(Err($"Unsupported feature type '{rf.Type}'.", fpath, rf));
                     break;
@@ -460,6 +472,132 @@ public sealed class PlanResolver
             Shape = shape,
             Width = width,
             Height = height,
+        };
+    }
+
+    private static EngravingTextFeature? ResolveEngraving(
+        RawEngravingFeature raw,
+        FaceName face,
+        Position? position,
+        string path,
+        List<PlanError> errors)
+    {
+        if (string.IsNullOrEmpty(raw.Text))
+        {
+            errors.Add(Err("Engraving requires 'text'.", $"{path}.text", raw));
+            return null;
+        }
+
+        if (raw.Size is not { } size || size <= 0)
+        {
+            errors.Add(Err("Engraving requires a positive 'size'.", $"{path}.size", raw));
+            return null;
+        }
+
+        var bold = false;
+        var italic = false;
+        if (!string.IsNullOrEmpty(raw.Style))
+        {
+            var styles = raw.Style.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+            foreach (var s in styles)
+            {
+                if (s.Equals("bold", StringComparison.OrdinalIgnoreCase)) bold = true;
+                else if (s.Equals("italic", StringComparison.OrdinalIgnoreCase)) italic = true;
+                else errors.Add(Err($"Unknown style value '{s}'.", $"{path}.style", raw));
+            }
+        }
+
+        return new EngravingTextFeature
+        {
+            Face = face,
+            Position = position,
+            Text = raw.Text,
+            Size = size,
+            Font = string.IsNullOrEmpty(raw.Font) ? "sans-serif" : raw.Font,
+            Bold = bold,
+            Italic = italic,
+        };
+    }
+
+    private static LineEngravingFeature? ResolveLineEngraving(
+        RawLineEngravingFeature raw,
+        FaceName face,
+        Position? position,
+        string path,
+        List<PlanError> errors)
+    {
+        if (string.IsNullOrEmpty(raw.Shape))
+        {
+            errors.Add(Err("Line engraving requires 'shape'.", $"{path}.shape", raw));
+            return null;
+        }
+
+        if (!Enum.TryParse<CutoutShape>(raw.Shape, ignoreCase: true, out var shape))
+        {
+            errors.Add(Err($"Unknown shape '{raw.Shape}'.", $"{path}.shape", raw));
+            return null;
+        }
+
+        double width;
+        double height;
+        if (raw.Diameter is { } d)
+        {
+            if (raw.Width is not null || raw.Height is not null)
+            {
+                errors.Add(Err("Line engraving may specify 'diameter' or 'width'+'height', not both.", path, raw));
+                return null;
+            }
+            width = d;
+            height = d;
+        }
+        else if (raw.Width is { } w && raw.Height is { } h)
+        {
+            width = w;
+            height = h;
+        }
+        else
+        {
+            errors.Add(Err("Line engraving requires 'diameter' or both 'width' and 'height'.", path, raw));
+            return null;
+        }
+
+        return new LineEngravingFeature
+        {
+            Face = face,
+            Position = position,
+            Shape = shape,
+            Width = width,
+            Height = height,
+        };
+    }
+
+    private static EngravingGridFeature? ResolveEngravingGrid(
+        RawEngravingGridFeature raw,
+        FaceName face,
+        string path,
+        List<PlanError> errors)
+    {
+        if (raw.CellSize is not { } cellSize || cellSize <= 0)
+        {
+            errors.Add(Err("Engraving grid requires a positive 'cell-size'.", $"{path}.cell-size", raw));
+            return null;
+        }
+
+        var center = GridCenter.Space;
+        if (!string.IsNullOrEmpty(raw.Center))
+        {
+            if (!Enum.TryParse<GridCenter>(raw.Center, ignoreCase: true, out center))
+            {
+                errors.Add(Err($"Unknown grid center '{raw.Center}'. Expected 'space', 'corner', or 'maximize'.", $"{path}.center", raw));
+                return null;
+            }
+        }
+
+        return new EngravingGridFeature
+        {
+            Face = face,
+            CellSize = cellSize,
+            Center = center,
         };
     }
 

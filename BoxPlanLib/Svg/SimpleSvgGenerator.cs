@@ -10,7 +10,8 @@ internal sealed class SvgGenerator
     private const double StrokeWidthMm = 0.1;
     private const string OutlineColor = "red";
     private const string InteriorColor = "blue";
-    private const string EngravingColor = "black";
+    private const string LineEngravingColor = "black";
+    private const string TextEngravingColor = "purple";
     private const string LabelColor = "green";
     private const string PageOutlineColor = "green";
 
@@ -51,8 +52,9 @@ internal sealed class SvgGenerator
               .Append(F(xCursor)).Append(" 0)\">");
             EmitPath(sb, s.Outline, s.BoundingBoxMin, OutlineColor);
             foreach (var p in s.InteriorCuts) EmitPath(sb, p, s.BoundingBoxMin, InteriorColor);
-            foreach (var p in s.Engravings) EmitPath(sb, p, s.BoundingBoxMin, EngravingColor);
-                        if (settings.Labels) EmitLabel(sb, s);
+            foreach (var p in s.Engravings) EmitPath(sb, p, s.BoundingBoxMin, LineEngravingColor);
+            foreach (var t in s.TextEngravings) EmitTextEngraving(sb, t, s.BoundingBoxMin);
+            if (settings.Labels) EmitLabel(sb, s);
             sb.Append("</g>");
             xCursor += widths[i] + settings.Spacing;
         }
@@ -114,7 +116,8 @@ internal sealed class SvgGenerator
                 sb.Append("\">");
                 EmitPath(sb, placement.Shape.Outline, placement.Shape.BoundingBoxMin, OutlineColor);
                 foreach (var path in placement.Shape.InteriorCuts) EmitPath(sb, path, placement.Shape.BoundingBoxMin, InteriorColor);
-                foreach (var path in placement.Shape.Engravings) EmitPath(sb, path, placement.Shape.BoundingBoxMin, EngravingColor);
+                foreach (var path in placement.Shape.Engravings) EmitPath(sb, path, placement.Shape.BoundingBoxMin, LineEngravingColor);
+                foreach (var t in placement.Shape.TextEngravings) EmitTextEngraving(sb, t, placement.Shape.BoundingBoxMin);
                 if (settings.Labels) EmitLabel(sb, placement.Shape);
                 sb.Append("</g>");
             }
@@ -132,7 +135,7 @@ internal sealed class SvgGenerator
 
         if (settings.UseAdvancedLayoutOptimizer)
         {
-            var optimizer = new AdvancedLayoutOptimizer(settings);
+            var optimizer = new AdvancedLayoutOptimizer(settings, new Cutting.PipelineLogger(settings.Debug));
             var optimized = optimizer.Optimize(shapes);
             if (optimized is not null)
             {
@@ -422,6 +425,25 @@ internal sealed class SvgGenerator
           .Append("\" text-anchor=\"middle\" dominant-baseline=\"middle\" font-size=\"")
           .Append(F(fontSize)).Append("\" font-family=\"sans-serif\">")
           .Append(Escape(label)).Append("</text>");
+        sb.Append("</g>");
+    }
+
+    private static void EmitTextEngraving(StringBuilder sb, TextEngraving engraving, Vec2 origin)
+    {
+        var x = engraving.X - origin.X;
+        var y = engraving.Y - origin.Y;
+        var fontWeight = engraving.Bold ? "bold" : "normal";
+        var fontStyle = engraving.Italic ? "italic" : "normal";
+        sb.Append("<g transform=\"translate(")
+          .Append(F(x)).Append(' ').Append(F(y))
+          .Append(") scale(1 -1)\">");
+        sb.Append("<text x=\"0\" y=\"0\" fill=\"").Append(TextEngravingColor)
+          .Append("\" text-anchor=\"middle\" dominant-baseline=\"middle\"")
+          .Append(" font-size=\"").Append(F(engraving.Size)).Append("\"")
+          .Append(" font-family=\"").Append(Escape(engraving.Font)).Append("\"")
+          .Append(" font-weight=\"").Append(fontWeight).Append("\"")
+          .Append(" font-style=\"").Append(fontStyle).Append("\">")
+          .Append(Escape(engraving.Text)).Append("</text>");
         sb.Append("</g>");
     }
 

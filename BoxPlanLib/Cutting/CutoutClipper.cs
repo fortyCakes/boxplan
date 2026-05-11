@@ -6,6 +6,12 @@ internal static class CutoutClipper
 {
     private const double Epsilon = 1e-6;
 
+    public static bool IsInsideOutline(Vec2 point, CuttablePath outline)
+    {
+        var polygon = BuildPolygon(outline);
+        return ContainsPoint(polygon, point);
+    }
+
     public static IReadOnlyList<CuttablePath> ClipToOutline(CuttablePath path, CuttablePath outline, PipelineLogger? logger = null)
     {
         logger?.Log($"[clipper] Clipping path to outline");

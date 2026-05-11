@@ -103,6 +103,35 @@ public sealed class CutoutFeature : Feature
     public required double Height { get; init; }
 }
 
+public sealed class EngravingTextFeature : Feature
+{
+    public required string Text { get; init; }
+    public required double Size { get; init; }
+    public string Font { get; init; } = "sans-serif";
+    public bool Bold { get; init; }
+    public bool Italic { get; init; }
+}
+
+public sealed class LineEngravingFeature : Feature
+{
+    public required CutoutShape Shape { get; init; }
+    public required double Width { get; init; }
+    public required double Height { get; init; }
+}
+
+public enum GridCenter
+{
+    Space,
+    Corner,
+    Maximize,
+}
+
+public sealed class EngravingGridFeature : Feature
+{
+    public required double CellSize { get; init; }
+    public GridCenter Center { get; init; } = GridCenter.Space;
+}
+
 public sealed record Position(Anchor Anchor, Vec2 Offset);
 
 public sealed class Fit

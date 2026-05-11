@@ -190,6 +190,7 @@ public sealed class CuttingPipeline
             Outline = path,
             InteriorCuts = interiorCuts,
             Engravings = Array.Empty<CuttablePath>(),
+            TextEngravings = Array.Empty<TextEngraving>(),
         };
     }
 
@@ -521,6 +522,8 @@ public sealed class CuttingPipeline
         var (path, bbMin, bbMax, translation) = KerfOffset.OffsetOutwardAndTranslate(polygon, settings.Kerf, logger);
 
         var interiorCuts = new List<CuttablePath>();
+        var engravings = new List<CuttablePath>();
+        var textEngravings = new List<TextEngraving>();
         foreach (var feature in features)
         {
             if (feature is CutoutFeature cutout)
@@ -528,6 +531,36 @@ public sealed class CuttingPipeline
                 var center = CutoutBuilder.ResolveCenter(cutout.Position, panelU, panelV, logger);
                 var cutPath = CutoutBuilder.Build(cutout, center, settings.Kerf, translation, logger);
                 interiorCuts.AddRange(CutoutClipper.ClipToOutline(cutPath, path, logger));
+            }
+            else if (feature is LineEngravingFeature lineEngraving)
+            {
+                var center = CutoutBuilder.ResolveCenter(lineEngraving.Position, panelU, panelV, logger);
+                // Engravings don't need kerf adjustment — we engrave the exact specified size.
+                var engravingPath = CutoutBuilder.Build(lineEngraving.Shape, lineEngraving.Width, lineEngraving.Height, center, kerf: 0, translation, logger);
+                engravings.AddRange(CutoutClipper.ClipToOutline(engravingPath, path, logger));
+            }
+            else if (feature is EngravingGridFeature grid)
+            {
+                foreach (var gridLine in EngravingBuilder.BuildGrid(panelU, panelV, grid.CellSize, grid.Center, translation))
+                    engravings.AddRange(CutoutClipper.ClipToOutline(gridLine, path, logger));
+            }
+            else if (feature is EngravingTextFeature engraving)
+            {
+                var center = CutoutBuilder.ResolveCenter(engraving.Position, panelU, panelV, logger);
+                var anchorPoint = new Vec2(center.X + translation.X, center.Y + translation.Y);
+                if (CutoutClipper.IsInsideOutline(anchorPoint, path))
+                {
+                    textEngravings.Add(new TextEngraving
+                    {
+                        Text = engraving.Text,
+                        X = anchorPoint.X,
+                        Y = anchorPoint.Y,
+                        Size = engraving.Size,
+                        Font = engraving.Font,
+                        Bold = engraving.Bold,
+                        Italic = engraving.Italic,
+                    });
+                }
             }
         }
         foreach (var slot in slots)
@@ -542,7 +575,8 @@ public sealed class CuttingPipeline
             BoundingBoxMax = bbMax,
             Outline = path,
             InteriorCuts = interiorCuts,
-            Engravings = Array.Empty<CuttablePath>(),
+            Engravings = engravings,
+            TextEngravings = textEngravings,
         };
     }
 }

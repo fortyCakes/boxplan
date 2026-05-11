@@ -1,0 +1,46 @@
+shapes:
+- id: "sample-box"
+  type: "box"
+  dimensions: [60.0, 50.0, 60.0]
+  location: [0.0, 0.0, 0.0]
+  origin: "bottom-left-front"
+  faces:
+    - name: "top"
+      type: "closed"
+  features:
+    # Line engraving: a rectangle border on the front face, offset from the edges.
+    - face: "front"
+      type: "line-engraving"
+      shape: "rectangle"
+      width: 40.0
+      height: 40.0
+      position:
+        anchor: "center"
+        offset: [0.0, 0.0]
+
+    # Engraving grid on the top face, space-centred (default).
+    - face: "top"
+      type: "engraving-grid"
+      cell-size: 10.0
+      center: "space"
+
+    # Engraving grid on the back face, corner-centred for comparison.
+    - face: "back"
+      type: "engraving-grid"
+      cell-size: 10.0
+      center: "corner"
+
+    # Text engraving on the right face.
+    - face: "right"
+      type: "engraving"
+      text: "boxplan"
+      size: 6.0
+      font: "sans-serif"
+      style: "bold"
+
+    # Engraving grid on the left face, maximize mode — fits as many whole cells as
+    # possible; cells straddling the edge are included when more than half is on the face.
+    - face: "left"
+      type: "engraving-grid"
+      cell-size: 10.0
+      center: "maximize"

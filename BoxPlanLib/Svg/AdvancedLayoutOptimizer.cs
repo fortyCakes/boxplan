@@ -1,3 +1,4 @@
+using BoxPlanLib.Cutting;
 using BoxPlanLib.Model;
 using Clipper2Lib;
 using Google.OrTools.Sat;
@@ -17,13 +18,15 @@ internal sealed class AdvancedLayoutOptimizer
     private readonly double _usableWidth;
     private readonly double _usableHeight;
     private readonly Random _random;
+    private readonly PipelineLogger _logger;
 
-    public AdvancedLayoutOptimizer(BoxPlanSettings settings)
+    public AdvancedLayoutOptimizer(BoxPlanSettings settings, PipelineLogger? logger = null)
     {
         _settings = settings;
         _usableWidth = settings.SheetWidth - (2 * settings.Margin);
         _usableHeight = settings.SheetHeight - (2 * settings.Margin);
         _random = new Random(settings.LayoutRandomSeed);
+        _logger = logger ?? new PipelineLogger(false);
     }
 
     public AdvancedLayoutResult? Optimize(BoxPlanCuttableShape[] shapes)
@@ -33,10 +36,13 @@ internal sealed class AdvancedLayoutOptimizer
             return new AdvancedLayoutResult(Array.Empty<AdvancedLayoutPlacement>(), 0);
         }
 
+        _logger.Log($"[layout] optimizing {shapes.Length} shape(s), sheet {_usableWidth:F1}x{_usableHeight:F1}mm usable");
+
         var pieces = BuildPieces(shapes);
         EnsureAllPiecesFitPage(pieces);
 
         var orderings = BuildOrderings(pieces);
+        _logger.Log($"[layout] evaluating {orderings.Count} ordering(s)");
         var candidates = new List<LayoutCandidate>();
 
         foreach (var ordering in orderings)
@@ -47,8 +53,11 @@ internal sealed class AdvancedLayoutOptimizer
             TryAddCandidate(candidates, BuildLayout(pieces, ordering, useConvexHull: true, useCompaction: true, useVoidFill: true, "hull-blf-compact-voidfill"));
         }
 
+        _logger.Log($"[layout] {candidates.Count} valid candidate(s) produced");
+
         if (candidates.Count == 0)
         {
+            _logger.Warn("layout optimizer produced no valid candidates");
             return null;
         }
 
@@ -58,6 +67,8 @@ internal sealed class AdvancedLayoutOptimizer
             .ThenBy(c => c.AggregateUsedArea)
             .ThenBy(c => c.Name, StringComparer.Ordinal)
             .First();
+
+        _logger.Log($"[layout] best strategy '{best.Name}': {best.PageCount} page(s), bounding area {best.BoundingAreaWithMargins:F0}mm²");
 
         var placements = new List<AdvancedLayoutPlacement>();
         for (var pageIndex = 0; pageIndex < best.Pages.Count; pageIndex++)
@@ -263,8 +274,11 @@ internal sealed class AdvancedLayoutOptimizer
         // discover better placement orders than simple sorting heuristics.
         if (pieces.Count < 4 || pieces.Count > 28)
         {
+            _logger.Log($"[layout] OR-Tools ordering skipped (piece count {pieces.Count} outside supported range 4–28)");
             return null;
         }
+
+        _logger.Log($"[layout] running OR-Tools sequence optimization for {pieces.Count} piece(s)");
 
         try
         {

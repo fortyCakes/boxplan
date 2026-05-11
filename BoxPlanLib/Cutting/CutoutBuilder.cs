@@ -21,19 +21,22 @@ internal static class CutoutBuilder
     }
 
     public static CuttablePath Build(CutoutFeature feature, Vec2 center, double kerf, Vec2 translation, PipelineLogger? logger = null)
+        => Build(feature.Shape, feature.Width, feature.Height, center, kerf, translation, logger);
+
+    public static CuttablePath Build(CutoutShape shape, double width, double height, Vec2 center, double kerf, Vec2 translation, PipelineLogger? logger = null)
     {
-        logger?.Log($"[cutout] Building cutout {feature.Shape} at center=({center.X},{center.Y})");
-        var w = Math.Abs(feature.Width) - kerf;
-        var h = Math.Abs(feature.Height) - kerf;
+        logger?.Log($"[cutout] Building shape {shape} at center=({center.X},{center.Y})");
+        var w = Math.Abs(width) - kerf;
+        var h = Math.Abs(height) - kerf;
         var cx = center.X + translation.X;
         var cy = center.Y + translation.Y;
 
-        return feature.Shape switch
+        return shape switch
         {
             CutoutShape.Rectangle  => BuildRectangle(cx, cy, w, h),
             CutoutShape.Circle     => BuildCircle(cx, cy, w / 2),
-            CutoutShape.Semicircle => BuildSemicircle(cx, cy, feature.Width >= 0 ? w / 2 : -(w / 2)),
-            _ => throw new InvalidOperationException($"Unsupported cutout shape {feature.Shape}"),
+            CutoutShape.Semicircle => BuildSemicircle(cx, cy, width >= 0 ? w / 2 : -(w / 2)),
+            _ => throw new InvalidOperationException($"Unsupported shape {shape}"),
         };
     }
 

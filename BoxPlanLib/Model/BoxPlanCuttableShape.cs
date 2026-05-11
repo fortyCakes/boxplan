@@ -10,6 +10,18 @@ public sealed class BoxPlanCuttableShape
     public required CuttablePath Outline { get; init; }
     public required IReadOnlyList<CuttablePath> InteriorCuts { get; init; }
     public required IReadOnlyList<CuttablePath> Engravings { get; init; }
+    public required IReadOnlyList<TextEngraving> TextEngravings { get; init; }
+}
+
+public sealed class TextEngraving
+{
+    public required string Text { get; init; }
+    public required double X { get; init; }
+    public required double Y { get; init; }
+    public required double Size { get; init; }
+    public string Font { get; init; } = "sans-serif";
+    public bool Bold { get; init; }
+    public bool Italic { get; init; }
 }
 
 public sealed class CuttablePath

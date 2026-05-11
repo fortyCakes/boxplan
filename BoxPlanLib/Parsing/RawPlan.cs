@@ -101,6 +101,28 @@ public sealed class RawCutoutFeature : RawFeature
     public double? Height { get; set; }
 }
 
+public sealed class RawEngravingFeature : RawFeature
+{
+    public string? Text { get; set; }
+    public double? Size { get; set; }
+    public string? Font { get; set; }
+    public string? Style { get; set; }
+}
+
+public sealed class RawLineEngravingFeature : RawFeature
+{
+    public string? Shape { get; set; }
+    public double? Diameter { get; set; }
+    public double? Width { get; set; }
+    public double? Height { get; set; }
+}
+
+public sealed class RawEngravingGridFeature : RawFeature
+{
+    public double? CellSize { get; set; }
+    public string? Center { get; set; }
+}
+
 public sealed class RawPosition : IRawLocated
 {
     public string? Anchor { get; set; }
