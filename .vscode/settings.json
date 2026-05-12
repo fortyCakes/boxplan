@@ -4,6 +4,7 @@
         "git add": true,
         "ConvertTo-Json": true,
         "ForEach-Object": true,
-        "dotnet build": true
+        "dotnet build": true,
+        ".\\BoxPlanLib.Cli\\sample-plans\\triangular-tray.yml": true
     }
 }

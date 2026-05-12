@@ -47,11 +47,15 @@ internal sealed class PolygonPanelShapeBuilder
         var bX = p0.X + ex * (start + length);
         var bY = p0.Y + ey * (start + length);
 
-        // Build clip rectangle CCW: a → b → b+depth*n → a+depth*n
+        // Overshoot the clip slightly outward of the polygon boundary so Clipper2
+        // doesn't treat an exactly-coincident clip edge as a separate hole. Without
+        // this, a notch whose outer edge sits exactly on a non-axis-aligned polygon
+        // edge can come back as a negative-area hole rather than a concave indent.
+        const double BoundaryOverlap = 1e-4;
         _notchClips.Add(new PathD
         {
-            new PointD(aX, aY),
-            new PointD(bX, bY),
+            new PointD(aX - nx * BoundaryOverlap, aY - ny * BoundaryOverlap),
+            new PointD(bX - nx * BoundaryOverlap, bY - ny * BoundaryOverlap),
             new PointD(bX + nx * depth, bY + ny * depth),
             new PointD(aX + nx * depth, aY + ny * depth),
         });

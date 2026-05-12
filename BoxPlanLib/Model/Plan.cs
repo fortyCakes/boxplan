@@ -164,6 +164,10 @@ public sealed class PrismShape : Shape
     public required PrismProfile Profile { get; init; }
     public double? Depth { get; init; }
     public required IReadOnlyList<PrismLateralFace> LateralFaces { get; init; }
+    // Uniform scale factor for the back profile, centroid-aligned. 1.0 = symmetric (default).
+    public double BackScale { get; init; } = 1.0;
+    // Area centroid of the front profile (in profile X,Z coords). Used to scale back vertices.
+    public Vec2 ProfileCentroid { get; init; } = Vec2.Zero;
 }
 
 public sealed class PrismProfile

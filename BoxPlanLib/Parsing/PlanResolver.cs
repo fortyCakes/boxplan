@@ -1,3 +1,4 @@
+using BoxPlanLib.Cutting;
 using BoxPlanLib.Model;
 
 namespace BoxPlanLib.Parsing;
@@ -159,7 +160,17 @@ public sealed class PlanResolver
         if (depth is not null && fit is not null)
             errors.Add(Err("Prism may specify 'depth' or 'fit', not both.", path, raw));
 
+        var backScale = 1.0;
+        if (raw.BackSize is { } bs)
+        {
+            if (bs <= 0)
+                errors.Add(Err("Prism 'back-size' must be positive.", $"{path}.back-size", raw));
+            else
+                backScale = bs;
+        }
+
         var faces = ResolvePrismCapFaces(raw.Faces, $"{path}.faces", errors);
+        var centroid = PrismGeometry.ComputeProfileCentroid(profile);
         var lateralFaces = BuildLateralFaces(profile, raw.LateralFaces, $"{path}.lateral-faces", errors, raw);
         var inserts = ResolveInserts(raw.Inserts, Array.Empty<DividerSet>(), faces, $"{path}.inserts", errors, pendingRefs);
 
@@ -176,6 +187,8 @@ public sealed class PlanResolver
             Dividers = Array.Empty<DividerSet>(),
             Inserts = inserts,
             Features = Array.Empty<Feature>(),
+            BackScale = backScale,
+            ProfileCentroid = centroid,
         };
     }
 

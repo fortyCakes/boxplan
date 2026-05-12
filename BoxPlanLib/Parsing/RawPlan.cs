@@ -158,6 +158,12 @@ public abstract class RawPrismShapeBase : RawShape
 
     [YamlMember(Alias = "lateral-faces")]
     public List<RawLateralFace>? LateralFaces { get; set; }
+
+    // Optional uniform scale factor for the back profile (centroid-aligned).
+    // 1.0 (or omitted) = symmetric prism; <1 = back smaller than front (frustum-like);
+    // >1 = back larger than front (inverted frustum).
+    [YamlMember(Alias = "back-size")]
+    public double? BackSize { get; set; }
 }
 
 // type: "prism" — explicit polygon via points list OR segment list.

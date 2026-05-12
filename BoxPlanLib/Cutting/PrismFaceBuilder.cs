@@ -16,6 +16,7 @@ internal static class PrismFaceBuilder
         PipelineLogger? logger)
     {
         var n = prism.LateralFaces.Count;
+        var asymmetric = PrismGeometry.IsAsymmetric(prism.BackScale);
 
         for (var i = 0; i < n; i++)
         {
@@ -23,7 +24,9 @@ internal static class PrismFaceBuilder
             if (lf.Type != FaceType.Closed) continue;
 
             var id = $"{shapeId}.lateral-{i}";
-            if (lf.IsCurved)
+            if (asymmetric)
+                yield return BuildTrapezoidLateralFace(id, i, prism, depth, settings, logger);
+            else if (lf.IsCurved)
                 yield return BuildCurvedLateralFace(id, i, prism, depth, settings, logger);
             else
                 yield return BuildStraightLateralFace(id, i, prism, depth, settings, logger);
@@ -68,9 +71,13 @@ internal static class PrismFaceBuilder
 
         var builder = new PanelShapeBuilder(w, h, logger);
 
-        // All lateral face corners get notches (cap faces are always lower priority).
+        // Corner reservations depend on which faces actually meet at the prism corner.
+        // Open caps or open neighbouring lateral faces do not participate in ownership.
         for (var ci = 0; ci < 4; ci++)
-            SubtractCornerNotch(builder, ci, w, h, t);
+        {
+            if (!OwnsLateralCorner(prism, faceIndex, ci))
+                SubtractLateralCornerNotch(builder, prism, faceIndex, ci, w, h, t);
+        }
 
         // Bottom edge (edge 0, meets back cap — lowest priority 0)
         if (backClosed)
@@ -106,23 +113,14 @@ internal static class PrismFaceBuilder
         {
             // prevFace.DihedralAngleToNext is the angle at the LEFT vertex of this face.
             var slotDepthLeft = SlotDepth(prevFace.DihedralAngleToNext, t);
-            var currentIsPrimaryOnLeft = IsLowerPriority(faceIndex, prevIndex);
             var blocks = FingerJointPattern.Build(h - 2 * t, s, t);
             var cursor = t;
             foreach (var block in blocks)
             {
-                if (currentIsPrimaryOnLeft)
-                {
-                    // Current face owns primary → tabs; subtract secondary (prevFace's tabs) at t
-                    if (!block.PrimaryOwns)
-                        builder.SubtractEdgeNotch(3, cursor, block.Length, t);
-                }
-                else
-                {
-                    // Current face is secondary → subtract primary (prevFace's tabs) at deep slot
-                    if (block.PrimaryOwns)
-                        builder.SubtractEdgeNotch(3, cursor, block.Length, slotDepthLeft);
-                }
+                // Lateral ownership runs in edge order around the prism: each face owns
+                // the edge to its next neighbour, so it always yields to the previous one.
+                if (block.PrimaryOwns)
+                    builder.SubtractEdgeNotch(3, cursor, block.Length, slotDepthLeft);
                 cursor += block.Length;
             }
         }
@@ -132,23 +130,14 @@ internal static class PrismFaceBuilder
         {
             // face.DihedralAngleToNext is the angle at the RIGHT vertex of this face (shared with next).
             var slotDepthRight = SlotDepth(face.DihedralAngleToNext, t);
-            var currentIsPrimaryOnRight = IsLowerPriority(faceIndex, nextIndex);
             var blocks = FingerJointPattern.Build(h - 2 * t, s, t);
             var cursor = t;
             foreach (var block in blocks)
             {
-                if (currentIsPrimaryOnRight)
-                {
-                    // Current face owns primary → tabs; subtract secondary at t
-                    if (!block.PrimaryOwns)
-                        builder.SubtractEdgeNotch(1, cursor, block.Length, t);
-                }
-                else
-                {
-                    // Current face is secondary → subtract primary at deep slot
-                    if (block.PrimaryOwns)
-                        builder.SubtractEdgeNotch(1, cursor, block.Length, slotDepthRight);
-                }
+                // Current face owns the edge to its next neighbour, so complementary
+                // notches on this primary side need the same dihedral depth as slots.
+                if (!block.PrimaryOwns)
+                    builder.SubtractEdgeNotch(1, cursor, block.Length, slotDepthRight);
                 cursor += block.Length;
             }
         }
@@ -202,7 +191,10 @@ internal static class PrismFaceBuilder
         var builder = new PanelShapeBuilder(w, h, logger);
 
         for (var ci = 0; ci < 4; ci++)
-            SubtractCornerNotch(builder, ci, w, h, t);
+        {
+            if (!OwnsLateralCorner(prism, faceIndex, ci))
+                SubtractLateralCornerNotch(builder, prism, faceIndex, ci, w, h, t);
+        }
 
         if (backClosed)
         {
@@ -231,13 +223,12 @@ internal static class PrismFaceBuilder
         if (prevFace.Type == FaceType.Closed)
         {
             var slotDepth = SlotDepth(prevFace.DihedralAngleToNext, t);
-            var isPrimary = IsLowerPriority(faceIndex, prevIndex);
             var blocks = FingerJointPattern.Build(h - 2 * t, s, t);
             var cursor = t;
             foreach (var block in blocks)
             {
-                if (isPrimary ? !block.PrimaryOwns : block.PrimaryOwns)
-                    builder.SubtractEdgeNotch(3, cursor, block.Length, isPrimary ? t : slotDepth);
+                if (block.PrimaryOwns)
+                    builder.SubtractEdgeNotch(3, cursor, block.Length, slotDepth);
                 cursor += block.Length;
             }
         }
@@ -245,13 +236,12 @@ internal static class PrismFaceBuilder
         if (nextFace.Type == FaceType.Closed)
         {
             var slotDepth = SlotDepth(face.DihedralAngleToNext, t);
-            var isPrimary = IsLowerPriority(faceIndex, nextIndex);
             var blocks = FingerJointPattern.Build(h - 2 * t, s, t);
             var cursor = t;
             foreach (var block in blocks)
             {
-                if (isPrimary ? !block.PrimaryOwns : block.PrimaryOwns)
-                    builder.SubtractEdgeNotch(1, cursor, block.Length, isPrimary ? t : slotDepth);
+                if (!block.PrimaryOwns)
+                    builder.SubtractEdgeNotch(1, cursor, block.Length, slotDepth);
                 cursor += block.Length;
             }
         }
@@ -274,6 +264,174 @@ internal static class PrismFaceBuilder
         };
     }
 
+    // ── Trapezoidal lateral face (back-scaled prism) ──────────────────────────
+
+    private static BoxPlanCuttableShape BuildTrapezoidLateralFace(
+        string id,
+        int faceIndex,
+        PrismShape prism,
+        double depth,
+        BoxPlanSettings settings,
+        PipelineLogger? logger)
+    {
+        var t = settings.MaterialThickness;
+        var s = settings.FingerJointSize;
+        var n = prism.LateralFaces.Count;
+        var face = prism.LateralFaces[faceIndex];
+        var centroid = prism.ProfileCentroid;
+        var scale = prism.BackScale;
+        var profile = prism.Profile;
+
+        var prevIndex = (faceIndex + n - 1) % n;
+        var nextIndex = (faceIndex + 1) % n;
+        var prevFace = prism.LateralFaces[prevIndex];
+        var nextFace = prism.LateralFaces[nextIndex];
+
+        var frontClosed = IsFaceClosed(prism, FaceName.Front);
+        var backClosed = IsFaceClosed(prism, FaceName.Back);
+
+        var verts = GetProfileVertices(profile);
+        // verts has n+1 entries with verts[n] == verts[0].
+        var edgeStart = verts[faceIndex];
+        var edgeEnd = verts[faceIndex + 1];
+        var nextEdgeEnd = faceIndex + 2 <= n ? verts[faceIndex + 2] : verts[faceIndex + 2 - n];
+        var prevEdgeStart = verts[(faceIndex + n - 1) % n];
+
+        var (poly, frontLen, backLen, leftSlant, rightSlant) =
+            PrismGeometry.TrapezoidLayout(edgeStart, edgeEnd, centroid, scale, depth);
+
+        // 3D dihedrals at the shared vertical slant edges.
+        var dihedralRight = PrismGeometry.Dihedral3D(
+            edgeStart, edgeEnd, nextEdgeEnd, centroid, scale, depth);
+        var dihedralLeft = PrismGeometry.Dihedral3D(
+            prevEdgeStart, edgeStart, edgeEnd, centroid, scale, depth);
+
+        // Cap-to-lateral dihedrals at the front/back horizontal edges.
+        var capFrontAngle = PrismGeometry.CapToLateralAngle(
+            edgeStart, edgeEnd, centroid, scale, depth, isFront: true);
+        var capBackAngle = PrismGeometry.CapToLateralAngle(
+            edgeStart, edgeEnd, centroid, scale, depth, isFront: false);
+
+        logger?.Log(
+            $"[prism] Trapezoid lateral {id} front={frontLen:F3} back={backLen:F3} "
+            + $"slantL={leftSlant:F3} slantR={rightSlant:F3} "
+            + $"dihL={dihedralLeft:F1}° dihR={dihedralRight:F1}° "
+            + $"capF={capFrontAngle:F1}° capB={capBackAngle:F1}°");
+
+        var builder = new PolygonPanelShapeBuilder(poly, logger);
+
+        // Edge convention (matches rectangular path):
+        //   0 = bottom = BACK cap edge   (length = backLen)
+        //   1 = right slant (to next face, length = rightSlant)
+        //   2 = top    = FRONT cap edge  (length = frontLen, traversed right→left)
+        //   3 = left slant  (to prev face, length = leftSlant)
+
+        var capFrontDepth = SlotDepth(capFrontAngle, t);
+        var capBackDepth = SlotDepth(capBackAngle, t);
+        var rightDepth = SlotDepth(dihedralRight, t);
+        var leftDepth = SlotDepth(dihedralLeft, t);
+
+        // Corner reservations: subtract a t-wide notch on each non-owned corner.
+        for (var ci = 0; ci < 4; ci++)
+        {
+            if (!OwnsLateralCorner(prism, faceIndex, ci))
+                SubtractTrapezoidCornerNotch(builder, ci, t,
+                    backLen, rightSlant, frontLen, leftSlant,
+                    capBackDepth, rightDepth, capFrontDepth, leftDepth);
+        }
+
+        // Edge 0 (bottom): back cap finger joints. Pattern length = backLen − 2t.
+        if (backClosed && backLen > 2 * t)
+        {
+            var blocks = FingerJointPattern.Build(backLen - 2 * t, s, t);
+            var cursor = t;
+            foreach (var block in blocks)
+            {
+                if (block.PrimaryOwns)
+                    builder.SubtractEdgeNotch(0, cursor, block.Length, capBackDepth);
+                cursor += block.Length;
+            }
+        }
+
+        // Edge 2 (top): front cap finger joints. Pattern length = frontLen − 2t.
+        if (frontClosed && frontLen > 2 * t)
+        {
+            var blocks = FingerJointPattern.Build(frontLen - 2 * t, s, t);
+            var cursor = t;
+            foreach (var block in blocks)
+            {
+                if (block.PrimaryOwns)
+                    builder.SubtractEdgeNotch(2, cursor, block.Length, capFrontDepth);
+                cursor += block.Length;
+            }
+        }
+
+        // Edge 3 (left slant): meets prev face. Yields to prev.
+        if (prevFace.Type == FaceType.Closed && leftSlant > 2 * t)
+        {
+            var blocks = FingerJointPattern.Build(leftSlant - 2 * t, s, t);
+            var cursor = t;
+            foreach (var block in blocks)
+            {
+                if (block.PrimaryOwns)
+                    builder.SubtractEdgeNotch(3, cursor, block.Length, leftDepth);
+                cursor += block.Length;
+            }
+        }
+
+        // Edge 1 (right slant): meets next face. Current face owns this joint.
+        if (nextFace.Type == FaceType.Closed && rightSlant > 2 * t)
+        {
+            var blocks = FingerJointPattern.Build(rightSlant - 2 * t, s, t);
+            var cursor = t;
+            foreach (var block in blocks)
+            {
+                if (!block.PrimaryOwns)
+                    builder.SubtractEdgeNotch(1, cursor, block.Length, rightDepth);
+                cursor += block.Length;
+            }
+        }
+
+        var polygon = builder.Build();
+        var (path, bbMin, bbMax, _) = KerfOffset.OffsetOutwardAndTranslate(polygon, settings.Kerf, logger);
+
+        return new BoxPlanCuttableShape
+        {
+            Id = id,
+            BoundingBoxMin = bbMin,
+            BoundingBoxMax = bbMax,
+            Outline = path,
+            InteriorCuts = Array.Empty<CuttablePath>(),
+            Engravings = Array.Empty<CuttablePath>(),
+            TextEngravings = Array.Empty<TextEngraving>(),
+        };
+    }
+
+    // Reserves a t-wide notch on each side of an unowned trapezoid corner.
+    // Each corner is between edge (i+3)%4 (incoming) and edge i (outgoing).
+    // Edge lengths and slot depths are passed positionally in edge-index order:
+    // 0=bottom(back), 1=right-slant, 2=top(front), 3=left-slant.
+    private static void SubtractTrapezoidCornerNotch(
+        PolygonPanelShapeBuilder builder,
+        int cornerIndex,
+        double t,
+        double bottomLen, double rightSlantLen, double topLen, double leftSlantLen,
+        double bottomDepth, double rightDepth, double topDepth, double leftDepth)
+    {
+        double[] edgeLengths = { bottomLen, rightSlantLen, topLen, leftSlantLen };
+        double[] edgeDepths = { bottomDepth, rightDepth, topDepth, leftDepth };
+
+        var prevEdge = (cornerIndex + 3) % 4;
+        var currentEdge = cornerIndex;
+        var prevDepth = edgeDepths[prevEdge];
+        var currentDepth = edgeDepths[currentEdge];
+
+        if (prevDepth > 0)
+            builder.SubtractEdgeNotch(prevEdge, edgeLengths[prevEdge] - t, t, prevDepth);
+        if (currentDepth > 0)
+            builder.SubtractEdgeNotch(currentEdge, 0, t, currentDepth);
+    }
+
     // ── Cap face (polygon panel) ──────────────────────────────────────────────
 
     private static BoxPlanCuttableShape BuildCapFace(
@@ -289,10 +447,17 @@ internal static class PrismFaceBuilder
         var n = prism.LateralFaces.Count;
         var profile = prism.Profile;
 
-        logger?.Log($"[prism] Building cap face {id}");
+        // For back caps with back-size != 1, scale the cap polygon (and its arc radii)
+        // uniformly around the profile centroid.
+        var capScale = isFront ? 1.0 : prism.BackScale;
+        var centroid = prism.ProfileCentroid;
+
+        logger?.Log($"[prism] Building cap face {id} scale={capScale:F3}");
 
         // Subject polygon: arcs are discretised into polyline segments so Clipper gets a valid area.
         var rawPoly = BuildCapPolygon(profile, n);
+        if (PrismGeometry.IsAsymmetric(capScale))
+            rawPoly = rawPoly.Select(v => PrismGeometry.ScalePoint(v, centroid, capScale)).ToList();
         var minX = rawPoly.Min(v => v.X);
         var minZ = rawPoly.Min(v => v.Y);
         var poly = rawPoly.Select(v => new Vec2(v.X - minX, v.Y - minZ)).ToList();
@@ -305,27 +470,30 @@ internal static class PrismFaceBuilder
             var lf = prism.LateralFaces[i];
             if (lf.Type != FaceType.Closed) continue;
 
-            var edgeLen = lf.EdgeLength;
+            // Scale the front edge length to the back cap's edge length when needed.
+            var edgeLen = lf.EdgeLength * capScale;
             var innerLen = edgeLen - 2 * t;
             if (innerLen <= 0) continue;
 
             var seg = profile.Segments[i];
-            // Chord endpoints in translated coords (needed by OrientedNotch / ArcGeometry).
+            // Chord endpoints in (scaled, translated) coords.
             var rawStart = i == 0 ? profile.StartPoint : profile.Segments[i - 1].EndPoint;
-            var edgeStart = new Vec2(rawStart.X - minX, rawStart.Y - minZ);
-            var edgeEnd   = new Vec2(seg.EndPoint.X - minX, seg.EndPoint.Y - minZ);
+            var scaledStart = PrismGeometry.ScalePoint(rawStart, centroid, capScale);
+            var scaledEnd = PrismGeometry.ScalePoint(seg.EndPoint, centroid, capScale);
+            var edgeStart = new Vec2(scaledStart.X - minX, scaledStart.Y - minZ);
+            var edgeEnd = new Vec2(scaledEnd.X - minX, scaledEnd.Y - minZ);
 
             var blocks = FingerJointPattern.Build(innerLen, s, t);
             var cursor = t;
 
             if (lf.IsCurved && seg is ProfileSegment.Arc arc)
             {
-                var translatedArc = new ProfileSegment.Arc(edgeEnd, arc.Radius, arc.Clockwise);
-                var (arcCenter, thetaStart, thetaTotal) = ArcGeometry(edgeStart, translatedArc);
+                var scaledArc = new ProfileSegment.Arc(edgeEnd, arc.Radius * capScale, arc.Clockwise);
+                var (arcCenter, thetaStart, thetaTotal) = ArcGeometry(edgeStart, scaledArc);
                 foreach (var block in blocks)
                 {
                     if (!block.PrimaryOwns)
-                        clips.Add(ArcNotch(arcCenter, arc.Radius, thetaStart, thetaTotal, edgeLen, cursor, block.Length, t));
+                        clips.Add(ArcNotch(arcCenter, scaledArc.Radius, thetaStart, thetaTotal, edgeLen, cursor, block.Length, t));
                     cursor += block.Length;
                 }
             }
@@ -483,9 +651,32 @@ internal static class PrismFaceBuilder
     private static bool IsFaceClosed(PrismShape prism, FaceName name)
         => prism.Faces.Any(f => f.Name == name && f.Type == FaceType.Closed);
 
-    // Lateral face priority = 2 + index; returns true if faceIndex has lower priority than otherIndex.
-    private static bool IsLowerPriority(int faceIndex, int otherIndex)
-        => faceIndex < otherIndex;
+    private static bool OwnsLateralCorner(PrismShape prism, int faceIndex, int cornerIndex)
+    {
+        var n = prism.LateralFaces.Count;
+        var prevIndex = (faceIndex + n - 1) % n;
+        var nextIndex = (faceIndex + 1) % n;
+        var capClosed = cornerIndex is 0 or 1
+            ? IsFaceClosed(prism, FaceName.Back)
+            : IsFaceClosed(prism, FaceName.Front);
+
+        if (capClosed)
+            return false;
+
+        switch (cornerIndex)
+        {
+            case 0: // bottom-left: previous face owns this side when the back cap is open.
+            case 3: // top-left
+                return prism.LateralFaces[prevIndex].Type != FaceType.Closed;
+
+            case 1: // bottom-right: current face owns the edge to its next neighbour.
+            case 2: // top-right
+                return true;
+
+            default:
+                throw new ArgumentOutOfRangeException(nameof(cornerIndex));
+        }
+    }
 
     // Slot depth for a lateral-to-lateral joint at interior dihedral angle θ (degrees).
     internal static double SlotDepth(double dihedralDeg, double t)
@@ -500,6 +691,65 @@ internal static class PrismFaceBuilder
         var prevI = (cornerIndex + 3) % 4;
         builder.SubtractEdgeNotch(prevI, edgeLengths[prevI] - t, t, t);
         builder.SubtractEdgeNotch(cornerIndex, 0, t, t);
+    }
+
+    private static void SubtractLateralCornerNotch(
+        PanelShapeBuilder builder,
+        PrismShape prism,
+        int faceIndex,
+        int cornerIndex,
+        double w,
+        double h,
+        double t)
+    {
+        var n = prism.LateralFaces.Count;
+        var prevIndex = (faceIndex + n - 1) % n;
+        var nextIndex = (faceIndex + 1) % n;
+        var prevFace = prism.LateralFaces[prevIndex];
+        var face = prism.LateralFaces[faceIndex];
+
+        var leftDepth = prevFace.Type == FaceType.Closed ? SlotDepth(prevFace.DihedralAngleToNext, t) : 0.0;
+        var rightDepth = prism.LateralFaces[nextIndex].Type == FaceType.Closed ? SlotDepth(face.DihedralAngleToNext, t) : 0.0;
+        var backClosed = IsFaceClosed(prism, FaceName.Back);
+        var frontClosed = IsFaceClosed(prism, FaceName.Front);
+
+        var prevEdgeIndex = (cornerIndex + 3) % 4;
+        var currentEdgeIndex = cornerIndex;
+        double[] edgeLengths = { w, h, w, h };
+
+        double prevDepth;
+        double currentDepth;
+
+        switch (cornerIndex)
+        {
+            case 0: // bottom-left
+                prevDepth = leftDepth;
+                currentDepth = backClosed ? t : leftDepth;
+                break;
+
+            case 1: // bottom-right
+                prevDepth = backClosed ? t : rightDepth;
+                currentDepth = rightDepth;
+                break;
+
+            case 2: // top-right
+                prevDepth = rightDepth;
+                currentDepth = frontClosed ? t : rightDepth;
+                break;
+
+            case 3: // top-left
+                prevDepth = frontClosed ? t : leftDepth;
+                currentDepth = leftDepth;
+                break;
+
+            default:
+                throw new ArgumentOutOfRangeException(nameof(cornerIndex));
+        }
+
+        if (prevDepth > 0)
+            builder.SubtractEdgeNotch(prevEdgeIndex, edgeLengths[prevEdgeIndex] - t, t, prevDepth);
+        if (currentDepth > 0)
+            builder.SubtractEdgeNotch(currentEdgeIndex, 0, t, currentDepth);
     }
 
     // Builds a clip polygon for a notch along an edge, properly oriented along the edge direction.

@@ -1,8 +1,0 @@
-shapes:
-  - id: "tri-tray"
-    type: "triangle"
-    width: 120.0
-    depth: 40.0
-    faces:
-      - name: "front"
-        type: "open"

@@ -97,6 +97,60 @@ public class PrismFaceTests
         return counts;
     }
 
+    private static double LongestHorizontalSpanAtTop(CuttablePath path)
+    {
+        const double tolerance = 1e-6;
+        var topY = OutlinePoints(path).Max(p => p.Y);
+        var maxSpan = 0.0;
+        var points = OutlinePoints(path);
+
+        for (var i = 0; i + 1 < points.Count; i++)
+        {
+            var start = points[i];
+            var end = points[i + 1];
+            if (Math.Abs(start.Y - topY) > tolerance || Math.Abs(end.Y - topY) > tolerance)
+                continue;
+
+            maxSpan = Math.Max(maxSpan, Math.Abs(end.X - start.X));
+        }
+
+        return maxSpan;
+    }
+
+    private static double MaxVerticalInset(CuttablePath path, bool fromLeft)
+    {
+        const double tolerance = 1e-6;
+        var points = OutlinePoints(path);
+        var maxX = points.Max(p => p.X);
+        var minX = points.Min(p => p.X);
+        var maxY = points.Max(p => p.Y);
+        var minY = points.Min(p => p.Y);
+        var midX = (minX + maxX) / 2.0;
+        var maxInset = 0.0;
+
+        for (var i = 0; i + 1 < points.Count; i++)
+        {
+            var start = points[i];
+            var end = points[i + 1];
+            if (Math.Abs(end.X - start.X) > tolerance)
+                continue;
+
+            if (fromLeft && start.X > midX)
+                continue;
+            if (!fromLeft && start.X < midX)
+                continue;
+
+            var midY = (start.Y + end.Y) / 2.0;
+            if (midY <= minY + 3.0 || midY >= maxY - 3.0)
+                continue;
+
+            var inset = fromLeft ? start.X : maxX - start.X;
+            maxInset = Math.Max(maxInset, inset);
+        }
+
+        return maxInset;
+    }
+
     // ── Shape count ───────────────────────────────────────────────────────────
 
     [Fact]
@@ -210,6 +264,70 @@ public class PrismFaceTests
                 Math.Abs(capCounts[i] - lateralCounts[i]),
                 0,
                 1);
+        }
+    }
+
+    [Fact]
+    public void Triangle_open_front_laterals_only_notch_non_owned_top_corners()
+    {
+        var shapes = Cut("""
+            shapes:
+              - id: "tri"
+                type: "triangle"
+                width: 120.0
+                depth: 40.0
+                faces:
+                  - name: "front"
+                    type: "open"
+            """,
+            new BoxPlanSettings
+            {
+                Kerf = 0.0,
+                MaterialThickness = 3.0,
+                FingerJointSize = 5.0,
+                SheetWidth = 1000,
+                SheetHeight = 1000,
+            });
+
+        var lateral0 = shapes.First(s => s.Id == "tri.lateral-0");
+        var lateral1 = shapes.First(s => s.Id == "tri.lateral-1");
+        var lateral2 = shapes.First(s => s.Id == "tri.lateral-2");
+        var expectedDepth = 3.0 / Math.Sin(Math.PI / 3.0);
+
+        foreach (var lateral in new[] { lateral0, lateral1, lateral2 })
+        {
+            var faceWidth = lateral.BoundingBoxMax.X - lateral.BoundingBoxMin.X;
+            Assert.Equal(faceWidth - expectedDepth, LongestHorizontalSpanAtTop(lateral.Outline), precision: 3);
+        }
+    }
+
+    [Fact]
+    public void Triangle_lateral_notches_use_slot_depth_on_both_sides()
+    {
+        var shapes = Cut("""
+            shapes:
+              - id: "tri"
+                type: "triangle"
+                width: 120.0
+                depth: 40.0
+                faces:
+                  - name: "front"
+                    type: "open"
+            """,
+            new BoxPlanSettings
+            {
+                Kerf = 0.0,
+                MaterialThickness = 3.0,
+                FingerJointSize = 5.0,
+                SheetWidth = 1000,
+                SheetHeight = 1000,
+            });
+
+        var expectedDepth = 3.0 / Math.Sin(Math.PI / 3.0);
+        foreach (var lateral in shapes.Where(s => s.Id.StartsWith("tri.lateral-")))
+        {
+            Assert.Equal(expectedDepth, MaxVerticalInset(lateral.Outline, fromLeft: true), precision: 3);
+            Assert.Equal(expectedDepth, MaxVerticalInset(lateral.Outline, fromLeft: false), precision: 3);
         }
     }
 
