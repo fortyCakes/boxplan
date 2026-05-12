@@ -206,6 +206,8 @@ internal static class PrismFaceBuilder
             builder.SubtractEdgeNotch(3, 0, t, t);     // corner 3: start of left edge
         }
 
+        // Bottom edge (back cap): single continuous pattern across all arcs.
+        // Matches the continuous pattern that BuildCapFace now applies for all-curved prisms.
         if (backClosed)
         {
             var blocks = FingerJointPattern.Build(w - 2 * t, s, t);
@@ -218,6 +220,8 @@ internal static class PrismFaceBuilder
             }
         }
 
+        // Top edge (front cap): same single pattern. Edge 2 runs right→left but the palindromic
+        // pattern is self-consistent under reversal, so complementarity with the cap is preserved.
         if (frontClosed)
         {
             var blocks = FingerJointPattern.Build(w - 2 * t, s, t);
@@ -230,10 +234,13 @@ internal static class PrismFaceBuilder
             }
         }
 
-        // Left edge yields to the right edge of the same panel.
+        // Left edge (edge 3): position 0 = top (front-cap end), position h = bottom (back-cap end).
+        // Only reserve t at a closed-cap end; run flush to the edge when the cap is open.
         {
-            var blocks = FingerJointPattern.Build(h - 2 * t, s, t);
-            var cursor = t;
+            var topMargin = frontClosed ? t : 0.0;
+            var botMargin = backClosed ? t : 0.0;
+            var blocks = FingerJointPattern.Build(h - topMargin - botMargin, s, t);
+            var cursor = topMargin;
             foreach (var block in blocks)
             {
                 if (block.PrimaryOwns)
@@ -242,10 +249,12 @@ internal static class PrismFaceBuilder
             }
         }
 
-        // Right edge owns the self-mating joint.
+        // Right edge (edge 1): position 0 = bottom (back-cap end), position h = top (front-cap end).
         {
-            var blocks = FingerJointPattern.Build(h - 2 * t, s, t);
-            var cursor = t;
+            var botMargin = backClosed ? t : 0.0;
+            var topMargin = frontClosed ? t : 0.0;
+            var blocks = FingerJointPattern.Build(h - botMargin - topMargin, s, t);
+            var cursor = botMargin;
             foreach (var block in blocks)
             {
                 if (!block.PrimaryOwns)
@@ -258,7 +267,12 @@ internal static class PrismFaceBuilder
         var (path, bbMin, bbMax, translation) = KerfOffset.OffsetOutwardAndTranslate(polygon, settings.Kerf, logger);
 
         var rawFlexCuts = FlexPatternBuilder.Build(w, h, settings, logger);
-        var flexCuts = ClipFlexCuts(rawFlexCuts, polygon, w, h, t, translation);
+        var flexCuts = ClipFlexCuts(rawFlexCuts, polygon, w, h,
+            marginBottom: backClosed ? t : 0,
+            marginRight: t,
+            marginTop: frontClosed ? t : 0,
+            marginLeft: t,
+            translation);
 
         return new BoxPlanCuttableShape
         {
@@ -365,7 +379,12 @@ internal static class PrismFaceBuilder
         var (path, bbMin, bbMax, translation) = KerfOffset.OffsetOutwardAndTranslate(polygon, settings.Kerf, logger);
 
         var rawFlexCuts = FlexPatternBuilder.Build(w, h, settings, logger);
-        var flexCuts = ClipFlexCuts(rawFlexCuts, polygon, w, h, t, translation);
+        var flexCuts = ClipFlexCuts(rawFlexCuts, polygon, w, h,
+            marginBottom: backClosed ? t : 0,
+            marginRight: nextFace.Type == FaceType.Closed ? t : 0,
+            marginTop: frontClosed ? t : 0,
+            marginLeft: prevFace.Type == FaceType.Closed ? t : 0,
+            translation);
 
         return new BoxPlanCuttableShape
         {
@@ -580,46 +599,103 @@ internal static class PrismFaceBuilder
         var subject = new PathsD { ToClipperPath(poly) };
         var clips = new PathsD();
 
-        for (var i = 0; i < n; i++)
+        // For all-curved prisms (e.g. full circle), use one continuous pattern across all arc
+        // edges so that no extra-wide tabs appear at arc-boundary junctions.
+        var allLateralCurved = Enumerable.Range(0, n)
+            .Where(i => prism.LateralFaces[i].Type == FaceType.Closed)
+            .All(i => prism.LateralFaces[i].IsCurved);
+
+        if (allLateralCurved)
         {
-            var lf = prism.LateralFaces[i];
-            if (lf.Type != FaceType.Closed) continue;
-
-            // Scale the front edge length to the back cap's edge length when needed.
-            var edgeLen = lf.EdgeLength * capScale;
-            var innerLen = edgeLen - 2 * t;
-            if (innerLen <= 0) continue;
-
-            var seg = profile.Segments[i];
-            // Chord endpoints in (scaled, translated) coords.
-            var rawStart = i == 0 ? profile.StartPoint : profile.Segments[i - 1].EndPoint;
-            var scaledStart = PrismGeometry.ScalePoint(rawStart, centroid, capScale);
-            var scaledEnd = PrismGeometry.ScalePoint(seg.EndPoint, centroid, capScale);
-            var edgeStart = new Vec2(scaledStart.X - minX, scaledStart.Y - minZ);
-            var edgeEnd = new Vec2(scaledEnd.X - minX, scaledEnd.Y - minZ);
-
-            var blocks = FingerJointPattern.Build(innerLen, s, t);
-            var cursor = t;
-
-            if (lf.IsCurved && seg is ProfileSegment.Arc arc)
+            // Precompute arc geometry for each closed lateral face.
+            var arcInfos = new List<(Vec2 center, double radius, double thetaStart, double thetaTotal, double edgeLen, double cumStart)>();
+            var cumLen = 0.0;
+            for (var i = 0; i < n; i++)
             {
+                var lf = prism.LateralFaces[i];
+                if (lf.Type != FaceType.Closed) continue;
+                var seg = profile.Segments[i];
+                if (seg is not ProfileSegment.Arc arc) continue;
+                var edgeLen = lf.EdgeLength * capScale;
+                var rawStart = i == 0 ? profile.StartPoint : profile.Segments[i - 1].EndPoint;
+                var scaledStart = PrismGeometry.ScalePoint(rawStart, centroid, capScale);
+                var scaledEnd   = PrismGeometry.ScalePoint(seg.EndPoint, centroid, capScale);
+                var edgeStart = new Vec2(scaledStart.X - minX, scaledStart.Y - minZ);
+                var edgeEnd   = new Vec2(scaledEnd.X   - minX, scaledEnd.Y   - minZ);
                 var scaledArc = new ProfileSegment.Arc(edgeEnd, arc.Radius * capScale, arc.Clockwise);
                 var (arcCenter, thetaStart, thetaTotal) = ArcGeometry(edgeStart, scaledArc);
+                arcInfos.Add((arcCenter, scaledArc.Radius, thetaStart, thetaTotal, edgeLen, cumLen));
+                cumLen += edgeLen;
+            }
+
+            var totalLen = cumLen;
+            var innerLen = totalLen - 2 * t;
+            if (innerLen > 0)
+            {
+                var blocks = FingerJointPattern.Build(innerLen, s, t);
+                var cursor = t;
                 foreach (var block in blocks)
                 {
                     if (!block.PrimaryOwns)
-                        clips.Add(ArcNotch(arcCenter, scaledArc.Radius, thetaStart, thetaTotal, edgeLen, cursor, block.Length, t));
+                    {
+                        // A slot may straddle an arc boundary; emit one ArcNotch per overlapping arc.
+                        foreach (var ai in arcInfos)
+                        {
+                            var arcEnd = ai.cumStart + ai.edgeLen;
+                            var overlapStart = Math.Max(cursor, ai.cumStart);
+                            var overlapEnd   = Math.Min(cursor + block.Length, arcEnd);
+                            if (overlapEnd > overlapStart)
+                            {
+                                clips.Add(ArcNotch(
+                                    ai.center, ai.radius, ai.thetaStart, ai.thetaTotal, ai.edgeLen,
+                                    overlapStart - ai.cumStart, overlapEnd - overlapStart, t));
+                            }
+                        }
+                    }
                     cursor += block.Length;
                 }
             }
-            else
+        }
+        else
+        {
+            for (var i = 0; i < n; i++)
             {
-                // Straight edge (Bezier falls back to chord-direction approximation).
-                foreach (var block in blocks)
+                var lf = prism.LateralFaces[i];
+                if (lf.Type != FaceType.Closed) continue;
+
+                var edgeLen = lf.EdgeLength * capScale;
+                var innerLen = edgeLen - 2 * t;
+                if (innerLen <= 0) continue;
+
+                var seg = profile.Segments[i];
+                var rawStart = i == 0 ? profile.StartPoint : profile.Segments[i - 1].EndPoint;
+                var scaledStart = PrismGeometry.ScalePoint(rawStart, centroid, capScale);
+                var scaledEnd   = PrismGeometry.ScalePoint(seg.EndPoint, centroid, capScale);
+                var edgeStart = new Vec2(scaledStart.X - minX, scaledStart.Y - minZ);
+                var edgeEnd   = new Vec2(scaledEnd.X   - minX, scaledEnd.Y   - minZ);
+
+                var blocks = FingerJointPattern.Build(innerLen, s, t);
+                var cursor = t;
+
+                if (lf.IsCurved && seg is ProfileSegment.Arc arc)
                 {
-                    if (!block.PrimaryOwns)
-                        clips.Add(OrientedNotch(edgeStart, edgeEnd, cursor, block.Length, t, poly));
-                    cursor += block.Length;
+                    var scaledArc = new ProfileSegment.Arc(edgeEnd, arc.Radius * capScale, arc.Clockwise);
+                    var (arcCenter, thetaStart, thetaTotal) = ArcGeometry(edgeStart, scaledArc);
+                    foreach (var block in blocks)
+                    {
+                        if (!block.PrimaryOwns)
+                            clips.Add(ArcNotch(arcCenter, scaledArc.Radius, thetaStart, thetaTotal, edgeLen, cursor, block.Length, t));
+                        cursor += block.Length;
+                    }
+                }
+                else
+                {
+                    foreach (var block in blocks)
+                    {
+                        if (!block.PrimaryOwns)
+                            clips.Add(OrientedNotch(edgeStart, edgeEnd, cursor, block.Length, t, poly));
+                        cursor += block.Length;
+                    }
                 }
             }
         }
@@ -964,29 +1040,31 @@ internal static class PrismFaceBuilder
     }
 
     // Clips open flex-cut paths against the safe interior of the panel, then applies translation.
-    // The safe interior is: panel polygon ∩ [t, W-t]×[t, H-t].
-    // This excludes both slot areas (missing from the polygon) and tab areas (within t of any edge).
+    // The safe interior is: panel polygon ∩ [mLeft, W-mRight]×[mBottom, H-mTop].
+    // Each per-edge margin is t when that edge has tabs (closed face), 0 when open.
     private static List<CuttablePath> ClipFlexCuts(
         IReadOnlyList<CuttablePath> cuts,
         List<Vec2> clipPolygon,
         double panelWidth,
         double panelHeight,
-        double margin,
+        double marginBottom,
+        double marginRight,
+        double marginTop,
+        double marginLeft,
         Vec2 translation)
     {
         if (cuts.Count == 0) return new List<CuttablePath>();
 
         const int precision = 8;
 
-        // Inset rectangle strips the t-wide border where all tabs live.
         var innerRect = new PathsD
         {
             new PathD
             {
-                new PointD(margin, margin),
-                new PointD(panelWidth - margin, margin),
-                new PointD(panelWidth - margin, panelHeight - margin),
-                new PointD(margin, panelHeight - margin),
+                new PointD(marginLeft, marginBottom),
+                new PointD(panelWidth - marginRight, marginBottom),
+                new PointD(panelWidth - marginRight, panelHeight - marginTop),
+                new PointD(marginLeft, panelHeight - marginTop),
             }
         };
 

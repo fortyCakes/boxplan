@@ -166,7 +166,7 @@ internal static class CliSettings
         LayoutSearchIterations = 32,
         LayoutRandomSeed = Random.Shared.Next(),
         FlexLineSpacing = 0.8,
-        FlexLineLengthFraction = 0.1,
+        FlexLineLengthFraction = 0.3,
         FlexLengthCompensationFactor = 1.0,
     };
 
