@@ -308,6 +308,30 @@ A hole cut all the way through the face.
 | `diameter` | Sets width = height = diameter. Mutually exclusive with `width`+`height`.                          |
 | `width`    | Required together with `height` (unless `diameter` is used).                                       |
 | `height`   | Required together with `width`.                                                                    |
+| `repeat`   | Optional array block. See [Repeat](#repeat).                                                       |
+
+#### Repeat
+
+Replicate a cutout into a 1D array along the face.
+
+```yaml
+- type: "cutout"
+  face: "left"
+  shape: "rectangle"
+  width: 3.1
+  height: 6
+  position:
+    anchor: "top-center"
+    offset: [0, -3]
+  repeat:
+    spacing: [6, 0]
+```
+
+| Field     | Description                                                                                                  |
+| --------- | ------------------------------------------------------------------------------------------------------------ |
+| `spacing` | **Required.** `[u, v]` step between consecutive cutout centers in face-local coordinates. Must be non-zero.  |
+
+`position` resolves to a single seed center as usual. The pipeline then walks in both `+spacing` and `-spacing` directions, emitting copies until the next copy's bounding box would cross the safe inner zone — the panel inset by one material thickness on all sides, which keeps cutouts clear of finger-joint tabs on adjacent edges.
 
 ### `type: engraving`
 

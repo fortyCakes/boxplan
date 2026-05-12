@@ -1019,6 +1019,23 @@ public sealed class PlanResolver
             return null;
         }
 
+        CutoutRepeat? repeat = null;
+        if (raw.Repeat is not null)
+        {
+            var spacing = ResolveVec2(raw.Repeat.Spacing, $"{path}.repeat.spacing", errors, raw.Repeat);
+            if (spacing is null)
+            {
+                errors.Add(Err("Cutout repeat requires 'spacing' as [u, v].", $"{path}.repeat.spacing", raw.Repeat));
+                return null;
+            }
+            if (spacing.Value.X == 0 && spacing.Value.Y == 0)
+            {
+                errors.Add(Err("Cutout repeat 'spacing' must be non-zero.", $"{path}.repeat.spacing", raw.Repeat));
+                return null;
+            }
+            repeat = new CutoutRepeat(spacing.Value);
+        }
+
         return new CutoutFeature
         {
             Face = face,
@@ -1026,6 +1043,7 @@ public sealed class PlanResolver
             Shape = shape,
             Width = width,
             Height = height,
+            Repeat = repeat,
         };
     }
 

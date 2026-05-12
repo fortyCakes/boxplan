@@ -105,7 +105,10 @@ public sealed class CutoutFeature : Feature
     public required CutoutShape Shape { get; init; }
     public required double Width { get; init; }
     public required double Height { get; init; }
+    public CutoutRepeat? Repeat { get; init; }
 }
+
+public sealed record CutoutRepeat(Vec2 Spacing);
 
 public sealed class EngravingTextFeature : Feature
 {

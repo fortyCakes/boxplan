@@ -23,6 +23,45 @@ internal static class CutoutBuilder
     public static CuttablePath Build(CutoutFeature feature, Vec2 center, double kerf, Vec2 translation, PipelineLogger? logger = null)
         => Build(feature.Shape, feature.Width, feature.Height, center, kerf, translation, logger);
 
+    public readonly record struct SafeZone(double UMin, double UMax, double VMin, double VMax);
+
+    public static IEnumerable<Vec2> ExpandCenters(
+        CutoutFeature feature,
+        Vec2 seed,
+        SafeZone zone)
+    {
+        if (feature.Repeat is null)
+        {
+            yield return seed;
+            yield break;
+        }
+
+        var spacing = feature.Repeat.Spacing;
+        var halfW = Math.Abs(feature.Width) / 2.0;
+        var halfH = Math.Abs(feature.Height) / 2.0;
+
+        bool Fits(Vec2 c) =>
+            c.X - halfW >= zone.UMin &&
+            c.X + halfW <= zone.UMax &&
+            c.Y - halfH >= zone.VMin &&
+            c.Y + halfH <= zone.VMax;
+
+        if (Fits(seed)) yield return seed;
+
+        for (var n = 1; ; n++)
+        {
+            var c = new Vec2(seed.X + n * spacing.X, seed.Y + n * spacing.Y);
+            if (!Fits(c)) break;
+            yield return c;
+        }
+        for (var n = 1; ; n++)
+        {
+            var c = new Vec2(seed.X - n * spacing.X, seed.Y - n * spacing.Y);
+            if (!Fits(c)) break;
+            yield return c;
+        }
+    }
+
     public static CuttablePath Build(CutoutShape shape, double width, double height, Vec2 center, double kerf, Vec2 translation, PipelineLogger? logger = null)
     {
         logger?.Log($"[cutout] Building shape {shape} at center=({center.X},{center.Y})");

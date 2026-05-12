@@ -336,4 +336,84 @@ public class CutoutTests
                 $"cutout point {point} extends outside outline Y range [{front.BoundingBoxMin.Y}, {front.BoundingBoxMax.Y}]");
         });
     }
+
+    [Fact]
+    public void Repeat_emits_one_cutout_per_fitting_step_along_spacing()
+    {
+        // Panel size (left face) is depth × height = 100 × 100. Material thickness
+        // = 3.0, so the safe inner zone along U is [3, 97]. Spacing [6, 0] centered
+        // at u = 50 fits ⌊((97 - 3.1/2) - 50) / 6⌋ = 7 copies each side + seed = 15.
+        var plan = ParseOk("""
+            shapes:
+              - id: "box"
+                type: "box"
+                dimensions: [100.0, 100.0, 100.0]
+                faces:
+                  - name: "top"
+                    type: "open"
+                features:
+                  - face: "left"
+                    type: "cutout"
+                    shape: "rectangle"
+                    width: 3.1
+                    height: 6.0
+                    position:
+                      anchor: "top-center"
+                      offset: [0.0, -3.0]
+                    repeat:
+                      spacing: [6.0, 0.0]
+            """);
+
+        var pieces = new BoxPlanLib().GetCuttableShapes(plan, Settings());
+        var left = pieces.Single(p => p.Id == "box.left");
+
+        Assert.Equal(15, left.InteriorCuts.Count);
+        Assert.All(left.InteriorCuts, c => Assert.Equal(4, c.Segments.Count));
+    }
+
+    [Fact]
+    public void Repeat_with_no_repeat_block_emits_single_cutout()
+    {
+        var plan = ParseOk("""
+            shapes:
+              - id: "box"
+                type: "box"
+                dimensions: [100.0, 100.0, 100.0]
+                features:
+                  - face: "front"
+                    type: "cutout"
+                    shape: "rectangle"
+                    width: 10.0
+                    height: 10.0
+                    position:
+                      anchor: "center"
+                      offset: [0.0, 0.0]
+            """);
+
+        var front = new BoxPlanLib().GetCuttableShapes(plan, Settings()).Single(p => p.Id == "box.front");
+        Assert.Single(front.InteriorCuts);
+    }
+
+    [Fact]
+    public void Repeat_rejects_zero_spacing()
+    {
+        var lib = new BoxPlanLib();
+        var result = lib.ParsePlan("""
+            shapes:
+              - id: "box"
+                type: "box"
+                dimensions: [100.0, 100.0, 100.0]
+                features:
+                  - face: "left"
+                    type: "cutout"
+                    shape: "rectangle"
+                    width: 3.0
+                    height: 6.0
+                    repeat:
+                      spacing: [0.0, 0.0]
+            """);
+
+        Assert.False(result.Success);
+        Assert.Contains(result.Errors, e => e.Message.Contains("non-zero"));
+    }
 }

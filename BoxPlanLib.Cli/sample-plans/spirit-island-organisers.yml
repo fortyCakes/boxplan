@@ -93,3 +93,23 @@ shapes:
       position: 
         anchor: "top-center"
         offset: [0.0, 0.0]
+    - type: "cutout"
+      face: "left"
+      shape: "rectangle"
+      width: 3.1
+      height: 6
+      position:
+        anchor: "top-center"
+        offset: [0, -3]
+      repeat:
+        spacing: [6, 0]
+    - type: "cutout"
+      face: "right"
+      shape: "rectangle"
+      width: 3.1
+      height: 6
+      position:
+        anchor: "top-center"
+        offset: [0, -3]
+      repeat:
+        spacing: [6, 0]

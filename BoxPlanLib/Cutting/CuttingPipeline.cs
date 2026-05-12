@@ -471,9 +471,17 @@ public sealed class CuttingPipeline
         {
             if (feature is CutoutFeature cutout)
             {
-                var center = CutoutBuilder.ResolveCenter(cutout.Position, panelU, panelV, logger);
-                var cutPath = CutoutBuilder.Build(cutout, center, settings.Kerf, translation, logger);
-                interiorCuts.AddRange(CutoutClipper.ClipToOutline(cutPath, path, logger));
+                var seed = CutoutBuilder.ResolveCenter(cutout.Position, panelU, panelV, logger);
+                var zone = new CutoutBuilder.SafeZone(
+                    UMin: openFaces.Contains(ccw[3].Neighbor) ? 0 : t,
+                    UMax: openFaces.Contains(ccw[1].Neighbor) ? panelU : panelU - t,
+                    VMin: openFaces.Contains(ccw[0].Neighbor) ? 0 : t,
+                    VMax: openFaces.Contains(ccw[2].Neighbor) ? panelV : panelV - t);
+                foreach (var center in CutoutBuilder.ExpandCenters(cutout, seed, zone))
+                {
+                    var cutPath = CutoutBuilder.Build(cutout, center, settings.Kerf, translation, logger);
+                    interiorCuts.AddRange(CutoutClipper.ClipToOutline(cutPath, path, logger));
+                }
             }
             else if (feature is LineEngravingFeature lineEngraving)
             {

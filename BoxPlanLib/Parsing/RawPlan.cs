@@ -100,6 +100,14 @@ public sealed class RawCutoutFeature : RawFeature
     public double? Diameter { get; set; }
     public double? Width { get; set; }
     public double? Height { get; set; }
+    public RawCutoutRepeat? Repeat { get; set; }
+}
+
+public sealed class RawCutoutRepeat : IRawLocated
+{
+    public double[]? Spacing { get; set; }
+
+    [YamlIgnore] public RawLocation? SourceLocation { get; set; }
 }
 
 public sealed class RawEngravingFeature : RawFeature
