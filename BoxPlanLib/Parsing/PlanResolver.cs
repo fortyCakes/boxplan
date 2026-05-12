@@ -76,6 +76,7 @@ public sealed class PlanResolver
         return raw switch
         {
             RawBoxShape box => ResolveBoxShape(box, path, errors, pendingRefs),
+            RawPanelShape panel => ResolvePanelShape(panel, path, errors),
             RawPrismShapeBase prism => ResolvePrismShape(prism, path, errors, pendingRefs),
             _ => Fail(errors, $"Unsupported shape type '{raw.Type}'.", path, raw),
         };
@@ -130,6 +131,99 @@ public sealed class PlanResolver
             Inserts = inserts,
             Features = features,
         };
+    }
+
+    // ── Panel resolution ─────────────────────────────────────────────────────
+
+    private static PanelShape? ResolvePanelShape(
+        RawPanelShape raw,
+        string path,
+        List<PlanError> errors)
+    {
+        var origin = ResolveOrigin(raw.Origin, $"{path}.origin", errors, raw) ?? Origin.BottomLeftFront;
+        var location = ResolveVec3(raw.Location, 3, $"{path}.location", errors, raw) ?? Vec3.Zero;
+        var disjoint = raw.Disjoint ?? raw.Location is null;
+
+        if (raw.Profile is null)
+        {
+            errors.Add(Err("Panel must specify 'profile'.", path, raw));
+            return null;
+        }
+        if (raw.Fit is not null)
+        {
+            errors.Add(Err("Panel does not support 'fit'.", $"{path}.fit", raw));
+        }
+        if (raw.Dividers is { Count: > 0 })
+        {
+            errors.Add(Err("Panel does not support 'dividers'.", $"{path}.dividers", raw));
+        }
+        if (raw.Inserts is { Count: > 0 })
+        {
+            errors.Add(Err("Panel does not support 'inserts'.", $"{path}.inserts", raw));
+        }
+
+        var profile = BuildProfile(raw.Profile, $"{path}.profile", errors);
+        if (profile is null) return null;
+
+        var panelFace = ResolvePanelFace(raw.Faces, $"{path}.faces", errors);
+        // Panel features always apply to the single front face; allow omitting the
+        // 'face:' field by defaulting it before delegating to the shared resolver.
+        if (raw.Features is not null)
+        {
+            foreach (var feature in raw.Features)
+            {
+                if (string.IsNullOrEmpty(feature.Face))
+                    feature.Face = "front";
+            }
+        }
+        var features = ResolveFeatures(raw.Features, panelFace, $"{path}.features", errors);
+        var centroid = PrismGeometry.ComputeProfileCentroid(profile);
+
+        return new PanelShape
+        {
+            Id = raw.Id ?? string.Empty,
+            Origin = origin,
+            Location = location,
+            Disjoint = disjoint,
+            Profile = profile,
+            ProfileCentroid = centroid,
+            Faces = panelFace,
+            Dividers = Array.Empty<DividerSet>(),
+            Inserts = Array.Empty<Insert>(),
+            Features = features,
+        };
+    }
+
+    // A panel has a single virtual face named 'front'. Users may explicitly set
+    // its type via faces: [{name: front, type: open|closed}], default closed.
+    private static IReadOnlyList<Face> ResolvePanelFace(
+        List<RawFace>? raw,
+        string path,
+        List<PlanError> errors)
+    {
+        var type = FaceType.Closed;
+        if (raw is not null)
+        {
+            for (var i = 0; i < raw.Count; i++)
+            {
+                var rf = raw[i];
+                var facePath = $"{path}[{i}]";
+                if (string.IsNullOrEmpty(rf.Name))
+                {
+                    errors.Add(Err("Face requires a 'name'.", facePath, rf));
+                    continue;
+                }
+                var name = ResolveFaceName(rf.Name, $"{facePath}.name", errors, rf);
+                if (name is null) continue;
+                if (name != FaceName.Front)
+                {
+                    errors.Add(Err($"Panel only supports the 'front' face (got '{rf.Name}').", facePath, rf));
+                    continue;
+                }
+                type = ResolveFaceType(rf.Type, $"{facePath}.type", errors, rf) ?? FaceType.Closed;
+            }
+        }
+        return new[] { new Face(FaceName.Front, type) };
     }
 
     // ── Prism resolution ─────────────────────────────────────────────────────
@@ -203,6 +297,7 @@ public sealed class PlanResolver
             RawPrismShape prism => BuildProfileFromPrism(prism, path, errors),
             RawNamedPolygonShape named => BuildProfileFromNamedPolygon(named, path, errors),
             RawRegularPolygonShape poly => BuildProfileFromRegularPolygon(poly, path, errors),
+            RawRectangleShape rect => BuildProfileFromRectangle(rect, path, errors),
             RawCircleShape circle => BuildProfileFromCircle(circle, path, errors),
             RawSemicircleShape semi => BuildProfileFromSemicircle(semi, path, errors),
             RawQuarterCircleShape quarter => BuildProfileFromQuarterCircle(quarter, path, errors),
@@ -317,6 +412,33 @@ public sealed class PlanResolver
         }
 
         return BuildRegularPolygonProfile(sides, w, h);
+    }
+
+    private static PrismProfile? BuildProfileFromRectangle(RawRectangleShape raw, string path, List<PlanError> errors)
+    {
+        if (raw.Width is not { } w || w <= 0)
+        {
+            errors.Add(Err("rectangle requires a positive 'width'.", $"{path}.width", raw));
+            return null;
+        }
+        if (raw.Height is not { } h || h <= 0)
+        {
+            errors.Add(Err("rectangle requires a positive 'height'.", $"{path}.height", raw));
+            return null;
+        }
+
+        var start = new Vec2(0, 0);
+        return new PrismProfile
+        {
+            StartPoint = start,
+            Segments = new ProfileSegment[]
+            {
+                new ProfileSegment.Line(new Vec2(w, 0)),
+                new ProfileSegment.Line(new Vec2(w, h)),
+                new ProfileSegment.Line(new Vec2(0, h)),
+                new ProfileSegment.Line(start),
+            },
+        };
     }
 
     private static PrismProfile? BuildProfileFromCircle(RawCircleShape raw, string path, List<PlanError> errors)

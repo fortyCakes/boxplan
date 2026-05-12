@@ -22,11 +22,29 @@ public sealed class PlanParser
                     new Dictionary<string, Type>
                     {
                         { "box", typeof(RawBoxShape) },
+                        { "panel", typeof(RawPanelShape) },
                         { "prism", typeof(RawPrismShape) },
                         { "triangle", typeof(RawNamedPolygonShape) },
                         { "pentagon", typeof(RawNamedPolygonShape) },
                         { "hexagon", typeof(RawNamedPolygonShape) },
                         { "regular-polygon", typeof(RawRegularPolygonShape) },
+                        { "rectangle", typeof(RawRectangleShape) },
+                        { "circle", typeof(RawCircleShape) },
+                        { "semicircle", typeof(RawSemicircleShape) },
+                        { "quarter-circle", typeof(RawQuarterCircleShape) },
+                    });
+                // The same map applies when the prism shape appears nested as a
+                // panel's 'profile:' block (declared type is RawPrismShapeBase).
+                o.AddKeyValueTypeDiscriminator<RawPrismShapeBase>(
+                    "type",
+                    new Dictionary<string, Type>
+                    {
+                        { "prism", typeof(RawPrismShape) },
+                        { "triangle", typeof(RawNamedPolygonShape) },
+                        { "pentagon", typeof(RawNamedPolygonShape) },
+                        { "hexagon", typeof(RawNamedPolygonShape) },
+                        { "regular-polygon", typeof(RawRegularPolygonShape) },
+                        { "rectangle", typeof(RawRectangleShape) },
                         { "circle", typeof(RawCircleShape) },
                         { "semicircle", typeof(RawSemicircleShape) },
                         { "quarter-circle", typeof(RawQuarterCircleShape) },

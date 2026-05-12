@@ -434,11 +434,24 @@ internal sealed class SvgGenerator
         var y = engraving.Y - origin.Y;
         var fontWeight = engraving.Bold ? "bold" : "normal";
         var fontStyle = engraving.Italic ? "italic" : "normal";
+                var textAnchor = engraving.Anchor switch
+                {
+                        Anchor.LeftCenter => "start",
+                        Anchor.RightCenter => "end",
+                        _ => "middle",
+                };
+                var alignmentBaseline = engraving.Anchor switch
+                {
+                        Anchor.TopCenter => "text-before-edge",
+                        Anchor.BottomCenter => "text-after-edge",
+                        _ => "middle",
+                };
         sb.Append("<g transform=\"translate(")
           .Append(F(x)).Append(' ').Append(F(y))
           .Append(") scale(1 -1)\">");
         sb.Append("<text x=\"0\" y=\"0\" fill=\"").Append(TextEngravingColor)
-          .Append("\" text-anchor=\"middle\" dominant-baseline=\"middle\"")
+                    .Append("\" text-anchor=\"").Append(textAnchor)
+                    .Append("\" alignment-baseline=\"").Append(alignmentBaseline).Append("\"")
           .Append(" font-size=\"").Append(F(engraving.Size)).Append("\"")
           .Append(" font-family=\"").Append(Escape(engraving.Font)).Append("\"")
           .Append(" font-weight=\"").Append(fontWeight).Append("\"")

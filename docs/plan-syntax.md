@@ -45,7 +45,7 @@ These fields are accepted on every shape type.
 | `faces`    | list of face overrides              | all closed           | See [Faces](#faces).                                                                         |
 | `dividers` | list of divider sets                | none                 | Internal partitions (box only — see [Dividers](#dividers)).                                  |
 | `inserts`  | list of inserts                     | none                 | Nest other shapes inside this one. See [Inserts](#inserts).                                  |
-| `features` | list of features                    | none                 | Cutouts, engravings, grids on faces. See [Features](#features). Box shapes only.             |
+| `features` | list of features                    | none                 | Cutouts, engravings, grids on faces. See [Features](#features). Box and panel shapes only.   |
 | `fit`      | fit object                          | none                 | Auto-sized to a parent cell. See [Fit](#fit). Mutually exclusive with explicit sizing.       |
 
 ---
@@ -105,6 +105,17 @@ N-sided regular polygon.
 
 Plus the common prism extras.
 
+### `rectangle`
+
+Axis-aligned rectangle.
+
+| Field    | Type   | Description                       |
+| -------- | ------ | --------------------------------- |
+| `width`  | number | **Required.** Must be positive.   |
+| `height` | number | **Required.** Must be positive.   |
+
+Plus the common prism extras.
+
 ### `circle`
 
 | Field      | Type   | Description                       |
@@ -122,6 +133,45 @@ Flat base at the bottom, arc on top.
 | `diameter` | number | **Required.** Must be positive.   |
 
 Plus the common prism extras.
+
+### `panel`
+
+A single flat face with no connected edges — a 2D piece (sign, label, decorative
+panel) that's emitted as one cuttable shape with no finger joints.
+
+| Field     | Type            | Description                                                                                                |
+| --------- | --------------- | ---------------------------------------------------------------------------------------------------------- |
+| `profile` | profile object  | **Required.** A nested block using the same `type` discriminator and fields as the prism-family shapes.    |
+
+The `profile.type` can be any of `prism`, `triangle`, `pentagon`, `hexagon`,
+`regular-polygon`, `rectangle`, `circle`, `semicircle`, or `quarter-circle`, with the same
+fields each of those shapes accepts (minus `depth`, `lateral-faces`, `back-size`,
+`fit`). Example:
+
+```yaml
+shapes:
+  - id: "name-plate"
+    type: "panel"
+    profile:
+      type: "hexagon"
+      width: 80.0
+    features:
+      - type: "engraving"
+        text: "Alex"
+        size: 12
+```
+
+Panel shapes accept `features` (cutouts, engravings, line-engravings, engraving-
+grids). Features default to `face: front` and may omit the field entirely. The
+only supported face name is `front`; marking it open suppresses the panel
+entirely. Panels do not support `dividers`, `inserts`, or `fit`.
+
+Panels lie in the world X-Z plane. `location` is interpreted as `[X, Y, Z]`
+where the profile's width axis is X, its height axis is Z, and `Y` is the
+out-of-plane coordinate. Two or more panels at the **same Y** whose world
+polygons share an actual edge segment (not just a corner point) are unioned
+into a single cuttable outline; features from each member panel are carried
+through to the merged shape. Set `disjoint: true` to opt a panel out of merging.
 
 ### `quarter-circle`
 
@@ -183,7 +233,8 @@ faces:
 | `type` | `closed` (default), `open`                               |
 
 Prism shapes only accept `front` and `back` as cap-face names; their side
-faces are configured via [`lateral-faces`](#lateral-faces) instead.
+faces are configured via [`lateral-faces`](#lateral-faces) instead. Panel
+shapes only accept `front`.
 
 ### Lateral faces
 
@@ -288,7 +339,8 @@ not both.
 
 ## Features
 
-Cutouts, engravings, and grids applied to a specific face. **Box shapes only.**
+Cutouts, engravings, and grids applied to a specific face. Supported on `box`
+and `panel` shapes. For panels, `face:` defaults to `front` if omitted.
 
 Every feature has these common fields:
 
@@ -336,6 +388,11 @@ Replicate a cutout into a 1D array along the face.
 ### `type: engraving`
 
 Text engraved on the face.
+
+If `position` is omitted, text is centered on the face. If `position` is provided,
+the resolved point uses the stated face anchor and offset, and the text aligns to
+that anchor (`left-center` starts at the point, `right-center` ends at it,
+`top-center` and `bottom-center` align vertically to it).
 
 | Field   | Description                                                                                  |
 | ------- | -------------------------------------------------------------------------------------------- |

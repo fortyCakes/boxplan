@@ -1,0 +1,33 @@
+shapes:
+- id: "divider-branch-and-claw"
+  type: "panel"
+  location: [0.0, 0.0, 0.0]
+  origin: "bottom-left-front"
+  profile:
+    type: "rectangle"
+    width: 68.0
+    height: 98.0
+  features:
+    - type: "engraving"
+      position:
+        anchor: "top-center"
+        offset: [0.0, -1.0]
+      font: "Plain Old Handwriting"
+      text: "branch & claw"
+      size: 8
+- id: "divider-branch-and-claw-notch-1"
+  type: "panel"
+  location: [68.0, 0.0, 95.0]
+  origin: "bottom-left-front"
+  profile:
+    type: "rectangle"
+    width: 3.0
+    height: 3.0
+- id: "divider-branch-and-claw-notch-2"
+  type: "panel"
+  location: [-3.0, 0.0, 95.0]
+  origin: "bottom-left-front"
+  profile:
+    type: "rectangle"
+    width: 3.0
+    height: 3.0

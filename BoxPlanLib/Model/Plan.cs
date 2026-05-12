@@ -163,6 +163,15 @@ public abstract record FitDimension
     public sealed record Fixed(double Value) : FitDimension;
 }
 
+// A single flat panel with no connected edges. Geometry comes from a PrismProfile
+// (reused from prism shapes) — the panel emits exactly one cuttable face with no
+// finger joints, suitable for standalone signs, labels or other 2D pieces.
+public sealed class PanelShape : Shape
+{
+    public required PrismProfile Profile { get; init; }
+    public Vec2 ProfileCentroid { get; init; } = Vec2.Zero;
+}
+
 public sealed class PrismShape : Shape
 {
     public required PrismProfile Profile { get; init; }

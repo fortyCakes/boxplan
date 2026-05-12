@@ -73,6 +73,38 @@ public class LineEngravingTests
     }
 
     [Fact]
+    public void Line_engraving_position_anchor_and_offset_are_applied()
+    {
+        var plan = ParseOk("""
+            shapes:
+              - id: "box"
+                type: "box"
+                dimensions: [100.0, 100.0, 100.0]
+                features:
+                  - face: "front"
+                    type: "line-engraving"
+                    shape: "rectangle"
+                    width: 20.0
+                    height: 10.0
+                    position:
+                      anchor: "top-center"
+                      offset: [0.0, -15.0]
+            """);
+
+        var pieces = new BoxPlanLib().GetCuttableShapes(plan, Settings());
+        var front = pieces.Single(p => p.Id == "box.front");
+        var engraving = Assert.Single(front.Engravings);
+
+        var xs = engraving.Segments.OfType<LineSegment>().Select(s => s.To.X).Append(engraving.Start.X).ToArray();
+        var ys = engraving.Segments.OfType<LineSegment>().Select(s => s.To.Y).Append(engraving.Start.Y).ToArray();
+        var midX = (xs.Min() + xs.Max()) / 2.0;
+        var midY = (ys.Min() + ys.Max()) / 2.0;
+
+        Assert.Equal((front.BoundingBoxMin.X + front.BoundingBoxMax.X) / 2.0, midX, precision: 3);
+        Assert.Equal(front.BoundingBoxMax.Y - 15.0, midY, precision: 3);
+    }
+
+    [Fact]
     public void Line_engraving_does_not_apply_kerf()
     {
         var plan = ParseOk("""

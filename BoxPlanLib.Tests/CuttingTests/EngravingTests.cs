@@ -91,6 +91,38 @@ public class EngravingTests
     }
 
     [Fact]
+    public void Engraving_position_anchor_and_offset_are_applied()
+    {
+        var plan = ParseOk("""
+            shapes:
+              - id: "box"
+                type: "box"
+                dimensions: [100.0, 100.0, 100.0]
+                features:
+                  - face: "front"
+                    type: "engraving"
+                    text: "Edge"
+                    size: 6.0
+                    position:
+                      anchor: "left-center"
+                      offset: [12.0, -5.0]
+            """);
+
+        var lib = new BoxPlanLib();
+        var pieces = lib.GetCuttableShapes(plan, Settings());
+        var front = pieces.Single(p => p.Id == "box.front");
+        var engraving = Assert.Single(front.TextEngravings);
+
+        Assert.Equal(front.BoundingBoxMin.X + 12.0, engraving.X, precision: 3);
+        Assert.Equal(((front.BoundingBoxMin.Y + front.BoundingBoxMax.Y) / 2.0) - 5.0, engraving.Y, precision: 3);
+        Assert.Equal(Anchor.LeftCenter, engraving.Anchor);
+
+        var svg = lib.GenerateSimpleSVG(pieces, Settings());
+        Assert.Contains("text-anchor=\"start\"", svg);
+        Assert.Contains("alignment-baseline=\"middle\"", svg);
+    }
+
+    [Fact]
     public void Engraving_without_text_is_invalid()
     {
         var lib = new BoxPlanLib();
@@ -153,6 +185,8 @@ public class EngravingTests
         Assert.Contains("font-style=\"normal\"", svg);
         Assert.Contains("font-family=\"sans-serif\"", svg);
         Assert.Contains("font-size=\"6.000\"", svg);
+    Assert.Contains("text-anchor=\"middle\"", svg);
+    Assert.Contains("alignment-baseline=\"middle\"", svg);
     }
 
     [Fact]

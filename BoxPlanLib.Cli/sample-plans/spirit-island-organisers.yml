@@ -72,44 +72,66 @@ shapes:
 #         anchor: "top-center"
 #         offset: [0.0, 0.0]
 
-- id: "card-holder-1"
-  type: "box" 
-  dimensions: [75.0, 101.0, 237.0]
-  faces:
-    - name: "top"
-      type: "open"
+# - id: "card-holder-1"
+#   type: "box" 
+#   dimensions: [75.0, 101.0, 237.0]
+#   faces:
+#     - name: "top"
+#       type: "open"
+#   features:
+#     - type: "cutout"
+#       face: "front"
+#       shape: "circle" 
+#       diameter: 50.0
+#       position: 
+#         anchor: "top-center"
+#         offset: [0.0, 0.0]
+#     - type: "cutout"
+#       face: "back"
+#       shape: "circle" 
+#       diameter: 50.0
+#       position: 
+#         anchor: "top-center"
+#         offset: [0.0, 0.0]
+#     - type: "cutout"
+#       face: "left"
+#       shape: "rectangle"
+#       width: 3.1
+#       height: 6
+#       position:
+#         anchor: "top-center"
+#         offset: [0, -3]
+#       repeat:
+#         spacing: [6, 0]
+#     - type: "cutout"
+#       face: "right"
+#       shape: "rectangle"
+#       width: 3.1
+#       height: 6
+#       position:
+#         anchor: "top-center"
+#         offset: [0, -3]
+#       repeat:
+#         spacing: [6, 0]
+
+- id: "divider-branch-and-claw"
+  type: "panel"
+  location: [0.0, 0.0, 0.0]
+  origin: "bottom-left-front"
+  profile:
+    type: "rectangle"
+    width: 68.0
+    height: 98.0
   features:
-    - type: "cutout"
-      face: "front"
-      shape: "circle" 
-      diameter: 50.0
-      position: 
-        anchor: "top-center"
-        offset: [0.0, 0.0]
-    - type: "cutout"
-      face: "back"
-      shape: "circle" 
-      diameter: 50.0
-      position: 
-        anchor: "top-center"
-        offset: [0.0, 0.0]
-    - type: "cutout"
-      face: "left"
-      shape: "rectangle"
-      width: 3.1
-      height: 6
-      position:
-        anchor: "top-center"
-        offset: [0, -3]
-      repeat:
-        spacing: [6, 0]
-    - type: "cutout"
-      face: "right"
-      shape: "rectangle"
-      width: 3.1
-      height: 6
-      position:
-        anchor: "top-center"
-        offset: [0, -3]
-      repeat:
-        spacing: [6, 0]
+    - type: "engraving"
+      font: "Plain Old Handwriting"
+      text: "branch & claw"
+      size: 10
+- id: "divider-branch-and-claw-notch-1"
+  type: "panel"
+  location: [68.0, 98.0, 0.0]
+  origin: "bottom-left-front"
+  profile:
+    type: "rectangle"
+    width: 3.0
+    height: 3.0

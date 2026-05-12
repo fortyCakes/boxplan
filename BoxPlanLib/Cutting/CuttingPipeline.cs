@@ -34,6 +34,10 @@ public sealed class CuttingPipeline
             groupIndex++;
         }
 
+        var mergeablePanels = plan.Shapes.OfType<PanelShape>().Where(p => !p.Disjoint).ToList();
+        var (mergedPanels, mergedPanelIds) = PanelMerger.Build(mergeablePanels, settings, logger);
+        output.AddRange(mergedPanels);
+
         foreach (var shape in plan.Shapes)
         {
             switch (shape)
@@ -47,6 +51,12 @@ public sealed class CuttingPipeline
                 case PrismShape prism when prism.Depth is { } prismDepth:
                     logger.Log($"[pipeline] Emitting prism {prism.Id}");
                     output.AddRange(PrismFaceBuilder.Build(prism.Id, prism, prismDepth, settings, logger));
+                    break;
+                case PanelShape panel:
+                    if (mergedPanelIds.Contains(panel.Id)) continue;
+                    logger.Log($"[pipeline] Emitting panel {panel.Id}");
+                    var panelShape = PanelFaceBuilder.Build(panel.Id, panel, settings, logger);
+                    if (panelShape is not null) output.Add(panelShape);
                     break;
             }
         }
@@ -506,6 +516,7 @@ public sealed class CuttingPipeline
                         Text = engraving.Text,
                         X = anchorPoint.X,
                         Y = anchorPoint.Y,
+                        Anchor = engraving.Position?.Anchor ?? Anchor.Center,
                         Size = engraving.Size,
                         Font = engraving.Font,
                         Bold = engraving.Bold,

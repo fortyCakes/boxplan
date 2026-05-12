@@ -18,6 +18,7 @@ public sealed class TextEngraving
     public required string Text { get; init; }
     public required double X { get; init; }
     public required double Y { get; init; }
+    public Anchor Anchor { get; init; } = Anchor.Center;
     public required double Size { get; init; }
     public string Font { get; init; } = "sans-serif";
     public bool Bold { get; init; }

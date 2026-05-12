@@ -158,6 +158,15 @@ public readonly record struct RawFitDimension(bool IsAuto, double Value, double 
     public static RawFitDimension Fixed(double value) => new(false, value, 0);
 }
 
+// ── Panel shape ─────────────────────────────────────────────────────────────
+
+// A flat single-face shape. The 'profile' block uses the same discriminator and
+// fields as prism shapes (prism / circle / hexagon / regular-polygon / etc.).
+public sealed class RawPanelShape : RawShape
+{
+    public RawPrismShapeBase? Profile { get; set; }
+}
+
 // ── Prism shapes ────────────────────────────────────────────────────────────
 
 // Abstract base shared by all prism-like shape types.
@@ -196,6 +205,13 @@ public sealed class RawNamedPolygonShape : RawPrismShapeBase
 public sealed class RawRegularPolygonShape : RawPrismShapeBase
 {
     public int? Sides { get; set; }
+    public double? Width { get; set; }
+    public double? Height { get; set; }
+}
+
+// type: "rectangle" — axis-aligned rectangular profile.
+public sealed class RawRectangleShape : RawPrismShapeBase
+{
     public double? Width { get; set; }
     public double? Height { get; set; }
 }
