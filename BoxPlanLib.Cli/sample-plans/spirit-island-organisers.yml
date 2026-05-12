@@ -72,47 +72,85 @@ shapes:
 #         anchor: "top-center"
 #         offset: [0.0, 0.0]
 
-# - id: "card-holder-1"
-#   type: "box" 
-#   dimensions: [75.0, 101.0, 237.0]
-#   faces:
-#     - name: "top"
-#       type: "open"
-#   features:
-#     - type: "cutout"
-#       face: "front"
-#       shape: "circle" 
-#       diameter: 50.0
-#       position: 
-#         anchor: "top-center"
-#         offset: [0.0, 0.0]
-#     - type: "cutout"
-#       face: "back"
-#       shape: "circle" 
-#       diameter: 50.0
-#       position: 
-#         anchor: "top-center"
-#         offset: [0.0, 0.0]
-#     - type: "cutout"
-#       face: "left"
-#       shape: "rectangle"
-#       width: 3.1
-#       height: 6
-#       position:
-#         anchor: "top-center"
-#         offset: [0, -3]
-#       repeat:
-#         spacing: [6, 0]
-#     - type: "cutout"
-#       face: "right"
-#       shape: "rectangle"
-#       width: 3.1
-#       height: 6
-#       position:
-#         anchor: "top-center"
-#         offset: [0, -3]
-#       repeat:
-#         spacing: [6, 0]
+- id: "card-holder-1"
+  type: "box" 
+  dimensions: [75.0, 101.0, 237.0]
+  faces:
+    - name: "top"
+      type: "open"
+  features:
+    - type: "cutout"
+      face: "front"
+      shape: "semicircle" 
+      diameter: -50.0
+      position: 
+        anchor: "top-center"
+        offset: [0.0, 0.0]
+    - type: "cutout"
+      face: "back"
+      shape: "semicircle" 
+      diameter: -50.0
+      position: 
+        anchor: "top-center"
+        offset: [0.0, 0.0]
+    - type: "cutout"
+      face: "left"
+      shape: "rectangle"
+      width: 3.1
+      height: 12
+      position:
+        anchor: "top-center"
+      repeat:
+        spacing: [6, 0]
+    - type: "cutout"
+      face: "right"
+      shape: "rectangle"
+      width: 3.1
+      height: 12
+      position:
+        anchor: "top-center"
+      repeat:
+        spacing: [6, 0]
+
+- id: "card-holder-2"
+  type: "box" 
+  dimensions: [75.0, 101.0, 237.0]
+  faces:
+    - name: "top"
+      type: "open"
+  features:
+    - type: "cutout"
+      face: "front"
+      shape: "semicircle" 
+      diameter: -50.0
+      position: 
+        anchor: "top-center"
+        offset: [0.0, 0.0]
+    - type: "cutout"
+      face: "back"
+      shape: "semicircle" 
+      diameter: -50.0
+      position: 
+        anchor: "top-center"
+        offset: [0.0, 0.0]
+    - type: "cutout"
+      face: "left"
+      shape: "rectangle"
+      width: 3.1
+      height: 12
+      position:
+        anchor: "top-center"
+      repeat:
+        spacing: [6, 0]
+    - type: "cutout"
+      face: "right"
+      shape: "rectangle"
+      width: 3.1
+      height: 12
+      position:
+        anchor: "top-center"
+      repeat:
+        spacing: [6, 0]
 
 - id: "divider-branch-and-claw"
   type: "panel"
@@ -124,14 +162,430 @@ shapes:
     height: 98.0
   features:
     - type: "engraving"
-      font: "Plain Old Handwriting"
-      text: "branch & claw"
-      size: 10
+      position:
+        anchor: "top-left"
+        offset: [3.0, -1.0]
+      font: "DK Snemand"
+      style: "bold"
+      text: "Branch & Claw"
+      size: 5
+    - type: "cutout"
+      shape: "rectangle"
+      width: 25.4
+      height: 50.8
+      position:
+        anchor: "top-right"
+        offset: [-6.0, 0.0]
 - id: "divider-branch-and-claw-notch-1"
   type: "panel"
-  location: [68.0, 98.0, 0.0]
+  location: [68.0, 0.0, 86.0]
   origin: "bottom-left-front"
   profile:
     type: "rectangle"
     width: 3.0
-    height: 3.0
+    height: 12.0
+- id: "divider-branch-and-claw-notch-2"
+  type: "panel"
+  location: [-3.0, 0.0, 86.0]
+  origin: "bottom-left-front"
+  profile:
+    type: "rectangle"
+    width: 3.0
+    height: 12.0
+
+- id: "divider-jagged-earth"
+  type: "panel"
+  location: [0.0, 4.0, 0.0]
+  origin: "bottom-left-front"
+  profile:
+    type: "rectangle"
+    width: 68.0
+    height: 98.0
+  features:
+    - type: "engraving"
+      position:
+        anchor: "top-left"
+        offset: [3.0, -1.0]
+      font: "DK Snemand"
+      style: "bold"
+      text: "Jaggged Earth" # For some reason the font collapses two g's into one, so I have to add an extra g to make it look right.
+      size: 5
+    - type: "cutout"
+      shape: "rectangle"
+      width: 25.4
+      height: 50.8
+      position:
+        anchor: "top-right"
+        offset: [-6.0, 0.0]
+- id: "divider-jagged-earth-notch-1"
+  type: "panel"
+  location: [68.0, 4.0, 86.0]
+  origin: "bottom-left-front"
+  profile:
+    type: "rectangle"
+    width: 3.0
+    height: 12.0
+- id: "divider-jagged-earth-notch-2"
+  type: "panel"
+  location: [-3.0, 4.0, 86.0]
+  origin: "bottom-left-front"
+  profile:
+    type: "rectangle"
+    width: 3.0
+    height: 12.0
+
+- id: "divider-nature-incarnate"
+  type: "panel"
+  location: [0.0, 8.0, 0.0]
+  origin: "bottom-left-front"
+  profile:
+    type: "rectangle"
+    width: 68.0
+    height: 98.0
+  features:
+    - type: "engraving"
+      position:
+        anchor: "top-left"
+        offset: [0.0, -1.0]
+      font: "DK Snemand"
+      style: "bold"
+      text: "Nature Incarnate"
+      size: 5
+    - type: "cutout"
+      shape: "rectangle"
+      width: 25.4
+      height: 50.8
+      position:
+        anchor: "top-right"
+        offset: [-6.0, 0.0]
+- id: "divider-nature-incarnate-notch-1"
+  type: "panel"
+  location: [68.0, 8.0, 86.0]
+  origin: "bottom-left-front"
+  profile:
+    type: "rectangle"
+    width: 3.0
+    height: 12.0
+- id: "divider-nature-incarnate-notch-2"
+  type: "panel"
+  location: [-3.0, 8.0, 86.0]
+  origin: "bottom-left-front"
+  profile:
+    type: "rectangle"
+    width: 3.0
+    height: 12.0
+
+    
+- id: "divider-horizons"
+  type: "panel"
+  location: [0.0, 12.0, 0.0]
+  origin: "bottom-left-front"
+  profile:
+    type: "rectangle"
+    width: 68.0
+    height: 98.0
+  features:
+    - type: "engraving"
+      position:
+        anchor: "top-left"
+        offset: [3.0, -1.0]
+      font: "DK Snemand"
+      style: "bold"
+      text: "Horizons"
+      size: 5
+    - type: "cutout"
+      shape: "rectangle"
+      width: 25.4
+      height: 50.8
+      position:
+        anchor: "top-right"
+        offset: [-6.0, 0.0]
+- id: "divider-horizons-notch-1"
+  type: "panel"
+  location: [68.0, 12.0, 86.0]
+  origin: "bottom-left-front"
+  profile:
+    type: "rectangle"
+    width: 3.0
+    height: 12.0
+- id: "divider-horizons-notch-2"
+  type: "panel"
+  location: [-3.0, 12.0, 86.0]
+  origin: "bottom-left-front"
+  profile:
+    type: "rectangle"
+    width: 3.0
+    height: 12.0
+
+- id: "divider-promos"
+  type: "panel"
+  location: [0.0, 16.0, 0.0]
+  origin: "bottom-left-front"
+  profile:
+    type: "rectangle"
+    width: 68.0
+    height: 98.0
+  features:
+    - type: "engraving"
+      position:
+        anchor: "top-left"
+        offset: [3.0, -1.0]
+      font: "DK Snemand"
+      style: "bold"
+      text: "Promos"
+      size: 5
+    - type: "cutout"
+      shape: "rectangle"
+      width: 25.4
+      height: 50.8
+      position:
+        anchor: "top-right"
+        offset: [-6.0, 0.0]
+- id: "divider-promos-notch-1"
+  type: "panel"
+  location: [68.0, 16.0, 86.0]
+  origin: "bottom-left-front"
+  profile:
+    type: "rectangle"
+    width: 3.0
+    height: 12.0
+- id: "divider-promos-notch-2"
+  type: "panel"
+  location: [-3.0, 16.0, 86.0]
+  origin: "bottom-left-front"
+  profile:
+    type: "rectangle"
+    width: 3.0
+    height: 12.0
+
+- id: "divider-aspects"
+  type: "panel"
+  location: [0.0, 20.0, 0.0]
+  origin: "bottom-left-front"
+  profile:
+    type: "rectangle"
+    width: 68.0
+    height: 98.0
+  features:
+    - type: "engraving"
+      position:
+        anchor: "top-left"
+        offset: [3.0, -1.0]
+      font: "DK Snemand"
+      style: "bold"
+      text: "Aspects"
+      size: 5
+    - type: "cutout"
+      shape: "rectangle"
+      width: 25.4
+      height: 50.8
+      position:
+        anchor: "top-right"
+        offset: [-6.0, 0.0]
+- id: "divider-aspects-notch-1"
+  type: "panel"
+  location: [68.0, 20.0, 86.0]
+  origin: "bottom-left-front"
+  profile:
+    type: "rectangle"
+    width: 3.0
+    height: 12.0
+- id: "divider-aspects-notch-2"
+  type: "panel"
+  location: [-3.0, 20.0, 86.0]
+  origin: "bottom-left-front"
+  profile:
+    type: "rectangle"
+    width: 3.0
+    height: 12.0
+
+- id: "divider-minor-powers"
+  type: "panel"
+  location: [0.0, 24.0, 0.0]
+  origin: "bottom-left-front"
+  profile:
+    type: "rectangle"
+    width: 68.0
+    height: 98.0
+  features:
+    - type: "engraving"
+      position:
+        anchor: "top-left"
+        offset: [3.0, -1.0]
+      font: "DK Snemand"
+      style: "bold"
+      text: "Minor Powers"
+      size: 5
+    - type: "cutout"
+      shape: "rectangle"
+      width: 25.4
+      height: 50.8
+      position:
+        anchor: "top-right"
+        offset: [-6.0, 0.0]
+- id: "divider-minor-powers-notch-1"
+  type: "panel"
+  location: [68.0, 24.0, 86.0]
+  origin: "bottom-left-front"
+  profile:
+    type: "rectangle"
+    width: 3.0
+    height: 12.0
+- id: "divider-minor-powers-notch-2"
+  type: "panel"
+  location: [-3.0, 24.0, 86.0]
+  origin: "bottom-left-front"
+  profile:
+    type: "rectangle"
+    width: 3.0
+    height: 12.0
+
+- id: "divider-major-powers"
+  type: "panel"
+  location: [0.0, 28.0, 0.0]
+  origin: "bottom-left-front"
+  profile:
+    type: "rectangle"
+    width: 68.0
+    height: 98.0
+  features:
+    - type: "engraving"
+      position:
+        anchor: "top-left"
+        offset: [3.0, -1.0]
+      font: "DK Snemand"
+      style: "bold"
+      text: "Major Powers"
+      size: 5
+    - type: "cutout"
+      shape: "rectangle"
+      width: 25.4
+      height: 50.8
+      position:
+        anchor: "top-right"
+        offset: [-6.0, 0.0]
+- id: "divider-major-powers-notch-1"
+  type: "panel"
+  location: [68.0, 28.0, 86.0]
+  origin: "bottom-left-front"
+  profile:
+    type: "rectangle"
+    width: 3.0
+    height: 12.0
+- id: "divider-major-powers-notch-2"
+  type: "panel"
+  location: [-3.0, 28.0, 86.0]
+  origin: "bottom-left-front"
+  profile:
+    type: "rectangle"
+    width: 3.0
+    height: 12.0
+
+- id: "divider-reference-cards"
+  type: "panel"
+  location: [0.0, 32.0, 0.0]
+  origin: "bottom-left-front"
+  profile:
+    type: "rectangle"
+    width: 68.0
+    height: 98.0
+  features:
+    - type: "engraving"
+      position:
+        anchor: "top-left"
+        offset: [3.0, -1.0]
+      font: "DK Snemand"
+      style: "bold"
+      text: "Reference Cards"
+      size: 5
+    - type: "cutout"
+      shape: "rectangle"
+      width: 25.4
+      height: 50.8
+      position:
+        anchor: "top-right"
+        offset: [-6.0, 0.0]
+- id: "divider-reference-cards-notch-1"
+  type: "panel"
+  location: [68.0, 32.0, 86.0]
+  origin: "bottom-left-front"
+  profile:
+    type: "rectangle"
+    width: 3.0
+    height: 12.0
+- id: "divider-reference-cards-notch-2"
+  type: "panel"
+  location: [-3.0, 32.0, 86.0]
+  origin: "bottom-left-front"
+  profile:
+    type: "rectangle"
+    width: 3.0
+    height: 12.0
+
+- id: "divider-blank"
+  type: "panel"
+  location: [0.0, 36.0, 0.0]
+  origin: "bottom-left-front"
+  profile:
+    type: "rectangle"
+    width: 68.0
+    height: 98.0
+  features:
+    - type: "cutout"
+      shape: "rectangle"
+      width: 25.4
+      height: 50.8
+      position:
+        anchor: "top-right"
+        offset: [-6.0, 0.0]
+- id: "divider-blank-notch-1"
+  type: "panel"
+  location: [68.0, 36.0, 86.0]
+  origin: "bottom-left-front"
+  profile:
+    type: "rectangle"
+    width: 3.0
+    height: 12.0
+- id: "divider-blank-notch-2"
+  type: "panel"
+  location: [-3.0, 36.0, 86.0]
+  origin: "bottom-left-front"
+  profile:
+    type: "rectangle"
+    width: 3.0
+    height: 12.0
+
+- id: "divider-blank-2"
+  type: "panel"
+  location: [0.0, 40.0, 0.0]
+  origin: "bottom-left-front"
+  profile:
+    type: "rectangle"
+    width: 68.0
+    height: 98.0
+  features:
+    - type: "cutout"
+      shape: "rectangle"
+      width: 25.4
+      height: 50.8
+      position:
+        anchor: "top-right"
+        offset: [-6.0, 0.0]
+- id: "divider-blank-2-notch-1"
+  type: "panel"
+  location: [68.0, 40.0, 86.0]
+  origin: "bottom-left-front"
+  profile:
+    type: "rectangle"
+    width: 3.0
+    height: 12.0
+- id: "divider-blank-2-notch-2"
+  type: "panel"
+  location: [-3.0, 40.0, 86.0]
+  origin: "bottom-left-front"
+  profile:
+    type: "rectangle"
+    width: 3.0
+    height: 12.0
+
+

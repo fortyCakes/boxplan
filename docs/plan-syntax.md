@@ -381,9 +381,9 @@ Replicate a cutout into a 1D array along the face.
 
 | Field     | Description                                                                                                  |
 | --------- | ------------------------------------------------------------------------------------------------------------ |
-| `spacing` | **Required.** `[u, v]` step between consecutive cutout centers in face-local coordinates. Must be non-zero.  |
+| `spacing` | **Required.** `[u, v]` step between consecutive cutout placements in face-local coordinates. Must be non-zero.  |
 
-`position` resolves to a single seed center as usual. The pipeline then walks in both `+spacing` and `-spacing` directions, emitting copies until the next copy's bounding box would cross the safe inner zone — the panel inset by one material thickness on all sides, which keeps cutouts clear of finger-joint tabs on adjacent edges.
+When a `position` is present, its anchor refers to the matching point on the cutout's bounding box: for example, `top-right` aligns the cutout's top-right to the face's top-right before applying `offset`. The pipeline then walks in both `+spacing` and `-spacing` directions, emitting copies until the next copy's bounding box would cross the safe inner zone — the panel inset by one material thickness on all sides, which keeps cutouts clear of finger-joint tabs on adjacent edges.
 
 ### `type: engraving`
 
@@ -404,6 +404,8 @@ that anchor (`left-center` starts at the point, `right-center` ends at it,
 ### `type: line-engraving`
 
 A shape engraved as line work (no fill).
+
+If `position` is provided, its anchor refers to the matching point on the engraving shape's bounding box, the same way cutout anchors do.
 
 | Field      | Description                                                                  |
 | ---------- | ---------------------------------------------------------------------------- |
@@ -431,7 +433,7 @@ position:
 
 | Field    | Values                                                                          |
 | -------- | ------------------------------------------------------------------------------- |
-| `anchor` | `top-center`, `bottom-center`, `left-center`, `right-center`, `center`          |
+| `anchor` | `top-left`, `top-center`, `top-right`, `left-center`, `center`, `right-center`, `bottom-left`, `bottom-center`, `bottom-right` |
 | `offset` | `[u, v]` in face-local coordinates. Defaults to `[0, 0]`.                       |
 
 ---

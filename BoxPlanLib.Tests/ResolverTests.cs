@@ -202,6 +202,56 @@ public class ResolverTests
     }
 
     [Fact]
+    public void Position_resolves_top_left_anchor()
+    {
+        var plan = ResolveOk("""
+            shapes:
+              - id: "a"
+                type: "box"
+                dimensions: [10.0, 10.0, 10.0]
+                features:
+                  - face: "front"
+                    type: "cutout"
+                    shape: "rectangle"
+                    width: 4.0
+                    height: 2.0
+                    position:
+                      anchor: "top-left"
+                      offset: [1.0, -2.0]
+            """);
+
+        var feature = Assert.Single(Assert.Single(plan.Shapes).Features);
+        var cutout = Assert.IsType<CutoutFeature>(feature);
+        Assert.Equal(Anchor.TopLeft, cutout.Position!.Anchor);
+        Assert.Equal(new Vec2(1.0, -2.0), cutout.Position!.Offset);
+    }
+
+    [Fact]
+    public void Position_resolves_bottom_right_anchor()
+    {
+        var plan = ResolveOk("""
+            shapes:
+              - id: "a"
+                type: "box"
+                dimensions: [10.0, 10.0, 10.0]
+                features:
+                  - face: "front"
+                    type: "cutout"
+                    shape: "rectangle"
+                    width: 4.0
+                    height: 2.0
+                    position:
+                      anchor: "bottom-right"
+                      offset: [-1.0, 2.0]
+            """);
+
+        var feature = Assert.Single(Assert.Single(plan.Shapes).Features);
+        var cutout = Assert.IsType<CutoutFeature>(feature);
+        Assert.Equal(Anchor.BottomRight, cutout.Position!.Anchor);
+        Assert.Equal(new Vec2(-1.0, 2.0), cutout.Position!.Offset);
+    }
+
+    [Fact]
     public void Fit_auto_depth_resolves_to_FitDimension_Auto()
     {
         var plan = ResolveOk("""

@@ -195,7 +195,7 @@ public class CutoutTests
                     diameter: 40.0
                     position:
                       anchor: "top-center"
-                      offset: [0.0, 0.0]
+                      offset: [0.0, 20.0]
             """);
 
         var pieces = new BoxPlanLib().GetCuttableShapes(plan, Settings());
@@ -270,7 +270,7 @@ public class CutoutTests
                     height: 20.0
                     position:
                       anchor: "top-center"
-                      offset: [0.0, 0.0]
+                      offset: [0.0, 10.0]
             """);
 
         var pieces = new BoxPlanLib().GetCuttableShapes(plan, Settings());
@@ -359,7 +359,7 @@ public class CutoutTests
                     height: 6.0
                     position:
                       anchor: "top-center"
-                      offset: [0.0, -3.0]
+                      offset: [0.0, 0.0]
                     repeat:
                       spacing: [6.0, 0.0]
             """);
@@ -369,6 +369,105 @@ public class CutoutTests
 
         Assert.Equal(15, left.InteriorCuts.Count);
         Assert.All(left.InteriorCuts, c => Assert.Equal(4, c.Segments.Count));
+    }
+
+    [Fact]
+    public void Top_left_anchor_positions_cutout_from_panel_corner()
+    {
+        var plan = ParseOk("""
+            shapes:
+              - id: "box"
+                type: "box"
+                dimensions: [100.0, 100.0, 100.0]
+                features:
+                  - face: "front"
+                    type: "cutout"
+                    shape: "rectangle"
+                    width: 20.0
+                    height: 10.0
+                    position:
+                      anchor: "top-left"
+                      offset: [12.0, -15.0]
+            """);
+
+        var pieces = new BoxPlanLib().GetCuttableShapes(plan, Settings());
+        var front = pieces.Single(p => p.Id == "box.front");
+        Assert.NotEmpty(front.InteriorCuts);
+
+        var points = front.InteriorCuts.SelectMany(Points).ToArray();
+        var xs = points.Select(p => p.X).ToArray();
+        var ys = points.Select(p => p.Y).ToArray();
+        var midX = (xs.Min() + xs.Max()) / 2.0;
+        var midY = (ys.Min() + ys.Max()) / 2.0;
+
+        Assert.Equal(front.BoundingBoxMin.X + 22.0, midX, precision: 3);
+        Assert.Equal(front.BoundingBoxMax.Y - 20.0, midY, precision: 3);
+    }
+
+    [Fact]
+    public void Top_right_anchor_positions_cutout_corner_at_panel_corner()
+    {
+        var plan = ParseOk("""
+            shapes:
+              - id: "box"
+                type: "box"
+                dimensions: [100.0, 100.0, 100.0]
+                features:
+                  - face: "front"
+                    type: "cutout"
+                    shape: "rectangle"
+                    width: 20.0
+                    height: 10.0
+                    position:
+                      anchor: "top-right"
+                      offset: [-12.0, -15.0]
+            """);
+
+        var pieces = new BoxPlanLib().GetCuttableShapes(plan, Settings());
+        var front = pieces.Single(p => p.Id == "box.front");
+        Assert.NotEmpty(front.InteriorCuts);
+
+        var points = front.InteriorCuts.SelectMany(Points).ToArray();
+        var xs = points.Select(p => p.X).ToArray();
+        var ys = points.Select(p => p.Y).ToArray();
+        var midX = (xs.Min() + xs.Max()) / 2.0;
+        var midY = (ys.Min() + ys.Max()) / 2.0;
+
+        Assert.Equal(front.BoundingBoxMax.X - 22.0, midX, precision: 3);
+        Assert.Equal(front.BoundingBoxMax.Y - 20.0, midY, precision: 3);
+    }
+
+    [Fact]
+    public void Bottom_right_anchor_positions_cutout_from_panel_corner()
+    {
+        var plan = ParseOk("""
+            shapes:
+              - id: "box"
+                type: "box"
+                dimensions: [100.0, 100.0, 100.0]
+                features:
+                  - face: "front"
+                    type: "cutout"
+                    shape: "rectangle"
+                    width: 20.0
+                    height: 10.0
+                    position:
+                      anchor: "bottom-right"
+                      offset: [-12.0, 15.0]
+            """);
+
+        var pieces = new BoxPlanLib().GetCuttableShapes(plan, Settings());
+        var front = pieces.Single(p => p.Id == "box.front");
+        Assert.NotEmpty(front.InteriorCuts);
+
+        var points = front.InteriorCuts.SelectMany(Points).ToArray();
+        var xs = points.Select(p => p.X).ToArray();
+        var ys = points.Select(p => p.Y).ToArray();
+        var midX = (xs.Min() + xs.Max()) / 2.0;
+        var midY = (ys.Min() + ys.Max()) / 2.0;
+
+        Assert.Equal(front.BoundingBoxMax.X - 22.0, midX, precision: 3);
+        Assert.Equal(front.BoundingBoxMin.Y + 20.0, midY, precision: 3);
     }
 
     [Fact]

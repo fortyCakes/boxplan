@@ -4,20 +4,47 @@ namespace BoxPlanLib.Cutting;
 
 internal static class CutoutBuilder
 {
+    private readonly record struct LocalBounds(double MinX, double MaxX, double MinY, double MaxY);
+
     public static Vec2 ResolveCenter(Position? position, double panelU, double panelV, PipelineLogger? logger = null)
     {
         logger?.Log($"[cutout] Resolving center for panelU={panelU}, panelV={panelV}");
         if (position is null) return new Vec2(panelU / 2, panelV / 2);
         var anchor = position.Anchor switch
         {
+            Anchor.TopLeft      => new Vec2(0, panelV),
             Anchor.TopCenter    => new Vec2(panelU / 2, panelV),
+            Anchor.TopRight     => new Vec2(panelU, panelV),
+            Anchor.BottomLeft   => new Vec2(0, 0),
             Anchor.BottomCenter => new Vec2(panelU / 2, 0),
+            Anchor.BottomRight  => new Vec2(panelU, 0),
             Anchor.LeftCenter   => new Vec2(0, panelV / 2),
             Anchor.RightCenter  => new Vec2(panelU, panelV / 2),
             Anchor.Center       => new Vec2(panelU / 2, panelV / 2),
             _ => new Vec2(panelU / 2, panelV / 2),
         };
         return new Vec2(anchor.X + position.Offset.X, anchor.Y + position.Offset.Y);
+    }
+
+    public static Vec2 ResolvePlacementCenter(
+        Position? position,
+        CutoutShape shape,
+        double width,
+        double height,
+        double panelU,
+        double panelV,
+        double kerf = 0,
+        PipelineLogger? logger = null)
+    {
+        if (position is null)
+        {
+            return new Vec2(panelU / 2, panelV / 2);
+        }
+
+        var anchorPoint = ResolveCenter(position, panelU, panelV, logger);
+        var bounds = GetLocalBounds(shape, width, height, kerf);
+        var featureAnchor = GetFeatureAnchorPoint(bounds, position.Anchor);
+        return new Vec2(anchorPoint.X - featureAnchor.X, anchorPoint.Y - featureAnchor.Y);
     }
 
     public static CuttablePath Build(CutoutFeature feature, Vec2 center, double kerf, Vec2 translation, PipelineLogger? logger = null)
@@ -28,7 +55,8 @@ internal static class CutoutBuilder
     public static IEnumerable<Vec2> ExpandCenters(
         CutoutFeature feature,
         Vec2 seed,
-        SafeZone zone)
+        SafeZone zone,
+        double kerf = 0)
     {
         if (feature.Repeat is null)
         {
@@ -37,14 +65,13 @@ internal static class CutoutBuilder
         }
 
         var spacing = feature.Repeat.Spacing;
-        var halfW = Math.Abs(feature.Width) / 2.0;
-        var halfH = Math.Abs(feature.Height) / 2.0;
+        var bounds = GetLocalBounds(feature.Shape, feature.Width, feature.Height, kerf);
 
         bool Fits(Vec2 c) =>
-            c.X - halfW >= zone.UMin &&
-            c.X + halfW <= zone.UMax &&
-            c.Y - halfH >= zone.VMin &&
-            c.Y + halfH <= zone.VMax;
+            c.X + bounds.MinX >= zone.UMin &&
+            c.X + bounds.MaxX <= zone.UMax &&
+            c.Y + bounds.MinY >= zone.VMin &&
+            c.Y + bounds.MaxY <= zone.VMax;
 
         if (Fits(seed)) yield return seed;
 
@@ -76,6 +103,42 @@ internal static class CutoutBuilder
             CutoutShape.Circle     => BuildCircle(cx, cy, w / 2),
             CutoutShape.Semicircle => BuildSemicircle(cx, cy, width >= 0 ? w / 2 : -(w / 2)),
             _ => throw new InvalidOperationException($"Unsupported shape {shape}"),
+        };
+    }
+
+    private static LocalBounds GetLocalBounds(CutoutShape shape, double width, double height, double kerf)
+    {
+        var w = Math.Max(0, Math.Abs(width) - kerf);
+        var h = Math.Max(0, Math.Abs(height) - kerf);
+
+        return shape switch
+        {
+            CutoutShape.Rectangle => new LocalBounds(-w / 2.0, w / 2.0, -h / 2.0, h / 2.0),
+            CutoutShape.Circle => new LocalBounds(-w / 2.0, w / 2.0, -w / 2.0, w / 2.0),
+            CutoutShape.Semicircle => width >= 0
+                ? new LocalBounds(-w / 2.0, w / 2.0, 0, w / 2.0)
+                : new LocalBounds(-w / 2.0, w / 2.0, -w / 2.0, 0),
+            _ => throw new InvalidOperationException($"Unsupported shape {shape}"),
+        };
+    }
+
+    private static Vec2 GetFeatureAnchorPoint(LocalBounds bounds, Anchor anchor)
+    {
+        var midX = (bounds.MinX + bounds.MaxX) / 2.0;
+        var midY = (bounds.MinY + bounds.MaxY) / 2.0;
+
+        return anchor switch
+        {
+            Anchor.TopLeft => new Vec2(bounds.MinX, bounds.MaxY),
+            Anchor.TopCenter => new Vec2(midX, bounds.MaxY),
+            Anchor.TopRight => new Vec2(bounds.MaxX, bounds.MaxY),
+            Anchor.LeftCenter => new Vec2(bounds.MinX, midY),
+            Anchor.Center => new Vec2(midX, midY),
+            Anchor.RightCenter => new Vec2(bounds.MaxX, midY),
+            Anchor.BottomLeft => new Vec2(bounds.MinX, bounds.MinY),
+            Anchor.BottomCenter => new Vec2(midX, bounds.MinY),
+            Anchor.BottomRight => new Vec2(bounds.MaxX, bounds.MinY),
+            _ => new Vec2(midX, midY),
         };
     }
 

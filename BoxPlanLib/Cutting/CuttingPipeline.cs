@@ -481,13 +481,13 @@ public sealed class CuttingPipeline
         {
             if (feature is CutoutFeature cutout)
             {
-                var seed = CutoutBuilder.ResolveCenter(cutout.Position, panelU, panelV, logger);
+                var seed = CutoutBuilder.ResolvePlacementCenter(cutout.Position, cutout.Shape, cutout.Width, cutout.Height, panelU, panelV, settings.Kerf, logger);
                 var zone = new CutoutBuilder.SafeZone(
                     UMin: openFaces.Contains(ccw[3].Neighbor) ? 0 : t,
                     UMax: openFaces.Contains(ccw[1].Neighbor) ? panelU : panelU - t,
                     VMin: openFaces.Contains(ccw[0].Neighbor) ? 0 : t,
                     VMax: openFaces.Contains(ccw[2].Neighbor) ? panelV : panelV - t);
-                foreach (var center in CutoutBuilder.ExpandCenters(cutout, seed, zone))
+                foreach (var center in CutoutBuilder.ExpandCenters(cutout, seed, zone, settings.Kerf))
                 {
                     var cutPath = CutoutBuilder.Build(cutout, center, settings.Kerf, translation, logger);
                     interiorCuts.AddRange(CutoutClipper.ClipToOutline(cutPath, path, logger));
@@ -495,7 +495,7 @@ public sealed class CuttingPipeline
             }
             else if (feature is LineEngravingFeature lineEngraving)
             {
-                var center = CutoutBuilder.ResolveCenter(lineEngraving.Position, panelU, panelV, logger);
+                var center = CutoutBuilder.ResolvePlacementCenter(lineEngraving.Position, lineEngraving.Shape, lineEngraving.Width, lineEngraving.Height, panelU, panelV, kerf: 0, logger);
                 // Engravings don't need kerf adjustment — we engrave the exact specified size.
                 var engravingPath = CutoutBuilder.Build(lineEngraving.Shape, lineEngraving.Width, lineEngraving.Height, center, kerf: 0, translation, logger);
                 engravings.AddRange(CutoutClipper.ClipToOutline(engravingPath, path, logger));

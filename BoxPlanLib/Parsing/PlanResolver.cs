@@ -1398,8 +1398,12 @@ public sealed class PlanResolver
 
     private static readonly Dictionary<string, Anchor> _anchors = new(StringComparer.OrdinalIgnoreCase)
     {
+        { "top-left", Anchor.TopLeft },
         { "top-center", Anchor.TopCenter },
+        { "top-right", Anchor.TopRight },
+        { "bottom-left", Anchor.BottomLeft },
         { "bottom-center", Anchor.BottomCenter },
+        { "bottom-right", Anchor.BottomRight },
         { "left-center", Anchor.LeftCenter },
         { "right-center", Anchor.RightCenter },
         { "center", Anchor.Center },

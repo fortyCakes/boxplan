@@ -31,8 +31,12 @@ public enum Axis
 
 public enum Anchor
 {
+    TopLeft,
     TopCenter,
+    TopRight,
+    BottomLeft,
     BottomCenter,
+    BottomRight,
     LeftCenter,
     RightCenter,
     Center,

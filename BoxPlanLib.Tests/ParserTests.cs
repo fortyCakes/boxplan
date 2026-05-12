@@ -103,6 +103,60 @@ public class ParserTests
     }
 
     [Fact]
+    public void Parses_top_left_anchor_in_feature_position()
+    {
+        var yaml = """
+            shapes:
+              - id: "d"
+                type: "box"
+                dimensions: [10.0, 10.0, 10.0]
+                features:
+                  - face: "front"
+                    type: "cutout"
+                    shape: "rectangle"
+                    width: 4.0
+                    height: 2.0
+                    position:
+                      anchor: "top-left"
+                      offset: [1.0, -2.0]
+            """;
+
+        var raw = ParseOk(yaml);
+
+        var feature = Assert.Single(Assert.Single(raw.Shapes).Features!);
+        var cutout = Assert.IsType<RawCutoutFeature>(feature);
+        Assert.Equal("top-left", cutout.Position!.Anchor);
+        Assert.Equal(new[] { 1.0, -2.0 }, cutout.Position!.Offset);
+    }
+
+    [Fact]
+    public void Parses_bottom_right_anchor_in_feature_position()
+    {
+        var yaml = """
+            shapes:
+              - id: "d"
+                type: "box"
+                dimensions: [10.0, 10.0, 10.0]
+                features:
+                  - face: "front"
+                    type: "cutout"
+                    shape: "rectangle"
+                    width: 4.0
+                    height: 2.0
+                    position:
+                      anchor: "bottom-right"
+                      offset: [-1.0, 2.0]
+            """;
+
+        var raw = ParseOk(yaml);
+
+        var feature = Assert.Single(Assert.Single(raw.Shapes).Features!);
+        var cutout = Assert.IsType<RawCutoutFeature>(feature);
+        Assert.Equal("bottom-right", cutout.Position!.Anchor);
+        Assert.Equal(new[] { -1.0, 2.0 }, cutout.Position!.Offset);
+    }
+
+    [Fact]
     public void Parses_fit_with_auto_depth()
     {
         var yaml = """

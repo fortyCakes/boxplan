@@ -101,7 +101,7 @@ public class LineEngravingTests
         var midY = (ys.Min() + ys.Max()) / 2.0;
 
         Assert.Equal((front.BoundingBoxMin.X + front.BoundingBoxMax.X) / 2.0, midX, precision: 3);
-        Assert.Equal(front.BoundingBoxMax.Y - 15.0, midY, precision: 3);
+        Assert.Equal(front.BoundingBoxMax.Y - 20.0, midY, precision: 3);
     }
 
     [Fact]

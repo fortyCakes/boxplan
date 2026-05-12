@@ -436,15 +436,23 @@ internal sealed class SvgGenerator
         var fontStyle = engraving.Italic ? "italic" : "normal";
                 var textAnchor = engraving.Anchor switch
                 {
-                        Anchor.LeftCenter => "start",
-                        Anchor.RightCenter => "end",
-                        _ => "middle",
+                    Anchor.TopLeft => "start",
+                    Anchor.LeftCenter => "start",
+                    Anchor.BottomLeft => "start",
+                    Anchor.TopRight => "end",
+                    Anchor.RightCenter => "end",
+                    Anchor.BottomRight => "end",
+                    _ => "middle",
                 };
                 var alignmentBaseline = engraving.Anchor switch
                 {
-                        Anchor.TopCenter => "text-before-edge",
-                        Anchor.BottomCenter => "text-after-edge",
-                        _ => "middle",
+                    Anchor.TopLeft => "text-before-edge",
+                    Anchor.TopCenter => "text-before-edge",
+                    Anchor.TopRight => "text-before-edge",
+                    Anchor.BottomLeft => "text-after-edge",
+                    Anchor.BottomCenter => "text-after-edge",
+                    Anchor.BottomRight => "text-after-edge",
+                    _ => "middle",
                 };
         sb.Append("<g transform=\"translate(")
           .Append(F(x)).Append(' ').Append(F(y))

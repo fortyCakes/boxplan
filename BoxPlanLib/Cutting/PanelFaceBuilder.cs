@@ -50,15 +50,15 @@ internal static class PanelFaceBuilder
             switch (feature)
             {
                 case CutoutFeature cutout:
-                    var seed = CutoutBuilder.ResolveCenter(cutout.Position, panelU, panelV, logger);
-                    foreach (var center in CutoutBuilder.ExpandCenters(cutout, seed, zone))
+                    var seed = CutoutBuilder.ResolvePlacementCenter(cutout.Position, cutout.Shape, cutout.Width, cutout.Height, panelU, panelV, settings.Kerf, logger);
+                    foreach (var center in CutoutBuilder.ExpandCenters(cutout, seed, zone, settings.Kerf))
                     {
                         var cutPath = CutoutBuilder.Build(cutout, center, settings.Kerf, translation, logger);
                         interiorCuts.AddRange(CutoutClipper.ClipToOutline(cutPath, path, logger));
                     }
                     break;
                 case LineEngravingFeature lineEngraving:
-                    var lineCenter = CutoutBuilder.ResolveCenter(lineEngraving.Position, panelU, panelV, logger);
+                    var lineCenter = CutoutBuilder.ResolvePlacementCenter(lineEngraving.Position, lineEngraving.Shape, lineEngraving.Width, lineEngraving.Height, panelU, panelV, kerf: 0, logger);
                     var engravingPath = CutoutBuilder.Build(
                         lineEngraving.Shape, lineEngraving.Width, lineEngraving.Height,
                         lineCenter, kerf: 0, translation, logger);

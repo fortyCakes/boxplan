@@ -123,6 +123,70 @@ public class EngravingTests
     }
 
     [Fact]
+    public void Engraving_top_left_anchor_uses_corner_position_and_svg_alignment()
+    {
+        var plan = ParseOk("""
+            shapes:
+              - id: "box"
+                type: "box"
+                dimensions: [100.0, 100.0, 100.0]
+                features:
+                  - face: "front"
+                    type: "engraving"
+                    text: "Corner"
+                    size: 6.0
+                    position:
+                      anchor: "top-left"
+                      offset: [8.0, -10.0]
+            """);
+
+        var lib = new BoxPlanLib();
+        var pieces = lib.GetCuttableShapes(plan, Settings());
+        var front = pieces.Single(p => p.Id == "box.front");
+        var engraving = Assert.Single(front.TextEngravings);
+
+        Assert.Equal(front.BoundingBoxMin.X + 8.0, engraving.X, precision: 3);
+        Assert.Equal(front.BoundingBoxMax.Y - 10.0, engraving.Y, precision: 3);
+        Assert.Equal(Anchor.TopLeft, engraving.Anchor);
+
+        var svg = lib.GenerateSimpleSVG(pieces, Settings());
+        Assert.Contains("text-anchor=\"start\"", svg);
+        Assert.Contains("alignment-baseline=\"text-before-edge\"", svg);
+    }
+
+    [Fact]
+    public void Engraving_bottom_right_anchor_uses_corner_position_and_svg_alignment()
+    {
+        var plan = ParseOk("""
+            shapes:
+              - id: "box"
+                type: "box"
+                dimensions: [100.0, 100.0, 100.0]
+                features:
+                  - face: "front"
+                    type: "engraving"
+                    text: "Corner"
+                    size: 6.0
+                    position:
+                      anchor: "bottom-right"
+                      offset: [-8.0, 10.0]
+            """);
+
+        var lib = new BoxPlanLib();
+        var pieces = lib.GetCuttableShapes(plan, Settings());
+        var front = pieces.Single(p => p.Id == "box.front");
+        var engraving = Assert.Single(front.TextEngravings);
+
+        Assert.Equal(front.BoundingBoxMax.X - 8.0, engraving.X, precision: 3);
+        Assert.Equal(front.BoundingBoxMin.Y + 10.0, engraving.Y, precision: 3);
+        Assert.Equal(Anchor.BottomRight, engraving.Anchor);
+
+        var svg = lib.GenerateSimpleSVG(pieces, Settings());
+        Assert.Contains("text-anchor=\"end\"", svg);
+        Assert.Contains("alignment-baseline=\"text-after-edge\"", svg);
+    }
+
+    [Fact]
     public void Engraving_without_text_is_invalid()
     {
         var lib = new BoxPlanLib();
