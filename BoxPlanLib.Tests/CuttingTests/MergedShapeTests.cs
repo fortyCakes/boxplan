@@ -85,6 +85,80 @@ public class MergedShapeTests
     }
 
     [Fact]
+    public void Disjoint_flag_prevents_merging_of_touching_boxes()
+    {
+        var plan = ParseOk("""
+            shapes:
+              - id: "lower"
+                type: "box"
+                dimensions: [30.0, 30.0, 30.0]
+                location: [0.0, 0.0, 0.0]
+                disjoint: true
+              - id: "upper"
+                type: "box"
+                dimensions: [30.0, 30.0, 30.0]
+                location: [0.0, 30.0, 0.0]
+            """);
+
+        var lib = new BoxPlanLib();
+        var pieces = lib.GetCuttableShapes(plan, Settings());
+
+        var ids = pieces.Select(p => p.Id).ToHashSet();
+        Assert.Equal(12, pieces.Length);
+        Assert.Contains("lower.top", ids);
+        Assert.Contains("upper.bottom", ids);
+        Assert.DoesNotContain(ids, id => id.StartsWith("merged-"));
+    }
+
+    [Fact]
+    public void Omitting_location_defaults_to_disjoint()
+    {
+        var plan = ParseOk("""
+            shapes:
+              - id: "a"
+                type: "box"
+                dimensions: [30.0, 30.0, 30.0]
+              - id: "b"
+                type: "box"
+                dimensions: [30.0, 30.0, 30.0]
+            """);
+
+        var lib = new BoxPlanLib();
+        var pieces = lib.GetCuttableShapes(plan, Settings());
+
+        var ids = pieces.Select(p => p.Id).ToHashSet();
+        // Both shapes would coincide at the origin; without disjoint-by-default
+        // they would merge into a single solid. Verify they stay independent.
+        Assert.Equal(12, pieces.Length);
+        Assert.Contains("a.top", ids);
+        Assert.Contains("b.top", ids);
+        Assert.DoesNotContain(ids, id => id.StartsWith("merged-"));
+    }
+
+    [Fact]
+    public void Explicit_disjoint_false_with_no_location_still_merges()
+    {
+        var plan = ParseOk("""
+            shapes:
+              - id: "lower"
+                type: "box"
+                dimensions: [30.0, 30.0, 30.0]
+                location: [0.0, 0.0, 0.0]
+              - id: "upper"
+                type: "box"
+                dimensions: [30.0, 30.0, 30.0]
+                disjoint: false
+            """);
+
+        var lib = new BoxPlanLib();
+        var pieces = lib.GetCuttableShapes(plan, Settings());
+
+        // upper has no location, so it sits at the origin and overlaps lower exactly.
+        // With disjoint: false the resolver still treats them as a merge candidate.
+        Assert.Contains(pieces, p => p.Id.StartsWith("merged-"));
+    }
+
+    [Fact]
     public void Two_side_by_side_cubes_emit_six_merged_faces()
     {
         var plan = ParseOk("""

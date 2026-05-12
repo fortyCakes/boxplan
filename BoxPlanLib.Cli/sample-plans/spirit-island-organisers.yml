@@ -1,0 +1,95 @@
+# An organiser for the game Spirit Island, designed to hold the various components of the game in a compact and efficient manner.
+# The organiser includes an exterior case, and includes compartments for the different types of cards, tokens, and other game pieces.
+# Sketchup red axis is x, blue axis is y, green axis is z.
+
+shapes:
+# This lays at the bottom of the organiser, and is used to hold the various manuals and rulebooks that come with the game.
+# - id: "manuals-compartment"
+#   type: "box" 
+#   dimensions: [282.0, 16.0, 316.0]
+#   faces:
+#     - name: "front"
+#       type: "open"
+#   features:
+#     - type: "cutout"
+#       face: "top"
+#       shape: "circle" 
+#       diameter: 50.0
+#       position: 
+#         anchor: "bottom-center"
+#         offset: [0.0, 0.0]
+#     - type: "cutout"
+#       face: "bottom"
+#       shape: "circle" 
+#       diameter: 50.0
+#       position: 
+#         anchor: "bottom-center"
+#         offset: [0.0, 0.0]
+
+# This contains the island boards vertically.
+# - id: "island-boards-compartment"
+#   type: "box" 
+#   dimensions: [26.0, 196.0, 316.0]
+#   faces:
+#     - name: "top"
+#       type: "open"
+#   features:
+#     - type: "cutout"
+#       face: "left"
+#       shape: "circle" 
+#       diameter: 200.0
+#       position: 
+#         anchor: "top-center"
+#         offset: [0.0, 0.0]
+#     - type: "cutout"
+#       face: "right"
+#       shape: "circle" 
+#       diameter: 200.0
+#       position: 
+#         anchor: "top-center"
+#         offset: [0.0, 0.0]
+
+# This holds the spirit panels.
+# - id: "spirit-panels-compartment"
+#   type: "box" 
+#   dimensions: [106.0, 161.0, 237.0]
+#   faces:
+#     - name: "top"
+#       type: "open"
+#   features:
+#     - type: "cutout"
+#       face: "left"
+#       shape: "circle" 
+#       diameter: 200.0
+#       position: 
+#         anchor: "top-center"
+#         offset: [0.0, 0.0]
+#     - type: "cutout"
+#       face: "right"
+#       shape: "circle" 
+#       diameter: 200.0
+#       position: 
+#         anchor: "top-center"
+#         offset: [0.0, 0.0]
+
+- id: "card-holder-1"
+  type: "box" 
+  dimensions: [75.0, 101.0, 237.0]
+  faces:
+    - name: "top"
+      type: "open"
+  features:
+    - type: "cutout"
+      face: "front"
+      shape: "circle" 
+      diameter: 50.0
+      position: 
+        anchor: "top-center"
+        offset: [0.0, 0.0]
+    - type: "cutout"
+      face: "back"
+      shape: "circle" 
+      diameter: 50.0
+      position: 
+        anchor: "top-center"
+        offset: [0.0, 0.0]

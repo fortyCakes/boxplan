@@ -41,6 +41,7 @@ These fields are accepted on every shape type.
 | `type`     | string                              | **required**         | Shape kind. See [Shape types](#shape-types).                                                 |
 | `origin`   | `bottom-left-front` \| `center`     | `bottom-left-front`  | Interpretation of `location`.                                                                |
 | `location` | `[x, y, z]` numbers                 | `[0, 0, 0]`          | Position in world coordinates.                                                               |
+| `disjoint` | boolean                             | `true` if `location` is omitted, else `false` | When `true`, the shape never merges with adjacent shapes — its faces are emitted independently even if its bounding box touches another's. |
 | `faces`    | list of face overrides              | all closed           | See [Faces](#faces).                                                                         |
 | `dividers` | list of divider sets                | none                 | Internal partitions (box only — see [Dividers](#dividers)).                                  |
 | `inserts`  | list of inserts                     | none                 | Nest other shapes inside this one. See [Inserts](#inserts).                                  |

@@ -73,7 +73,8 @@ public sealed class CuttingPipeline
     }
 
     private static bool IsMergeCandidate(BoxShape box) =>
-        box.Dividers.Count == 0
+        !box.Disjoint
+        && box.Dividers.Count == 0
         && box.Inserts.Count == 0
         && box.Features.Count == 0;
 

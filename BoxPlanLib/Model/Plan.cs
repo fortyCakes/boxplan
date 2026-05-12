@@ -61,6 +61,7 @@ public abstract class Shape
     public required string Id { get; init; }
     public required Origin Origin { get; init; }
     public required Vec3 Location { get; init; }
+    public bool Disjoint { get; init; }
     public required IReadOnlyList<Face> Faces { get; init; }
     public required IReadOnlyList<DividerSet> Dividers { get; init; }
     public required IReadOnlyList<Insert> Inserts { get; init; }

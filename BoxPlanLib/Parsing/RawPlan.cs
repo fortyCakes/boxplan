@@ -25,6 +25,7 @@ public abstract class RawShape : IRawLocated
 
     public string? Origin { get; set; }
     public double[]? Location { get; set; }
+    public bool? Disjoint { get; set; }
     public List<RawFace>? Faces { get; set; }
     public List<RawDividerSet>? Dividers { get; set; }
     public List<RawInsert>? Inserts { get; set; }

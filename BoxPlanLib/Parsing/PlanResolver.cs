@@ -89,6 +89,7 @@ public sealed class PlanResolver
     {
         var origin = ResolveOrigin(raw.Origin, $"{path}.origin", errors, raw) ?? Origin.BottomLeftFront;
         var location = ResolveVec3(raw.Location, 3, $"{path}.location", errors, raw) ?? Vec3.Zero;
+        var disjoint = raw.Disjoint ?? raw.Location is null;
 
         Vec3? dimensions = null;
         if (raw.Dimensions is not null)
@@ -121,6 +122,7 @@ public sealed class PlanResolver
             Id = raw.Id ?? string.Empty,
             Origin = origin,
             Location = location,
+            Disjoint = disjoint,
             Dimensions = dimensions,
             Fit = fit,
             Faces = faces,
@@ -140,6 +142,7 @@ public sealed class PlanResolver
     {
         var origin = ResolveOrigin(raw.Origin, $"{path}.origin", errors, raw) ?? Origin.BottomLeftFront;
         var location = ResolveVec3(raw.Location, 3, $"{path}.location", errors, raw) ?? Vec3.Zero;
+        var disjoint = raw.Disjoint ?? raw.Location is null;
 
         var profile = BuildProfile(raw, path, errors);
         if (profile is null) return null;
@@ -179,6 +182,7 @@ public sealed class PlanResolver
             Id = raw.Id ?? string.Empty,
             Origin = origin,
             Location = location,
+            Disjoint = disjoint,
             Profile = profile,
             Depth = depth,
             Fit = fit,
