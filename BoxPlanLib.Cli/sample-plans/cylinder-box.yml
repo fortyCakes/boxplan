@@ -2,4 +2,4 @@ shapes:
   - id: "cylinder"
     type: "circle"
     diameter: 80.0
-    depth: 60.0
+    depth: 30.0

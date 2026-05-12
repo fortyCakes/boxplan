@@ -18,18 +18,28 @@ internal static class PrismFaceBuilder
         var n = prism.LateralFaces.Count;
         var asymmetric = PrismGeometry.IsAsymmetric(prism.BackScale);
 
-        for (var i = 0; i < n; i++)
+        // When all lateral faces are closed curved arcs (e.g. a full cylinder), emit a single
+        // wrap-around flex panel spanning the full circumference rather than one per arc.
+        var allCurved = !asymmetric && prism.LateralFaces.All(lf => lf.Type == FaceType.Closed && lf.IsCurved);
+        if (allCurved)
         {
-            var lf = prism.LateralFaces[i];
-            if (lf.Type != FaceType.Closed) continue;
+            yield return BuildMergedCurvedPanel($"{shapeId}.lateral", prism, depth, settings, logger);
+        }
+        else
+        {
+            for (var i = 0; i < n; i++)
+            {
+                var lf = prism.LateralFaces[i];
+                if (lf.Type != FaceType.Closed) continue;
 
-            var id = $"{shapeId}.lateral-{i}";
-            if (asymmetric)
-                yield return BuildTrapezoidLateralFace(id, i, prism, depth, settings, logger);
-            else if (lf.IsCurved)
-                yield return BuildCurvedLateralFace(id, i, prism, depth, settings, logger);
-            else
-                yield return BuildStraightLateralFace(id, i, prism, depth, settings, logger);
+                var id = $"{shapeId}.lateral-{i}";
+                if (asymmetric)
+                    yield return BuildTrapezoidLateralFace(id, i, prism, depth, settings, logger);
+                else if (lf.IsCurved)
+                    yield return BuildCurvedLateralFace(id, i, prism, depth, settings, logger);
+                else
+                    yield return BuildStraightLateralFace(id, i, prism, depth, settings, logger);
+            }
         }
 
         foreach (var face in prism.Faces)
@@ -152,6 +162,111 @@ internal static class PrismFaceBuilder
             BoundingBoxMax = bbMax,
             Outline = path,
             InteriorCuts = Array.Empty<CuttablePath>(),
+            Engravings = Array.Empty<CuttablePath>(),
+            TextEngravings = Array.Empty<TextEngraving>(),
+        };
+    }
+
+    // ── Merged curved panel (full wrap-around, e.g. cylinder) ─────────────────
+
+    private static BoxPlanCuttableShape BuildMergedCurvedPanel(
+        string id,
+        PrismShape prism,
+        double depth,
+        BoxPlanSettings settings,
+        PipelineLogger? logger)
+    {
+        var t = settings.MaterialThickness;
+        var s = settings.FingerJointSize;
+        var compensation = settings.FlexLengthCompensationFactor > 0 ? settings.FlexLengthCompensationFactor : 1.0;
+
+        var w = prism.LateralFaces.Sum(lf => lf.EdgeLength) * compensation;
+        var h = depth;
+
+        var frontClosed = IsFaceClosed(prism, FaceName.Front);
+        var backClosed = IsFaceClosed(prism, FaceName.Back);
+
+        logger?.Log($"[prism] Building merged curved panel {id} totalArcLen={w:F3} depth={h:F3}");
+
+        var builder = new PanelShapeBuilder(w, h, logger);
+
+        // Corner reservations where caps are closed. Both vertical-edge depths are t (self-mating).
+        if (backClosed)
+        {
+            builder.SubtractEdgeNotch(3, h - t, t, t); // corner 0: end of left edge
+            builder.SubtractEdgeNotch(0, 0, t, t);     // corner 0: start of bottom edge
+            builder.SubtractEdgeNotch(0, w - t, t, t); // corner 1: end of bottom edge
+            builder.SubtractEdgeNotch(1, 0, t, t);     // corner 1: start of right edge
+        }
+        if (frontClosed)
+        {
+            builder.SubtractEdgeNotch(1, h - t, t, t); // corner 2: end of right edge
+            builder.SubtractEdgeNotch(2, 0, t, t);     // corner 2: start of top edge
+            builder.SubtractEdgeNotch(2, w - t, t, t); // corner 3: end of top edge
+            builder.SubtractEdgeNotch(3, 0, t, t);     // corner 3: start of left edge
+        }
+
+        if (backClosed)
+        {
+            var blocks = FingerJointPattern.Build(w - 2 * t, s, t);
+            var cursor = t;
+            foreach (var block in blocks)
+            {
+                if (block.PrimaryOwns)
+                    builder.SubtractEdgeNotch(0, cursor, block.Length, t);
+                cursor += block.Length;
+            }
+        }
+
+        if (frontClosed)
+        {
+            var blocks = FingerJointPattern.Build(w - 2 * t, s, t);
+            var cursor = t;
+            foreach (var block in blocks)
+            {
+                if (block.PrimaryOwns)
+                    builder.SubtractEdgeNotch(2, cursor, block.Length, t);
+                cursor += block.Length;
+            }
+        }
+
+        // Left edge yields to the right edge of the same panel.
+        {
+            var blocks = FingerJointPattern.Build(h - 2 * t, s, t);
+            var cursor = t;
+            foreach (var block in blocks)
+            {
+                if (block.PrimaryOwns)
+                    builder.SubtractEdgeNotch(3, cursor, block.Length, t);
+                cursor += block.Length;
+            }
+        }
+
+        // Right edge owns the self-mating joint.
+        {
+            var blocks = FingerJointPattern.Build(h - 2 * t, s, t);
+            var cursor = t;
+            foreach (var block in blocks)
+            {
+                if (!block.PrimaryOwns)
+                    builder.SubtractEdgeNotch(1, cursor, block.Length, t);
+                cursor += block.Length;
+            }
+        }
+
+        var polygon = builder.Build();
+        var (path, bbMin, bbMax, translation) = KerfOffset.OffsetOutwardAndTranslate(polygon, settings.Kerf, logger);
+
+        var rawFlexCuts = FlexPatternBuilder.Build(w, h, settings, logger);
+        var flexCuts = ClipFlexCuts(rawFlexCuts, polygon, w, h, t, translation);
+
+        return new BoxPlanCuttableShape
+        {
+            Id = id,
+            BoundingBoxMin = bbMin,
+            BoundingBoxMax = bbMax,
+            Outline = path,
+            InteriorCuts = flexCuts,
             Engravings = Array.Empty<CuttablePath>(),
             TextEngravings = Array.Empty<TextEngraving>(),
         };

@@ -23,10 +23,10 @@ public class FlexPatternTests
             FlexLengthCompensationFactor = compensation,
         };
 
-    // Helper: fraction=0.9, width=10 → cutLen=9, pitch=14 → only [0,9] fits per even row,
-    // only [1,10] fits per odd row; exactly 1 cut per row.
-    private static IReadOnlyList<CuttablePath> SingleCutPerRow(double panelHeight = 25.0) =>
-        FlexPatternBuilder.Build(10.0, panelHeight, FlexSettings(spacing: 5.0, fraction: 0.9), null);
+    // Helper: spacing=5, fraction=0.9, height=10 → cutLen=9, pitch=14 → only one cut fits per column.
+    // panelWidth controls colCount: floor(panelWidth/5) columns × 1 cut each.
+    private static IReadOnlyList<CuttablePath> SingleCutPerColumn(double panelWidth = 25.0) =>
+        FlexPatternBuilder.Build(panelWidth, 10.0, FlexSettings(spacing: 5.0, fraction: 0.9), null);
 
     // ── Empty cases ───────────────────────────────────────────────────────────
 
@@ -45,99 +45,99 @@ public class FlexPatternTests
     }
 
     [Fact]
-    public void Returns_empty_when_panel_height_too_short()
+    public void Returns_empty_when_panel_too_narrow_for_any_column()
     {
-        var cuts = FlexPatternBuilder.Build(60.0, 50.0, FlexSettings(spacing: 100.0), null);
+        var cuts = FlexPatternBuilder.Build(50.0, 60.0, FlexSettings(spacing: 100.0), null);
         Assert.Empty(cuts);
     }
 
-    // ── Single cut per row ────────────────────────────────────────────────────
+    // ── Single cut per column ─────────────────────────────────────────────────
 
     [Fact]
-    public void Single_cut_per_row_when_only_one_segment_fits()
+    public void Single_cut_per_column_when_only_one_segment_fits()
     {
-        // fraction=0.9, width=10: cutLen=9, pitch=14 — second segment would start at x=14 >= 10
-        // height=25, spacing=5: floor(25/5)=5 rows × 1 cut = 5 total
-        var cuts = SingleCutPerRow();
+        // fraction=0.9, height=10: cutLen=9, pitch=14 — second segment would start at y=14 >= 10
+        // width=25, spacing=5: floor(25/5)=5 columns × 1 cut = 5 total
+        var cuts = SingleCutPerColumn();
         Assert.Equal(5, cuts.Count);
     }
 
     [Fact]
-    public void Even_rows_start_at_left_edge()
+    public void Even_columns_start_at_bottom_edge()
     {
-        var cuts = SingleCutPerRow();
-        // Flat list with 1 cut per row: even rows at indices 0, 2, 4
+        var cuts = SingleCutPerColumn();
+        // Flat list with 1 cut per column: even columns at indices 0, 2, 4
         for (var i = 0; i < cuts.Count; i += 2)
-            Assert.Equal(0.0, cuts[i].Start.X, precision: 9);
+            Assert.Equal(0.0, cuts[i].Start.Y, precision: 9);
     }
 
     [Fact]
-    public void Odd_rows_end_at_right_edge()
+    public void Odd_columns_end_at_top_edge()
     {
-        var cuts = SingleCutPerRow();
+        var cuts = SingleCutPerColumn();
         for (var i = 1; i < cuts.Count; i += 2)
         {
             var seg = Assert.IsType<LineSegment>(Assert.Single(cuts[i].Segments));
-            Assert.Equal(10.0, seg.To.X, precision: 9);
+            Assert.Equal(10.0, seg.To.Y, precision: 9);
         }
     }
 
     [Fact]
-    public void Full_length_cuts_have_length_equal_to_fraction_times_width()
+    public void Full_length_cuts_have_length_equal_to_fraction_times_height()
     {
-        // In the single-cut-per-row case no cuts are clipped, so all have the full length.
-        var cuts = SingleCutPerRow();
+        // In the single-cut-per-column case no cuts are clipped, so all have the full length.
+        var cuts = SingleCutPerColumn();
         var expectedLen = 10.0 * 0.9;
         Assert.All(cuts, cut =>
         {
             var seg = Assert.IsType<LineSegment>(Assert.Single(cut.Segments));
-            Assert.Equal(expectedLen, Math.Abs(seg.To.X - cut.Start.X), precision: 9);
+            Assert.Equal(expectedLen, Math.Abs(seg.To.Y - cut.Start.Y), precision: 9);
         });
     }
 
-    // ── Multiple cuts per row ─────────────────────────────────────────────────
+    // ── Multiple cuts per column ──────────────────────────────────────────────
 
     [Fact]
-    public void Multiple_cuts_per_row_when_panel_is_wide()
+    public void Multiple_cuts_per_column_when_panel_is_tall()
     {
-        // fraction=0.3, width=100, spacing=5: cutLen=30, pitch=35
-        // Even row: [0,30],[35,65],[70,100] = 3 cuts (100 is exact multiple)
-        // Odd row:  [70,100],[35,65],[0,30] = 3 cuts
-        // height=20, spacing=5: floor(20/5)=4 rows × 3 cuts = 12 total
-        var cuts = FlexPatternBuilder.Build(100.0, 20.0, FlexSettings(spacing: 5.0, fraction: 0.3), null);
+        // fraction=0.3, height=100, spacing=5: cutLen=30, pitch=35
+        // Even col: [0,30],[35,65],[70,100] = 3 cuts (100 is exact multiple)
+        // Odd col:  [70,100],[35,65],[0,30] = 3 cuts
+        // width=20, spacing=5: floor(20/5)=4 columns × 3 cuts = 12 total
+        var cuts = FlexPatternBuilder.Build(20.0, 100.0, FlexSettings(spacing: 5.0, fraction: 0.3), null);
         Assert.Equal(12, cuts.Count);
     }
 
     [Fact]
-    public void All_x_coordinates_stay_within_panel_bounds()
+    public void All_y_coordinates_stay_within_panel_bounds()
     {
-        var panelWidth = 100.0;
-        var cuts = FlexPatternBuilder.Build(panelWidth, 50.0, FlexSettings(spacing: 5.0, fraction: 0.75), null);
+        var panelHeight = 100.0;
+        var cuts = FlexPatternBuilder.Build(50.0, panelHeight, FlexSettings(spacing: 5.0, fraction: 0.75), null);
         Assert.All(cuts, cut =>
         {
-            Assert.True(cut.Start.X >= -1e-9, $"Start.X={cut.Start.X} is negative");
+            Assert.True(cut.Start.Y >= -1e-9, $"Start.Y={cut.Start.Y} is negative");
             var seg = Assert.IsType<LineSegment>(Assert.Single(cut.Segments));
-            Assert.True(seg.To.X <= panelWidth + 1e-9, $"End.X={seg.To.X} exceeds panel width");
+            Assert.True(seg.To.Y <= panelHeight + 1e-9, $"End.Y={seg.To.Y} exceeds panel height");
         });
     }
 
-    // ── Vertical centering ────────────────────────────────────────────────────
+    // ── Horizontal centering ──────────────────────────────────────────────────
 
     [Fact]
-    public void Cuts_are_centred_vertically_within_panel()
+    public void Cuts_are_centred_horizontally_within_panel()
     {
-        var panelH = 50.0;
-        var cuts = SingleCutPerRow(panelH);
-        var minY = cuts.Min(c => c.Start.Y);
-        var maxY = cuts.Max(c => c.Start.Y);
-        var centre = (minY + maxY) / 2.0;
-        Assert.Equal(panelH / 2.0, centre, precision: 6);
+        var panelW = 50.0;
+        var cuts = SingleCutPerColumn(panelW);
+        var minX = cuts.Min(c => c.Start.X);
+        var maxX = cuts.Max(c => c.Start.X);
+        var centre = (minX + maxX) / 2.0;
+        Assert.Equal(panelW / 2.0, centre, precision: 6);
     }
 
     // ── Pipeline integration ──────────────────────────────────────────────────
 
     [Fact]
-    public void Circle_prism_curved_face_has_interior_flex_cuts()
+    public void Circle_prism_emits_single_merged_lateral_with_flex_cuts()
     {
         var lib = new BoxPlanLib();
         var plan = lib.ParsePlan("""
@@ -162,9 +162,8 @@ public class FlexPatternTests
         };
 
         var shapes = lib.GetCuttableShapes(plan.Value!, settings);
-        var laterals = shapes.Where(s => s.Id.StartsWith("cyl.lateral-")).ToArray();
-        Assert.Equal(2, laterals.Length);
-        Assert.All(laterals, s => Assert.NotEmpty(s.InteriorCuts));
+        var lateral = shapes.Single(s => s.Id == "cyl.lateral");
+        Assert.NotEmpty(lateral.InteriorCuts);
     }
 
     [Fact]
