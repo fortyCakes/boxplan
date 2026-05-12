@@ -3,9 +3,9 @@ using BoxPlanLib.Model;
 namespace BoxPlanLib.Cutting;
 
 // Generates the staggered flex-cut pattern for a panel that will be bent.
-// Each column repeats cut-gap-cut from alternating sides, where gap = FlexLineSpacing:
-//   even columns (from bottom): [0,L]  [L+G, 2L+G]  ...
-//   odd  columns (from top):    [H-L,H]  [H-2L-G, H-L-G]  ...
+// Columns use a half-pitch stagger so gap centres are always pitch/2 apart:
+//   even columns: cuts at [0,L]  [pitch, pitch+L]  ...
+//   odd  columns: cuts at [pitch/2, pitch/2+L]  [3*pitch/2, 3*pitch/2+L]  ...
 // Cuts are returned in panel space [0,panelWidth]×[0,panelHeight]; the caller
 // is responsible for clipping them against the actual panel outline.
 internal static class FlexPatternBuilder
@@ -50,9 +50,9 @@ internal static class FlexPatternBuilder
             {
                 for (var k = 0; ; k++)
                 {
-                    var y1 = panelHeight - k * pitch;
-                    if (y1 <= 0) break;
-                    var y0 = Math.Max(y1 - cutLen, 0.0);
+                    var y0 = pitch / 2.0 + k * pitch;
+                    if (y0 >= panelHeight) break;
+                    var y1 = Math.Min(y0 + cutLen, panelHeight);
                     cuts.Add(VerticalCut(x, y0, y1));
                 }
             }

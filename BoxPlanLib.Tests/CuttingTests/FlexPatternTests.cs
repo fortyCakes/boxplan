@@ -83,16 +83,17 @@ public class FlexPatternTests
     }
 
     [Fact]
-    public void Full_length_cuts_have_length_equal_to_fraction_times_height()
+    public void Even_column_cuts_have_full_length_equal_to_fraction_times_height()
     {
-        // In the single-cut-per-column case no cuts are clipped, so all have the full length.
+        // Odd columns start at pitch/2 and their single cut is clipped at the top boundary.
+        // Even columns always start at y=0 and are never clipped in the single-cut case.
         var cuts = SingleCutPerColumn();
         var expectedLen = 10.0 * 0.9;
-        Assert.All(cuts, cut =>
+        for (var i = 0; i < cuts.Count; i += 2)
         {
-            var seg = Assert.IsType<LineSegment>(Assert.Single(cut.Segments));
-            Assert.Equal(expectedLen, Math.Abs(seg.To.Y - cut.Start.Y), precision: 9);
-        });
+            var seg = Assert.IsType<LineSegment>(Assert.Single(cuts[i].Segments));
+            Assert.Equal(expectedLen, Math.Abs(seg.To.Y - cuts[i].Start.Y), precision: 9);
+        }
     }
 
     // ── Multiple cuts per column ──────────────────────────────────────────────
