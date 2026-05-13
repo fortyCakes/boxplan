@@ -310,7 +310,8 @@ public sealed class CuttingPipeline
     {
         logger?.Log($"[shape] Emitting shape {idPrefix}");
         ScoopCutter.Validate(box, dims, settings);
-        var scoopShrink = ScoopCutter.HostShrinkByEdge(box, dims);
+        var scoopShrink = ScoopCutter.HostShrinkByEdge(box, dims, settings.MaterialThickness);
+        var scoopSmoothEdges = ScoopCutter.CollectSmoothEdges(box, dims, settings.MaterialThickness);
         var (scoopAxisSlots, scoopObliqueSlots) = ScoopCutter.CollectFaceSlots(box, dims, settings);
         var edges = SharedEdgeTable.Build(dims, settings, logger);
         var openFaces = box.Faces.Where(f => f.Type == FaceType.Open).Select(f => f.Name).ToHashSet();
@@ -325,7 +326,8 @@ public sealed class CuttingPipeline
             var allSlots = extraSlots is null ? dividerSlots : dividerSlots.Concat(extraSlots).ToArray();
             var obliqueSlots = scoopObliqueSlots.TryGetValue(face.Name, out var os) ? os : null;
             scoopShrink.TryGetValue(face.Name, out var hostShrink);
-            output.Add(BuildFacePiece(idPrefix, face.Name, dims, edges, openFaces, faceFeatures, allSlots, hostShrink, obliqueSlots, settings, logger));
+            scoopSmoothEdges.TryGetValue(face.Name, out var smoothSegments);
+            output.Add(BuildFacePiece(idPrefix, face.Name, dims, edges, openFaces, faceFeatures, allSlots, hostShrink, smoothSegments, obliqueSlots, settings, logger));
         }
 
         EmitDividerPanels(idPrefix, box, dims, openFaces, output, settings, logger);
@@ -422,6 +424,14 @@ public sealed class CuttingPipeline
         return true;
     }
 
+    private static bool InSmooth(IReadOnlyList<SmoothSegment>? segs, int edgeIndex, double start, double end)
+    {
+        if (segs is null) return false;
+        foreach (var s in segs)
+            if (s.EdgeIndex == edgeIndex && start < s.End && end > s.Start) return true;
+        return false;
+    }
+
     private static BoxPlanCuttableShape BuildFacePiece(
         string shapeId,
         FaceName face,
@@ -431,6 +441,7 @@ public sealed class CuttingPipeline
         IReadOnlyList<Feature> features,
         IEnumerable<SlotSpec> slots,
         double[]? hostShrink,
+        IReadOnlyList<SmoothSegment>? smoothSegments,
         IReadOnlyList<ObliqueSlotSpec>? obliqueSlots,
         BoxPlanSettings settings,
         PipelineLogger? logger = null)
@@ -469,8 +480,10 @@ public sealed class CuttingPipeline
         {
             if (cornerOwned[i]) continue;
             var prevI = (i + 3) % 4;
-            builder.SubtractEdgeNotch(prevI, edgeLengths[prevI] - t, t, t);
-            builder.SubtractEdgeNotch(i, 0, t, t);
+            if (!InSmooth(smoothSegments, prevI, edgeLengths[prevI] - t, edgeLengths[prevI]))
+                builder.SubtractEdgeNotch(prevI, edgeLengths[prevI] - t, t, t);
+            if (!InSmooth(smoothSegments, i, 0, t))
+                builder.SubtractEdgeNotch(i, 0, t, t);
         }
 
         // Finger notches: for each edge, subtract the blocks owned by the neighbour face.
@@ -487,7 +500,7 @@ public sealed class CuttingPipeline
             var cursor = t; // inner region starts t from the CCW-start corner
             foreach (var block in ordered)
             {
-                if (block.Owner != face)
+                if (block.Owner != face && !InSmooth(smoothSegments, i, cursor, cursor + block.Length))
                     builder.SubtractEdgeNotch(i, cursor, block.Length, t);
                 cursor += block.Length;
             }

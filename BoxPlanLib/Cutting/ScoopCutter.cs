@@ -11,6 +11,10 @@ internal sealed record ObliqueSlotSpec(
     double Length, // slot length along Dir
     double Width); // slot width along Perp (= material thickness)
 
+// An edge segment [Start, End) on a face panel that should be smooth — no finger joints,
+// no corner notches — because the mating panel no longer extends to that region.
+internal readonly record struct SmoothSegment(int EdgeIndex, double Start, double End);
+
 // Phase-2 scoop cutting. Each scoop panel gets finger joints on all 4 edges, and the
 // anchor wall, host face, and cap panels receive matching interior slot cuts.
 //
@@ -22,9 +26,72 @@ internal static class ScoopCutter
 {
     public static bool HasScoops(BoxShape box) => box.Scoops.Count > 0;
 
+    // Returns smooth segments per face: edge regions where no finger joints or corner
+    // notches should be cut because the mating panel no longer extends there.
+    //   - Anchor face: the entire edge bordering the host face (host pulled back inset-t).
+    //   - Cap faces: the anchor-end portion of the edge bordering the host face, length inset-t.
+    public static IReadOnlyDictionary<FaceName, IReadOnlyList<SmoothSegment>> CollectSmoothEdges(
+        BoxShape box, Vec3 dims, double t)
+    {
+        var result = new Dictionary<FaceName, List<SmoothSegment>>();
+        if (!HasScoops(box)) return new Dictionary<FaceName, IReadOnlyList<SmoothSegment>>();
+
+        foreach (var sc in box.Scoops)
+        {
+            EnsureSupportedHost(sc);
+            var g = ScoopGeometry.Compute(sc, dims);
+
+            AddSmooth(result, g.Anchor, sc.Face, g.Anchor, dims, 0);
+
+            var capLen = sc.Inset - t;
+            if (capLen > 0)
+            {
+                AddSmooth(result, g.CapLow,  sc.Face, g.Anchor, dims, capLen);
+                AddSmooth(result, g.CapHigh, sc.Face, g.Anchor, dims, capLen);
+            }
+        }
+
+        return result.ToDictionary(kv => kv.Key, kv => (IReadOnlyList<SmoothSegment>)kv.Value);
+    }
+
+    // Adds a smooth segment on `face`'s edge that borders `hostFace`.
+    // For the anchor face (face == anchorFace), the entire edge is smooth (smoothLen=0 → full).
+    // For a cap face, `smoothLen` mm at the anchor end of the edge is smooth.
+    private static void AddSmooth(
+        Dictionary<FaceName, List<SmoothSegment>> result,
+        FaceName face, FaceName hostFace, FaceName anchorFace, Vec3 dims, double smoothLen)
+    {
+        var ccw = FaceLayout.EdgesCcw(face);
+        for (var i = 0; i < ccw.Length; i++)
+        {
+            if (ccw[i].Neighbor != hostFace) continue;
+            var (u, v) = FaceLayout.PanelSize(face, dims);
+            double[] lens = { u, v, u, v };
+            var edgeLen = lens[i];
+
+            double start, end;
+            if (face == anchorFace)
+            {
+                start = 0; end = edgeLen; // entire edge
+            }
+            else
+            {
+                // Determine which end of this edge is adjacent to the anchor face.
+                var startNeighbor = ccw[(i + 3) % 4].Neighbor;
+                start = startNeighbor == anchorFace ? 0 : edgeLen - smoothLen;
+                end = start + smoothLen;
+            }
+
+            if (!result.TryGetValue(face, out var list))
+                result[face] = list = new List<SmoothSegment>();
+            list.Add(new SmoothSegment(i, start, end));
+            break;
+        }
+    }
+
     // Per-face host-panel inset (mm to strip from each of the 4 CCW edges).
     public static IReadOnlyDictionary<FaceName, double[]> HostShrinkByEdge(
-        BoxShape box, Vec3 dims)
+        BoxShape box, Vec3 dims, double t)
     {
         if (!HasScoops(box))
             return new Dictionary<FaceName, double[]>();
@@ -39,7 +106,7 @@ internal static class ScoopCutter
                 arr = new double[4];
                 result[sc.Face] = arr;
             }
-            arr[g.EdgeIndex] = sc.Inset;
+            arr[g.EdgeIndex] = sc.Inset - t;
         }
         return result;
     }
@@ -150,7 +217,7 @@ internal static class ScoopCutter
         return DividerJointBuilder.BuildFingerSlots(
             g.EdgeAxisLength / 2.0, g.Scoop.Rise,
             w: g.EdgeAxisLength, h: effectiveT,
-            effectiveT, s, dividerOwnsPrimary: true);
+            t, s, dividerOwnsPrimary: true);
     }
 
     // ── Toe slots (host face) ─────────────────────────────────────────────────
@@ -165,8 +232,8 @@ internal static class ScoopCutter
         if (g.InsetAlongU)
         {
             u = g.EdgeAtHigh
-                ? g.InsetAxisLength - g.Scoop.Inset - effectiveT / 2.0
-                : g.Scoop.Inset + effectiveT / 2.0;
+                ? g.InsetAxisLength - g.Scoop.Inset + t - effectiveT / 2.0
+                : g.Scoop.Inset - t + effectiveT / 2.0;
             v = g.EdgeAxisLength / 2.0;
             w = effectiveT;
             h = g.EdgeAxisLength;
@@ -175,12 +242,12 @@ internal static class ScoopCutter
         {
             u = g.EdgeAxisLength / 2.0;
             v = g.EdgeAtHigh
-                ? g.InsetAxisLength - g.Scoop.Inset - effectiveT / 2.0
-                : g.Scoop.Inset + effectiveT / 2.0;
+                ? g.InsetAxisLength - g.Scoop.Inset + t - effectiveT / 2.0
+                : g.Scoop.Inset - t + effectiveT / 2.0;
             w = g.EdgeAxisLength;
             h = effectiveT;
         }
-        return DividerJointBuilder.BuildFingerSlots(u, v, w, h, effectiveT, s, dividerOwnsPrimary: true);
+        return DividerJointBuilder.BuildFingerSlots(u, v, w, h, t, s, dividerOwnsPrimary: true);
     }
 
     // ── Cap oblique slots (cap panels) ────────────────────────────────────────
@@ -238,10 +305,10 @@ internal static class ScoopCutter
         // Edge 3 (U=0, Heel):           joint with anchor wall; meets at oblique angle
         var toeT  = t * g.Slant / g.Scoop.Inset;
         var heelT = t * g.Slant / g.Scoop.Rise;
-        SubtractDividerEdge(builder, 0, g.Slant,          t,     s);
-        SubtractDividerEdge(builder, 1, g.EdgeAxisLength, toeT,  s);
-        SubtractDividerEdge(builder, 2, g.Slant,          t,     s);
-        SubtractDividerEdge(builder, 3, g.EdgeAxisLength, heelT, s);
+        SubtractDividerEdge(builder, 0, g.Slant,          t,     t, s);
+        SubtractDividerEdge(builder, 1, g.EdgeAxisLength, toeT,  t, s);
+        SubtractDividerEdge(builder, 2, g.Slant,          t,     t, s);
+        SubtractDividerEdge(builder, 3, g.EdgeAxisLength, heelT, t, s);
 
         var polygon = builder.Build();
         var (path, bbMin, bbMax, _) = KerfOffset.OffsetOutwardAndTranslate(polygon, settings.Kerf, logger);
@@ -257,15 +324,23 @@ internal static class ScoopCutter
         };
     }
 
+    // tabDepth: how deep to cut the DividerTab notches (= t for straight joints,
+    //           effectiveT for oblique joints where the mating panel is angled).
+    // patternT: t used for end-inset sizing and finger spacing — always the raw
+    //           material thickness so corners stay consistent across the panel.
     private static void SubtractDividerEdge(
-        PanelShapeBuilder builder, int edgeIndex, double length, double t, double s)
+        PanelShapeBuilder builder, int edgeIndex, double length,
+        double tabDepth, double patternT, double s)
     {
-        var spans = DividerJointBuilder.BuildSpans(length, t, s, joined: true, dividerOwnsPrimary: true);
+        var spans = DividerJointBuilder.BuildSpans(length, patternT, s, joined: true, dividerOwnsPrimary: true);
         var cursor = 0.0;
         foreach (var span in spans)
         {
             if (span.Kind is DividerJointSpanKind.DividerTab or DividerJointSpanKind.EndInset)
-                builder.SubtractEdgeNotch(edgeIndex, cursor, span.Length, t);
+            {
+                var depth = span.Kind == DividerJointSpanKind.EndInset ? patternT : tabDepth;
+                builder.SubtractEdgeNotch(edgeIndex, cursor, span.Length, depth);
+            }
             cursor += span.Length;
         }
     }

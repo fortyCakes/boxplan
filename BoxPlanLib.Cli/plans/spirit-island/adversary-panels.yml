@@ -1,0 +1,23 @@
+shapes:
+# This holds the adversary panels.
+- id: "adversary-panels-compartment"
+  type: "box" 
+  dimensions: [106.0, 161.0, 20.0]
+  faces:
+    - name: "top"
+      type: "open"
+  features:
+    - type: "cutout"
+      face: "back"
+      shape: "semicircle" 
+      diameter: -50.0
+      position: 
+        anchor: "top-center"
+        offset: [0.0, 0.0]
+    - type: "cutout"
+      face: "front"
+      shape: "semicircle" 
+      diameter: -50.0
+      position: 
+        anchor: "top-center"
+        offset: [0.0, 0.0]

@@ -4,7 +4,7 @@
 shapes:
   - id: "scooped-tray"
     type: "box"
-    dimensions: [50.0, 30.0, 50.0]  # width, height, depth
+    dimensions: [50.0, 25.0, 50.0]  # width, height, depth
     origin: "bottom-left-front"
     faces:
       - name: "top"
@@ -13,4 +13,4 @@ shapes:
       - face: bottom
         edge: [front, back]
         inset: 15
-        rise: 10
+        rise: 15

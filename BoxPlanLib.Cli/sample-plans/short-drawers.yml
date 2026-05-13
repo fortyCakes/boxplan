@@ -1,0 +1,35 @@
+shapes:
+# Shorter drawers for small components.
+- id: "short-drawers-compartment"
+  type: "box" 
+  dimensions: [106.0, 161.0, 59.0]
+  faces:
+    - name: "front"
+      type: "open"
+  dividers:
+    - split: { x: 2, y: 5 }
+      facing: front
+  inserts:
+      - fill: "all-cells"
+        ref: "drawer"
+
+- id: "drawer"
+  type: "box"
+
+  fit:
+    mode: "cell"
+    clearance: 1.0
+    depth: auto  
+
+  faces:
+    - name: "top"
+      type: "open"
+
+  features:
+    - face: "front"
+      type: "cutout"
+      shape: "semicircle"
+      diameter: -25.0
+      position:
+        anchor: "top-center"
+        offset: [0.0, 0.0]

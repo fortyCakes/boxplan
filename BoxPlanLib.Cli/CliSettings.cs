@@ -164,7 +164,7 @@ internal static class CliSettings
         SheetWidth = 400,
         SheetHeight = 400,
         Margin = 5.0,
-        Kerf = 0.1,
+        Kerf = 0.0,
         MaterialThickness = 3.0,
         FingerJointSize = 5.0,
         Spacing = 1.0,

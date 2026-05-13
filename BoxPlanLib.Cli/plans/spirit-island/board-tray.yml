@@ -1,0 +1,39 @@
+# This contains the island boards vertically.
+shapes:
+- id: "invader-box-1"
+  type: "box" 
+  dimensions: [75.0, 60.0, 79.0]
+  faces:
+    - name: "top"
+      type: "open"
+- id: "invader-box-2"
+  type: "box" 
+  dimensions: [75.0, 60.0, 79.0]
+  faces:
+    - name: "top"
+      type: "open"
+- id: "invader-box-3"
+  type: "box" 
+  dimensions: [75.0, 60.0, 79.0]
+  faces:
+    - name: "top"
+      type: "open"
+- id: "invader-box-4"
+  type: "box" 
+  dimensions: [75.0, 60.0, 79.0]
+  faces:
+    - name: "top"
+      type: "open"
+- id: "invader-box-5"
+  type: "box" 
+  dimensions: [75.0, 60.0, 79.0]
+  faces:
+    - name: "top"
+      type: "open"
+- id: "invader-box-6"
+  type: "box" 
+  dimensions: [75.0, 60.0, 79.0]
+  faces:
+    - name: "top"
+      type: "open"
+

@@ -323,7 +323,7 @@ public class ScoopTests
         var pieces = new BoxPlanLib().GetCuttableShapes(plan, Settings(kerf: 0));
         var bottom = pieces.Single(p => p.Id == "trough.bottom");
         var w = bottom.BoundingBoxMax.X - bottom.BoundingBoxMin.X;
-        Assert.Equal(150, w, 4); // 200 - 25 - 25
+        Assert.Equal(156, w, 4); // 200 - (25-3) - (25-3) = 156
     }
 
     [Fact]
