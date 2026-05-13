@@ -1,0 +1,16 @@
+# A tray with sloped floor sections at the left and right sides. The external
+# silhouette stays rectangular; inside, the bottom face is narrowed and the gap
+# is bridged by two diagonal panels that joint into the side walls.
+shapes:
+  - id: "scooped-tray"
+    type: "box"
+    dimensions: [50.0, 30.0, 50.0]  # width, height, depth
+    origin: "bottom-left-front"
+    faces:
+      - name: "top"
+        type: "open"
+    scoops:
+      - face: bottom
+        edge: [front, back]
+        inset: 15
+        rise: 10

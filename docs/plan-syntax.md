@@ -255,6 +255,61 @@ lateral-faces:
 
 ---
 
+## Scoops
+
+Internal sloped panels inside a `box`. Each scoop adds one rectangular interior
+panel that sits on a host face (e.g. the bottom), rising to meet one of the four
+faces adjacent to the host. Used to create trays, troughs, or hoppers where the
+floor slopes inward at the sides while the external silhouette stays rectangular.
+
+```yaml
+scoops:
+  - face: bottom        # host face the slope sits on
+    edge: left          # which of the host face's four edges the slope's heel attaches to
+    inset: 25           # how far in along the host face the slope's toe sits (mm)
+    rise: 30            # how far up the heel wall the slope's top sits (mm)
+
+  # Sugar — `edge` accepts a list for symmetric pairs
+  - face: bottom
+    edge: [left, right]
+    inset: 25
+    rise: 30
+
+  # Sugar — `edge: all-edges` expands to all four edges of the host face
+  - face: bottom
+    edge: all-edges
+    inset: 15
+    rise: 20
+```
+
+| Field   | Type                                                                                  | Description                                                                          |
+| ------- | ------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
+| `face`  | `top`, `bottom`, `left`, `right`, `front`, `back`                                     | **Required.** Host face the scoop sits on.                                            |
+| `edge`  | edge name, list of edge names, or the keyword `all-edges`                             | **Required.** Which edge(s) of the host face the scoop's heel attaches to.            |
+| `inset` | number                                                                                | **Required.** Positive distance in mm from the anchor edge along the host face.       |
+| `rise`  | number                                                                                | **Required.** Positive distance in mm up the anchor wall (perpendicular to host).     |
+
+The anchor edge must be one of the four faces adjacent to the host. `edge`'s
+list and `all-edges` forms desugar at parse time into one scoop record per edge
+that shares the same `inset` and `rise`.
+
+**Validation:** `inset` and `rise` must be positive and within the host face's
+inset-axis length and the anchor wall's height respectively. Two scoops on the
+same `(face, edge)` pair are rejected as a duplicate. Opposing scoops on the
+same axis (e.g. `left` + `right` of `bottom`) must have combined insets ≤ the
+inset-axis length. At cutting time the remaining flat strip on the host face
+must be ≥ material thickness.
+
+**Current implementation status (Phase 1):** the cutting pipeline supports
+scoops on the `bottom` face only; other hosts are accepted by the parser but
+throw `NotImplementedException` during cutting. Scoop panels are currently
+emitted as plain rectangles — joinery (toe joint to host, heel slot on the
+anchor wall, oblique slots on the perpendicular caps) is on the roadmap and
+should be hand-finished in CAD for now. Opposing scoops whose toes meet exactly
+also throw `NotImplementedException`.
+
+---
+
 ## Dividers
 
 Internal partitions inside a `box`. Each entry is either an axis+positions

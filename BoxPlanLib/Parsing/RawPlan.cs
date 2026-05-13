@@ -38,6 +38,26 @@ public abstract class RawShape : IRawLocated
 public sealed class RawBoxShape : RawShape
 {
     public double[]? Dimensions { get; set; }
+    public List<RawScoop>? Scoops { get; set; }
+}
+
+public sealed class RawScoop : IRawLocated
+{
+    public string? Face { get; set; }
+    public RawScoopEdge? Edge { get; set; }
+    public double? Inset { get; set; }
+    public double? Rise { get; set; }
+
+    [YamlIgnore] public RawLocation? SourceLocation { get; set; }
+}
+
+// Holds the raw YAML payload for the scoop 'edge' field, which accepts either
+// a scalar edge name, a YAML list of edge names, or the keyword 'all-edges'.
+public sealed record RawScoopEdge(IReadOnlyList<string> Names, bool IsAllEdges)
+{
+    public static RawScoopEdge Single(string name) => new(new[] { name }, IsAllEdges: false);
+    public static RawScoopEdge List(IReadOnlyList<string> names) => new(names, IsAllEdges: false);
+    public static RawScoopEdge AllEdges { get; } = new(Array.Empty<string>(), IsAllEdges: true);
 }
 
 public sealed class RawFace : IRawLocated

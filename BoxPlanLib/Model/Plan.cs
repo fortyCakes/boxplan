@@ -76,7 +76,14 @@ public abstract class Shape
 public sealed class BoxShape : Shape
 {
     public Vec3? Dimensions { get; init; }
+    public IReadOnlyList<Scoop> Scoops { get; init; } = Array.Empty<Scoop>();
 }
+
+// An interior sloped panel inside a box. The scoop sits on a host face (e.g. bottom),
+// rising to meet one of the four faces adjacent to the host (the "edge wall"). It joints
+// to the host face along its toe, into the edge wall's interior at the rise line, and
+// into both perpendicular caps along an oblique line from heel to toe.
+public sealed record Scoop(FaceName Face, FaceName Edge, double Inset, double Rise);
 
 public sealed record Face(FaceName Name, FaceType Type);
 

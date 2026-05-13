@@ -309,6 +309,9 @@ public sealed class CuttingPipeline
         PipelineLogger? logger = null)
     {
         logger?.Log($"[shape] Emitting shape {idPrefix}");
+        ScoopCutter.Validate(box, dims, settings);
+        var scoopShrink = ScoopCutter.HostShrinkByEdge(box, dims);
+        var (scoopAxisSlots, scoopObliqueSlots) = ScoopCutter.CollectFaceSlots(box, dims, settings);
         var edges = SharedEdgeTable.Build(dims, settings, logger);
         var openFaces = box.Faces.Where(f => f.Type == FaceType.Open).Select(f => f.Name).ToHashSet();
         var slotsByFace = BuildSlotsByFace(box.Dividers, dims, settings.MaterialThickness, settings.FingerJointSize);
@@ -317,11 +320,16 @@ public sealed class CuttingPipeline
         {
             if (face.Type != FaceType.Closed) continue;
             var faceFeatures = box.Features.Where(f => f.Face == face.Name).ToArray();
-            var faceSlots = slotsByFace.TryGetValue(face.Name, out var s) ? s : Array.Empty<SlotSpec>();
-            output.Add(BuildFacePiece(idPrefix, face.Name, dims, edges, openFaces, faceFeatures, faceSlots, settings, logger));
+            var dividerSlots = slotsByFace.TryGetValue(face.Name, out var ds) ? ds : Array.Empty<SlotSpec>();
+            var extraSlots = scoopAxisSlots.TryGetValue(face.Name, out var ss) ? ss : null;
+            var allSlots = extraSlots is null ? dividerSlots : dividerSlots.Concat(extraSlots).ToArray();
+            var obliqueSlots = scoopObliqueSlots.TryGetValue(face.Name, out var os) ? os : null;
+            scoopShrink.TryGetValue(face.Name, out var hostShrink);
+            output.Add(BuildFacePiece(idPrefix, face.Name, dims, edges, openFaces, faceFeatures, allSlots, hostShrink, obliqueSlots, settings, logger));
         }
 
         EmitDividerPanels(idPrefix, box, dims, openFaces, output, settings, logger);
+        output.AddRange(ScoopCutter.BuildScoopPanels(idPrefix, box, dims, settings, logger));
     }
 
     private static IReadOnlyDictionary<FaceName, IReadOnlyList<SlotSpec>> BuildSlotsByFace(
@@ -421,7 +429,9 @@ public sealed class CuttingPipeline
         IReadOnlyDictionary<string, SharedEdge> edges,
         IReadOnlySet<FaceName> openFaces,
         IReadOnlyList<Feature> features,
-        IReadOnlyList<SlotSpec> slots,
+        IEnumerable<SlotSpec> slots,
+        double[]? hostShrink,
+        IReadOnlyList<ObliqueSlotSpec>? obliqueSlots,
         BoxPlanSettings settings,
         PipelineLogger? logger = null)
     {
@@ -440,6 +450,18 @@ public sealed class CuttingPipeline
         }
 
         var builder = new PanelShapeBuilder(panelU, panelV, logger);
+
+        // Scoop shrink: remove a full-edge strip on each scooped edge so the host
+        // face panel is reduced to fit between the scoop toe lines. Joinery on the
+        // new edge (toe joint to the scoop) is not generated in Phase 1.
+        if (hostShrink is not null)
+        {
+            for (var i = 0; i < 4; i++)
+            {
+                if (hostShrink[i] <= 0) continue;
+                builder.SubtractEdgeNotch(i, 0, edgeLengths[i], hostShrink[i]);
+            }
+        }
 
         // Corner notches at each non-owned corner: subtract a t×t square shared between
         // the two edges meeting at that corner.
@@ -528,6 +550,11 @@ public sealed class CuttingPipeline
         foreach (var slot in slots)
         {
             interiorCuts.Add(CutoutBuilder.BuildSlotRectangle(slot, settings.Kerf, translation, logger));
+        }
+        if (obliqueSlots is not null)
+        {
+            foreach (var obl in obliqueSlots)
+                interiorCuts.Add(CutoutBuilder.BuildObliqueSlotRectangle(obl, settings.Kerf, translation));
         }
 
         return new BoxPlanCuttableShape

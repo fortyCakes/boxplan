@@ -145,11 +145,48 @@ internal static class CutoutBuilder
     public static CuttablePath BuildSlotRectangle(SlotSpec slot, double kerf, Vec2 translation, PipelineLogger? logger = null)
     {
         logger?.Log($"[cutout] Building slot rectangle at ({slot.U},{slot.V}) size=({slot.Width},{slot.Height})");
-        var w = Math.Abs(slot.Width) - kerf;
-        var h = Math.Abs(slot.Height) - kerf;
+        // Kerf applies to the slot's length (finger-span) direction only.
+        // The depth dimension is the material thickness t, which is uncut in that
+        // direction and must be left at the exact specified value.
+        var rawW = Math.Abs(slot.Width);
+        var rawH = Math.Abs(slot.Height);
+        double w, h;
+        if (rawW >= rawH) { w = rawW - kerf; h = rawH; }
+        else              { w = rawW;        h = rawH - kerf; }
         var cx = slot.U + translation.X;
         var cy = slot.V + translation.Y;
         return BuildRectangle(cx, cy, w, h);
+    }
+
+    public static CuttablePath BuildObliqueSlotRectangle(ObliqueSlotSpec obl, double kerf, Vec2 translation)
+    {
+        // Kerf applies to the span-length direction; the width (material thickness) is exact.
+        var halfLen = Math.Max(0, (obl.Length - kerf) / 2.0);
+        var halfWidth = obl.Width / 2.0;
+        var cx = obl.Center.X + translation.X;
+        var cy = obl.Center.Y + translation.Y;
+
+        var p1 = new Vec2(cx - halfLen * obl.Dir.X - halfWidth * obl.Perp.X,
+                          cy - halfLen * obl.Dir.Y - halfWidth * obl.Perp.Y);
+        var p2 = new Vec2(cx + halfLen * obl.Dir.X - halfWidth * obl.Perp.X,
+                          cy + halfLen * obl.Dir.Y - halfWidth * obl.Perp.Y);
+        var p3 = new Vec2(cx + halfLen * obl.Dir.X + halfWidth * obl.Perp.X,
+                          cy + halfLen * obl.Dir.Y + halfWidth * obl.Perp.Y);
+        var p4 = new Vec2(cx - halfLen * obl.Dir.X + halfWidth * obl.Perp.X,
+                          cy - halfLen * obl.Dir.Y + halfWidth * obl.Perp.Y);
+
+        return new CuttablePath
+        {
+            Start = p1,
+            Segments = new List<PathSegment>
+            {
+                new LineSegment(p2),
+                new LineSegment(p3),
+                new LineSegment(p4),
+                new LineSegment(p1),
+            },
+            Closed = true,
+        };
     }
 
     private static CuttablePath BuildRectangle(double cx, double cy, double w, double h)

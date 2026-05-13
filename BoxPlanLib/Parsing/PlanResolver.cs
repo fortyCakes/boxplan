@@ -117,6 +117,7 @@ public sealed class PlanResolver
         var dividers = ResolveDividers(raw.Dividers, dimensions, $"{path}.dividers", errors);
         var inserts = ResolveInserts(raw.Inserts, dividers, faces, $"{path}.inserts", errors, pendingRefs);
         var features = ResolveFeatures(raw.Features, faces, $"{path}.features", errors);
+        var scoops = ResolveScoops(raw.Scoops, dimensions, $"{path}.scoops", errors);
 
         return new BoxShape
         {
@@ -130,7 +131,191 @@ public sealed class PlanResolver
             Dividers = dividers,
             Inserts = inserts,
             Features = features,
+            Scoops = scoops,
         };
+    }
+
+    // The four faces sharing an edge with `face`. Used to validate that a scoop's
+    // anchor edge sits on a face actually adjacent to the host.
+    private static IReadOnlyList<FaceName> AdjacentFaces(FaceName face) => face switch
+    {
+        FaceName.Bottom or FaceName.Top
+            => new[] { FaceName.Front, FaceName.Right, FaceName.Back, FaceName.Left },
+        FaceName.Front or FaceName.Back
+            => new[] { FaceName.Bottom, FaceName.Right, FaceName.Top, FaceName.Left },
+        FaceName.Left or FaceName.Right
+            => new[] { FaceName.Bottom, FaceName.Back, FaceName.Top, FaceName.Front },
+        _ => Array.Empty<FaceName>(),
+    };
+
+    // Opposing edge on the host face — used to enforce that opposing scoop insets don't cross.
+    private static FaceName Opposite(FaceName face) => face switch
+    {
+        FaceName.Left => FaceName.Right,
+        FaceName.Right => FaceName.Left,
+        FaceName.Front => FaceName.Back,
+        FaceName.Back => FaceName.Front,
+        FaceName.Top => FaceName.Bottom,
+        FaceName.Bottom => FaceName.Top,
+        _ => face,
+    };
+
+    // Length of the host face's axis perpendicular to `edge` — used for inset bounds.
+    private static double InsetAxisLength(FaceName host, FaceName edge, Vec3 dims) => (host, edge) switch
+    {
+        (FaceName.Bottom or FaceName.Top, FaceName.Left or FaceName.Right) => dims.X,
+        (FaceName.Bottom or FaceName.Top, FaceName.Front or FaceName.Back) => dims.Z,
+        (FaceName.Front or FaceName.Back, FaceName.Left or FaceName.Right) => dims.X,
+        (FaceName.Front or FaceName.Back, FaceName.Bottom or FaceName.Top) => dims.Y,
+        (FaceName.Left or FaceName.Right, FaceName.Front or FaceName.Back) => dims.Z,
+        (FaceName.Left or FaceName.Right, FaceName.Bottom or FaceName.Top) => dims.Y,
+        _ => 0,
+    };
+
+    // Length of the rise axis — outward-normal of the host face.
+    private static double RiseAxisLength(FaceName host, Vec3 dims) => host switch
+    {
+        FaceName.Bottom or FaceName.Top => dims.Y,
+        FaceName.Front or FaceName.Back => dims.Z,
+        FaceName.Left or FaceName.Right => dims.X,
+        _ => 0,
+    };
+
+    private static IReadOnlyList<Scoop> ResolveScoops(
+        List<RawScoop>? raw,
+        Vec3? dimensions,
+        string path,
+        List<PlanError> errors)
+    {
+        if (raw is null || raw.Count == 0)
+        {
+            return Array.Empty<Scoop>();
+        }
+
+        var seenEdges = new HashSet<(FaceName Face, FaceName Edge)>();
+        var byFaceAxis = new Dictionary<(FaceName Face, FaceName InsetAxisEdge), double>();
+        var result = new List<Scoop>();
+
+        for (var i = 0; i < raw.Count; i++)
+        {
+            var rs = raw[i];
+            var spath = $"{path}[{i}]";
+
+            var face = ResolveFaceName(rs.Face, $"{spath}.face", errors, rs);
+            if (face is null) continue;
+
+            if (rs.Edge is null)
+            {
+                errors.Add(Err("Scoop requires 'edge'.", $"{spath}.edge", rs));
+                continue;
+            }
+
+            if (rs.Inset is not { } inset || inset <= 0)
+            {
+                errors.Add(Err("Scoop 'inset' must be positive.", $"{spath}.inset", rs));
+                continue;
+            }
+            if (rs.Rise is not { } rise || rise <= 0)
+            {
+                errors.Add(Err("Scoop 'rise' must be positive.", $"{spath}.rise", rs));
+                continue;
+            }
+
+            var adjacent = AdjacentFaces(face.Value);
+            var edges = ExpandEdges(rs.Edge, face.Value, adjacent, spath, errors, rs);
+            if (edges is null) continue;
+
+            foreach (var edge in edges)
+            {
+                if (!adjacent.Contains(edge))
+                {
+                    errors.Add(Err(
+                        $"Edge '{edge.ToString().ToLowerInvariant()}' is not adjacent to face '{face.Value.ToString().ToLowerInvariant()}'.",
+                        $"{spath}.edge",
+                        rs));
+                    continue;
+                }
+                if (!seenEdges.Add((face.Value, edge)))
+                {
+                    errors.Add(Err(
+                        $"Duplicate scoop on face '{face.Value.ToString().ToLowerInvariant()}' edge '{edge.ToString().ToLowerInvariant()}'.",
+                        spath,
+                        rs));
+                    continue;
+                }
+
+                if (dimensions is { } dims)
+                {
+                    var insetMax = InsetAxisLength(face.Value, edge, dims);
+                    var riseMax = RiseAxisLength(face.Value, dims);
+                    if (inset >= insetMax)
+                    {
+                        errors.Add(Err(
+                            $"Scoop 'inset' {inset} exceeds host face dimension {insetMax} on the inset axis.",
+                            $"{spath}.inset",
+                            rs));
+                        continue;
+                    }
+                    if (rise >= riseMax)
+                    {
+                        errors.Add(Err(
+                            $"Scoop 'rise' {rise} exceeds adjacent wall height {riseMax}.",
+                            $"{spath}.rise",
+                            rs));
+                        continue;
+                    }
+
+                    // Track combined inset for opposing pairs (same face, opposite edges
+                    // share an inset axis).
+                    var key = (face.Value, MinEdge(edge, Opposite(edge)));
+                    byFaceAxis.TryGetValue(key, out var soFar);
+                    var combined = soFar + inset;
+                    if (combined > insetMax + 1e-9)
+                    {
+                        errors.Add(Err(
+                            $"Opposing scoops on face '{face.Value.ToString().ToLowerInvariant()}' have combined inset {combined} > axis length {insetMax}.",
+                            $"{spath}.inset",
+                            rs));
+                        continue;
+                    }
+                    byFaceAxis[key] = combined;
+                }
+
+                result.Add(new Scoop(face.Value, edge, inset, rise));
+            }
+        }
+
+        return result;
+    }
+
+    private static FaceName MinEdge(FaceName a, FaceName b) =>
+        (int)a < (int)b ? a : b;
+
+    private static IReadOnlyList<FaceName>? ExpandEdges(
+        RawScoopEdge raw,
+        FaceName face,
+        IReadOnlyList<FaceName> adjacent,
+        string path,
+        List<PlanError> errors,
+        IRawLocated at)
+    {
+        if (raw.IsAllEdges)
+        {
+            return adjacent;
+        }
+        if (raw.Names.Count == 0)
+        {
+            errors.Add(Err("Scoop 'edge' list is empty.", $"{path}.edge", at));
+            return null;
+        }
+        var result = new List<FaceName>(raw.Names.Count);
+        foreach (var name in raw.Names)
+        {
+            var resolved = ResolveFaceName(name, $"{path}.edge", errors, at);
+            if (resolved is null) return null;
+            result.Add(resolved.Value);
+        }
+        return result;
     }
 
     // ── Panel resolution ─────────────────────────────────────────────────────

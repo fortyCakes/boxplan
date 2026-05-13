@@ -15,6 +15,7 @@ public sealed class PlanParser
         _deserializer = new DeserializerBuilder()
             .WithNamingConvention(HyphenatedNamingConvention.Instance)
             .WithTypeConverter(new RawFitDimensionConverter())
+            .WithTypeConverter(new RawScoopEdgeConverter())
             .WithTypeDiscriminatingNodeDeserializer(o =>
             {
                 o.AddKeyValueTypeDiscriminator<RawShape>(
