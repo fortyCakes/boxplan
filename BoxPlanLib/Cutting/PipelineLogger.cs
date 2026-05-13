@@ -23,4 +23,14 @@ internal sealed class PipelineLogger
     {
         Console.WriteLine($"[warn] {message}");
     }
+
+    public void Progress(string message)
+    {
+        Console.Write($"\r{message,-80}");
+    }
+
+    public void EndProgress()
+    {
+        Console.Write($"\r{new string(' ', 80)}\r");
+    }
 }

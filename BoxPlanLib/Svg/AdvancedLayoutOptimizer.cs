@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using BoxPlanLib.Cutting;
 using BoxPlanLib.Model;
 using Clipper2Lib;
@@ -5,7 +6,7 @@ using Google.OrTools.Sat;
 
 namespace BoxPlanLib.Svg;
 
-internal sealed record AdvancedLayoutPlacement(BoxPlanCuttableShape Shape, int PageIndex, double X, double Y, bool Rotated);
+internal sealed record AdvancedLayoutPlacement(BoxPlanCuttableShape Shape, int PageIndex, double X, double Y, int Rotation);
 
 internal sealed record AdvancedLayoutResult(IReadOnlyList<AdvancedLayoutPlacement> Items, int PageCount);
 
@@ -44,14 +45,27 @@ internal sealed class AdvancedLayoutOptimizer
         var orderings = BuildOrderings(pieces);
         _logger.Log($"[layout] evaluating {orderings.Count} ordering(s)");
         var candidates = new List<LayoutCandidate>();
+        var sw = Stopwatch.StartNew();
+        var bestPages = int.MaxValue;
 
-        foreach (var ordering in orderings)
+        for (var i = 0; i < orderings.Count; i++)
         {
+            var ordering = orderings[i];
+            var bestDisplay = bestPages == int.MaxValue ? "-" : $"{bestPages}p";
+            _logger.Progress($"[layout] ordering {i + 1}/{orderings.Count}  {sw.Elapsed.TotalSeconds:F1}s  best: {bestDisplay}");
+
+            var prevCount = candidates.Count;
             TryAddCandidate(candidates, BuildLayout(pieces, ordering, useConvexHull: false, useCompaction: false, useVoidFill: false, "outline-blf"));
             TryAddCandidate(candidates, BuildLayout(pieces, ordering, useConvexHull: true, useCompaction: false, useVoidFill: false, "hull-blf"));
             TryAddCandidate(candidates, BuildLayout(pieces, ordering, useConvexHull: true, useCompaction: true, useVoidFill: false, "hull-blf-compact"));
             TryAddCandidate(candidates, BuildLayout(pieces, ordering, useConvexHull: true, useCompaction: true, useVoidFill: true, "hull-blf-compact-voidfill"));
+
+            for (var j = prevCount; j < candidates.Count; j++)
+                if (candidates[j].PageCount < bestPages)
+                    bestPages = candidates[j].PageCount;
         }
+
+        _logger.EndProgress();
 
         _logger.Log($"[layout] {candidates.Count} valid candidate(s) produced");
 
@@ -76,7 +90,7 @@ internal sealed class AdvancedLayoutOptimizer
             var page = best.Pages[pageIndex];
             foreach (var item in page.Items)
             {
-                placements.Add(new AdvancedLayoutPlacement(item.Piece.Shape, pageIndex, item.X, item.Y, item.Geometry.Rotated));
+                placements.Add(new AdvancedLayoutPlacement(item.Piece.Shape, pageIndex, item.X, item.Y, item.Geometry.Rotation));
             }
         }
 
@@ -133,14 +147,14 @@ internal sealed class AdvancedLayoutOptimizer
         return result;
     }
 
-    private static OrientedGeometry BuildOrientedGeometry(IReadOnlyList<Vec2> outline, IReadOnlyList<Vec2> hull, bool rotated)
+    private static OrientedGeometry BuildOrientedGeometry(IReadOnlyList<Vec2> outline, IReadOnlyList<Vec2> hull, int rotation)
     {
         var (minX, minY, maxX, maxY) = Bounds(outline);
         var normalizedOutline = TranslatePolygon(outline, -minX, -minY);
         var normalizedHull = TranslatePolygon(hull, -minX, -minY);
 
         return new OrientedGeometry(
-            rotated,
+            rotation,
             maxX - minX,
             maxY - minY,
             normalizedOutline,
@@ -574,10 +588,12 @@ internal sealed class AdvancedLayoutOptimizer
     {
         placed = default!;
 
+        var seenDims = new HashSet<(double, double)>();
         var orientations = piece.Orientations
             .OrderBy(o => o.Height)
             .ThenBy(o => o.Width)
             .ThenBy(o => o.Rotated)
+            .Where(o => seenDims.Add((Math.Round(o.Width, 4), Math.Round(o.Height, 4))))
             .ToArray();
 
         var candidates = BuildCandidatePositions(page, seedCandidates);
@@ -587,6 +603,11 @@ internal sealed class AdvancedLayoutOptimizer
         {
             foreach (var candidate in candidates)
             {
+                // Candidates are sorted by (Y, X). Once Y exceeds best.Y, no further candidate
+                // can satisfy IsBetterPlacement (requires Y < best.Y, or same Y with lower X/height).
+                if (best is not null && candidate.Y > best.Y + Epsilon)
+                    break;
+
                 if (!FitsBounds(candidate.X, candidate.Y, geometry, envelopeLimit))
                 {
                     continue;
@@ -925,6 +946,23 @@ internal sealed class AdvancedLayoutOptimizer
         return NormalizePolygon(rotated);
     }
 
+    private static IReadOnlyList<Vec2> Rotate180AndNormalize(IReadOnlyList<Vec2> polygon, double originalWidth, double originalHeight)
+    {
+        var rotated = new List<Vec2>(polygon.Count);
+        foreach (var point in polygon)
+        {
+            rotated.Add(new Vec2(originalWidth - point.X, originalHeight - point.Y));
+        }
+
+        return NormalizePolygon(rotated);
+    }
+
+    private static string OutlineKey(IReadOnlyList<Vec2> outline) =>
+        string.Join(";", outline
+            .Select(v => ((long)Math.Round(v.X * 1e4), (long)Math.Round(v.Y * 1e4)))
+            .OrderBy(t => t.Item1).ThenBy(t => t.Item2)
+            .Select(t => $"{t.Item1},{t.Item2}"));
+
     private static IReadOnlyList<Vec2> TranslatePolygon(IReadOnlyList<Vec2> polygon, double dx, double dy)
     {
         var translated = new List<Vec2>(polygon.Count);
@@ -1119,7 +1157,7 @@ internal sealed class AdvancedLayoutOptimizer
     }
 
     private sealed record OrientedGeometry(
-        bool Rotated,
+        int Rotation,
         double Width,
         double Height,
         IReadOnlyList<Vec2> Outline,
