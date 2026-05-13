@@ -1,0 +1,23 @@
+# This contains the island boards vertically.
+shapes:
+- id: "island-boards-compartment"
+  type: "box" 
+  dimensions: [26.0, 196.0, 316.0]
+  faces:
+    - name: "top"
+      type: "open"
+  features:
+    - type: "cutout"
+      face: "left"
+      shape: "circle" 
+      diameter: 200.0
+      position: 
+        anchor: "top-center"
+        offset: [0.0, 0.0]
+    - type: "cutout"
+      face: "right"
+      shape: "circle" 
+      diameter: 200.0
+      position: 
+        anchor: "top-center"
+        offset: [0.0, 0.0]

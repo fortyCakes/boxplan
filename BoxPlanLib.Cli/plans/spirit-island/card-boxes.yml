@@ -1,0 +1,81 @@
+shapes:
+
+- id: "card-holder-1"
+  type: "box" 
+  dimensions: [75.0, 101.0, 237.0]
+  faces:
+    - name: "top"
+      type: "open"
+  features:
+    - type: "cutout"
+      face: "front"
+      shape: "semicircle" 
+      diameter: -50.0
+      position: 
+        anchor: "top-center"
+        offset: [0.0, 0.0]
+    - type: "cutout"
+      face: "back"
+      shape: "semicircle" 
+      diameter: -50.0
+      position: 
+        anchor: "top-center"
+        offset: [0.0, 0.0]
+    - type: "cutout"
+      face: "left"
+      shape: "rectangle"
+      width: 3.1
+      height: 12
+      position:
+        anchor: "top-center"
+      repeat:
+        spacing: [6, 0]
+    - type: "cutout"
+      face: "right"
+      shape: "rectangle"
+      width: 3.1
+      height: 12
+      position:
+        anchor: "top-center"
+      repeat:
+        spacing: [6, 0]
+
+- id: "card-holder-2"
+  type: "box" 
+  dimensions: [75.0, 101.0, 237.0]
+  faces:
+    - name: "top"
+      type: "open"
+  features:
+    - type: "cutout"
+      face: "front"
+      shape: "semicircle" 
+      diameter: -50.0
+      position: 
+        anchor: "top-center"
+        offset: [0.0, 0.0]
+    - type: "cutout"
+      face: "back"
+      shape: "semicircle" 
+      diameter: -50.0
+      position: 
+        anchor: "top-center"
+        offset: [0.0, 0.0]
+    - type: "cutout"
+      face: "left"
+      shape: "rectangle"
+      width: 3.1
+      height: 12
+      position:
+        anchor: "top-center"
+      repeat:
+        spacing: [6, 0]
+    - type: "cutout"
+      face: "right"
+      shape: "rectangle"
+      width: 3.1
+      height: 12
+      position:
+        anchor: "top-center"
+      repeat:
+        spacing: [6, 0]

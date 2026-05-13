@@ -1,0 +1,23 @@
+shapes:
+# This holds the spirit panels.
+- id: "spirit-panels-compartment"
+  type: "box" 
+  dimensions: [106.0, 161.0, 237.0]
+  faces:
+    - name: "top"
+      type: "open"
+  features:
+    - type: "cutout"
+      face: "left"
+      shape: "circle" 
+      diameter: 200.0
+      position: 
+        anchor: "top-center"
+        offset: [0.0, 0.0]
+    - type: "cutout"
+      face: "right"
+      shape: "circle" 
+      diameter: 200.0
+      position: 
+        anchor: "top-center"
+        offset: [0.0, 0.0]

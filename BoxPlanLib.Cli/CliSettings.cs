@@ -13,6 +13,7 @@ internal static class CliSettings
     {
         public required BoxPlanSettings Settings { get; init; }
         public required List<string> Positional { get; init; }
+        public string? InputDirectory { get; init; }
         public required bool HelpRequested { get; init; }
         public required bool SaveSettingsRequested { get; init; }
         public string? LoadedSettingsPath { get; init; }
@@ -24,6 +25,7 @@ internal static class CliSettings
         var positional = new List<string>();
         var flagOverrides = new Dictionary<PropertyInfo, object>();
         string? settingsOverridePath = null;
+        string? inputDirectory = null;
         var skipSettingsFile = false;
         var helpRequested = false;
         var saveSettingsRequested = false;
@@ -48,6 +50,12 @@ internal static class CliSettings
             if (name.Equals("settings", StringComparison.OrdinalIgnoreCase))
             {
                 settingsOverridePath = inlineValue ?? ConsumeNextValue(args, ref i, name);
+                continue;
+            }
+
+            if (name.Equals("input-dir", StringComparison.OrdinalIgnoreCase))
+            {
+                inputDirectory = inlineValue ?? ConsumeNextValue(args, ref i, name);
                 continue;
             }
 
@@ -143,6 +151,7 @@ internal static class CliSettings
         {
             Settings = settings,
             Positional = positional,
+            InputDirectory = inputDirectory,
             HelpRequested = helpRequested,
             SaveSettingsRequested = saveSettingsRequested,
             LoadedSettingsPath = loadedPath,
@@ -174,9 +183,11 @@ internal static class CliSettings
     {
         var lines = new List<string>
         {
-            "Usage: boxplan [options] [input.yml [output.svg]]",
+            "Usage: boxplan [options] [input.yml|input-dir [output-dir]]",
             "",
             "If no input is provided, every .yml in the sample-plans directory is processed.",
+            "Paged output writes one SVG per page into an output directory.",
+            "If output-dir is omitted, it defaults to sample-output/<plan-or-input-folder-name>/.",
             "",
             "Settings precedence (highest wins):",
             "  1. CLI flags",
@@ -185,6 +196,7 @@ internal static class CliSettings
             "",
             "Options:",
             "  --settings <path>          Load settings from the given YAML file",
+            "  --input-dir <path>         Process all plan files in a directory into one combined paged output",
             "  --no-settings-file         Ignore any .boxplansettings file",
             $"  --save-settings            Write resolved settings to {FileName} (or --settings path)",
             "  --help, -h                 Show this help text",

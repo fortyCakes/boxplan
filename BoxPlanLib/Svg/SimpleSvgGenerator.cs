@@ -70,22 +70,7 @@ internal sealed class SvgGenerator
             return "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"0mm\" height=\"0mm\" viewBox=\"0 0 0 0\"/>";
         }
 
-        if (settings.SheetWidth <= 0 || settings.SheetHeight <= 0)
-        {
-            throw new ArgumentOutOfRangeException(nameof(settings), "Sheet dimensions must be positive.");
-        }
-
-        if (settings.Margin < 0)
-        {
-            throw new ArgumentOutOfRangeException(nameof(settings), "Margin cannot be negative.");
-        }
-
-        double usableWidth = settings.SheetWidth - (2 * settings.Margin);
-        double usableHeight = settings.SheetHeight - (2 * settings.Margin);
-        if (usableWidth <= 0 || usableHeight <= 0)
-        {
-            throw new ArgumentOutOfRangeException(nameof(settings), "Margin leaves no usable sheet area.");
-        }
+        ValidatePagedSettings(settings);
 
         var placements = LayoutPages(shapes, settings);
         double totalWidth = placements.PageCount * settings.SheetWidth + Math.Max(0, placements.PageCount - 1) * settings.Spacing;
@@ -127,6 +112,77 @@ internal sealed class SvgGenerator
 
         sb.Append("</g></svg>");
         return sb.ToString();
+    }
+
+    public IReadOnlyList<string> GeneratePagedSvgPages(BoxPlanCuttableShape[] shapes, BoxPlanSettings settings)
+    {
+        if (shapes.Length == 0)
+        {
+            return Array.Empty<string>();
+        }
+
+        ValidatePagedSettings(settings);
+
+        var placements = LayoutPages(shapes, settings);
+        var pages = new List<string>(placements.PageCount);
+
+        for (int pageIndex = 0; pageIndex < placements.PageCount; pageIndex++)
+        {
+            pages.Add(BuildSinglePageSvg(placements, pageIndex, settings, shapes.Length));
+        }
+
+        return pages;
+    }
+
+    private static string BuildSinglePageSvg(LayoutResult placements, int pageIndex, BoxPlanSettings settings, int shapeCount)
+    {
+        var sb = new StringBuilder(256 + shapeCount * 192);
+        sb.Append("<svg xmlns=\"http://www.w3.org/2000/svg\" ");
+        sb.Append("width=\"").Append(F(settings.SheetWidth)).Append("mm\" ");
+        sb.Append("height=\"").Append(F(settings.SheetHeight)).Append("mm\" ");
+        sb.Append("viewBox=\"0 0 ").Append(F(settings.SheetWidth)).Append(' ').Append(F(settings.SheetHeight)).Append("\">");
+        sb.Append("<g transform=\"translate(0 ").Append(F(settings.SheetHeight)).Append(") scale(1 -1)\">");
+
+        foreach (var placement in placements.Items.Where(p => p.PageIndex == pageIndex))
+        {
+            sb.Append("<g id=\"").Append(Escape(placement.Shape.Id)).Append("\" transform=\"translate(")
+                .Append(F(settings.Margin + placement.X)).Append(' ').Append(F(settings.Margin + placement.Y)).Append(')');
+            if (placement.Rotated)
+            {
+                sb.Append(" translate(").Append(F(Height(placement.Shape))).Append(" 0) rotate(90)");
+            }
+
+            sb.Append("\">");
+            EmitPath(sb, placement.Shape.Outline, placement.Shape.BoundingBoxMin, OutlineColor);
+            foreach (var path in placement.Shape.InteriorCuts) EmitPath(sb, path, placement.Shape.BoundingBoxMin, InteriorColor);
+            foreach (var path in placement.Shape.Engravings) EmitPath(sb, path, placement.Shape.BoundingBoxMin, LineEngravingColor);
+            foreach (var t in placement.Shape.TextEngravings) EmitTextEngraving(sb, t, placement.Shape.BoundingBoxMin);
+            if (settings.Labels) EmitLabel(sb, placement.Shape);
+            sb.Append("</g>");
+        }
+
+        sb.Append("</g></svg>");
+        return sb.ToString();
+    }
+
+    private static void ValidatePagedSettings(BoxPlanSettings settings)
+    {
+        if (settings.SheetWidth <= 0 || settings.SheetHeight <= 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(settings), "Sheet dimensions must be positive.");
+        }
+
+        if (settings.Margin < 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(settings), "Margin cannot be negative.");
+        }
+
+        double usableWidth = settings.SheetWidth - (2 * settings.Margin);
+        double usableHeight = settings.SheetHeight - (2 * settings.Margin);
+        if (usableWidth <= 0 || usableHeight <= 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(settings), "Margin leaves no usable sheet area.");
+        }
     }
 
     private static LayoutResult LayoutPages(BoxPlanCuttableShape[] shapes, BoxPlanSettings settings)

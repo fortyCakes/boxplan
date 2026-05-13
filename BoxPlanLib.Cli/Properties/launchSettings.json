@@ -1,0 +1,9 @@
+{
+  "$schema": "https://json.schemastore.org/launchsettings.json",
+  "profiles": {
+    "Spirit Island Directory": {
+      "commandName": "Project",
+      "commandLineArgs": "--input-dir plans/spirit-island sample-output/spirit-island"
+    }
+  }
+}

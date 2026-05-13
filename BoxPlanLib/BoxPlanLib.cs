@@ -46,6 +46,9 @@ public class BoxPlanLib
     public string GeneratePagedSVG(BoxPlanCuttableShape[] cuttableShapes, BoxPlanSettings materialSettings)
         => _svgGenerator.GeneratePagedSvg(cuttableShapes, materialSettings);
 
+    public IReadOnlyList<string> GeneratePagedSVGPages(BoxPlanCuttableShape[] cuttableShapes, BoxPlanSettings materialSettings)
+        => _svgGenerator.GeneratePagedSvgPages(cuttableShapes, materialSettings);
+
     //
     // public string GenerateFullPagedSvg(string plan, BoxPlanMaterialSettings materialSettings)
     // {

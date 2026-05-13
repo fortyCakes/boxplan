@@ -14,6 +14,21 @@
             "console": "integratedTerminal",
             "stopAtEntry": false,
             "preLaunchTask": "build BoxPlanLib.Cli"
+        },
+        {
+            "name": "BoxPlanLib.Cli (Spirit Island dir)",
+            "type": "coreclr",
+            "request": "launch",
+            "program": "${workspaceFolder}/BoxPlanLib.Cli/bin/Debug/net9.0/BoxPlanLib.Cli.dll",
+            "cwd": "${workspaceFolder}",
+            "args": [
+                "--input-dir",
+                "BoxPlanLib.Cli/plans/spirit-island",
+                "sample-output/spirit-island"
+            ],
+            "console": "integratedTerminal",
+            "stopAtEntry": false,
+            "preLaunchTask": "build BoxPlanLib.Cli"
         }
     ]
 }
