@@ -213,7 +213,7 @@ internal static class ScoopCutter
     // by t/cos(theta) where cos(theta) = rise/slant.
     private static IReadOnlyList<SlotSpec> BuildHeelSlots(ScoopGeometry g, double t, double s)
     {
-        var effectiveT = t * g.Slant / g.Scoop.Rise;
+        var effectiveT = t * g.Slant / g.Scoop.Rise - t / 2.0;
         return DividerJointBuilder.BuildFingerSlots(
             g.EdgeAxisLength / 2.0, g.Scoop.Rise,
             w: g.EdgeAxisLength, h: effectiveT,
