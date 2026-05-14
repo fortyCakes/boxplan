@@ -1,0 +1,46 @@
+shapes:
+# - id: "top-tray"
+#   type: "box" 
+#   dimensions: [256.0, 35.0, 316.0]
+#   faces:
+#     - name: "top"
+#       type: "open"
+
+# - id: "presence-tokens-1" # TODO add 5 more of these for the other 5 colors
+#   type: "box" 
+#   dimensions: [51.0, 32.0, 51.0]
+#   origin: "bottom-left-front"
+#   faces:
+#     - name: "top"
+#       type: "open"
+#   features:
+#     - face: "front"
+#       type: "engraving"
+#       text: "Yellow"
+#       size: 6.0
+#       font: "DK Snemand"
+#       style: "bold"
+#       position:
+#         anchor: "bottom-center"
+#         offset: [0.0, 6.0]    
+#   scoops:
+#     - face: bottom
+#       edge: [front, back]
+#       inset: 15
+#       rise: 15
+
+- id: "element-tokens"
+  type: "box" 
+  dimensions: [51.0, 32.0, 316.0]
+  origin: "bottom-left-front"
+  faces:
+    - name: "top"
+      type: "open"
+  dividers:
+    - split: { z: 8 }
+      facing: top
+  scoops:
+    - face: bottom
+      edge: [left, right]
+      inset: 15
+      rise: 15

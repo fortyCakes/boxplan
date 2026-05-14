@@ -55,10 +55,15 @@ internal sealed class AdvancedLayoutOptimizer
             _logger.Progress($"[layout] ordering {i + 1}/{orderings.Count}  {sw.Elapsed.TotalSeconds:F1}s  best: {bestDisplay}");
 
             var prevCount = candidates.Count;
-            TryAddCandidate(candidates, BuildLayout(pieces, ordering, useConvexHull: false, useCompaction: false, useVoidFill: false, "outline-blf"));
-            TryAddCandidate(candidates, BuildLayout(pieces, ordering, useConvexHull: true, useCompaction: false, useVoidFill: false, "hull-blf"));
-            TryAddCandidate(candidates, BuildLayout(pieces, ordering, useConvexHull: true, useCompaction: true, useVoidFill: false, "hull-blf-compact"));
-            TryAddCandidate(candidates, BuildLayout(pieces, ordering, useConvexHull: true, useCompaction: true, useVoidFill: true, "hull-blf-compact-voidfill"));
+            void SubProgress(string suffix)
+            {
+                var bd = bestPages == int.MaxValue ? "-" : $"{bestPages}p";
+                _logger.Progress($"[layout] ordering {i + 1}/{orderings.Count}  {sw.Elapsed.TotalSeconds:F1}s  best: {bd} | {suffix}");
+            }
+            TryAddCandidate(candidates, BuildLayout(pieces, ordering, useConvexHull: false, useCompaction: false, useVoidFill: false, "outline-blf", SubProgress));
+            TryAddCandidate(candidates, BuildLayout(pieces, ordering, useConvexHull: true, useCompaction: false, useVoidFill: false, "hull-blf", SubProgress));
+            TryAddCandidate(candidates, BuildLayout(pieces, ordering, useConvexHull: true, useCompaction: true, useVoidFill: false, "hull-blf-compact", SubProgress));
+            TryAddCandidate(candidates, BuildLayout(pieces, ordering, useConvexHull: true, useCompaction: true, useVoidFill: true, "hull-blf-compact-voidfill", SubProgress));
 
             for (var j = prevCount; j < candidates.Count; j++)
                 if (candidates[j].PageCount < bestPages)
@@ -127,15 +132,21 @@ internal sealed class AdvancedLayoutOptimizer
             var normalizedOutline = NormalizePolygon(outline);
             var normalizedHull = ConvexHull(normalizedOutline);
 
-            var orientation0 = BuildOrientedGeometry(normalizedOutline, normalizedHull, rotated: false);
+            var orientation0 = BuildOrientedGeometry(normalizedOutline, normalizedHull, rotation: 0);
             var orientations = new List<OrientedGeometry> { orientation0 };
+            var seenOutlines = new HashSet<string> { OutlineKey(orientation0.Outline) };
 
-            if (Math.Abs(orientation0.Width - orientation0.Height) > 1e-6)
+            void TryAddOrientation(IReadOnlyList<Vec2> outline, int rotation)
             {
-                var rotatedOutline = Rotate90AndNormalize(normalizedOutline, orientation0.Height);
-                var rotatedHull = ConvexHull(rotatedOutline);
-                orientations.Add(BuildOrientedGeometry(rotatedOutline, rotatedHull, rotated: true));
+                var hull = ConvexHull(outline);
+                var o = BuildOrientedGeometry(outline, hull, rotation);
+                if (seenOutlines.Add(OutlineKey(o.Outline)))
+                    orientations.Add(o);
             }
+
+            TryAddOrientation(Rotate90AndNormalize(normalizedOutline, orientation0.Height), rotation: 90);
+            TryAddOrientation(Rotate180AndNormalize(normalizedOutline, orientation0.Width, orientation0.Height), rotation: 180);
+            TryAddOrientation(Rotate90AndNormalize(Rotate180AndNormalize(normalizedOutline, orientation0.Width, orientation0.Height), orientation0.Height), rotation: 270);
 
             var area = Math.Abs(SignedArea(normalizedOutline));
             var hullArea = Math.Abs(SignedArea(normalizedHull));
@@ -413,13 +424,15 @@ internal sealed class AdvancedLayoutOptimizer
         bool useConvexHull,
         bool useCompaction,
         bool useVoidFill,
-        string strategyName)
+        string strategyName,
+        Action<string> subProgress)
     {
         var pages = new List<PageState>();
         var unplaced = new HashSet<int>(ordering);
 
         while (unplaced.Count > 0)
         {
+            subProgress($"{strategyName}: page {pages.Count + 1}  {unplaced.Count}/{pieces.Count} pieces");
             var page = new PageState(pages.Count);
             var orderForPage = ordering.Where(unplaced.Contains).Select(index => pieces[index]).ToList();
 
@@ -588,12 +601,12 @@ internal sealed class AdvancedLayoutOptimizer
     {
         placed = default!;
 
-        var seenDims = new HashSet<(double, double)>();
+        var seenOutlines = new HashSet<string>();
         var orientations = piece.Orientations
             .OrderBy(o => o.Height)
             .ThenBy(o => o.Width)
-            .ThenBy(o => o.Rotated)
-            .Where(o => seenDims.Add((Math.Round(o.Width, 4), Math.Round(o.Height, 4))))
+            .ThenBy(o => o.Rotation)
+            .Where(o => seenOutlines.Add(OutlineKey(o.Outline)))
             .ToArray();
 
         var candidates = BuildCandidatePositions(page, seedCandidates);

@@ -1,0 +1,332 @@
+shapes:
+# Longer drawers for slightly larger components.
+- id: "long-drawers-compartment"
+  type: "box" 
+  dimensions: [150.0, 161.0, 79.0]
+  faces:
+    - name: "front"
+      type: "open"
+  dividers:
+    - split: { x: 2, y: 5 }
+      facing: front
+  inserts:
+    - cell: [0, 0]
+      ref: "long-drawer-1"
+    - cell: [1, 0]
+      ref: "long-drawer-2"
+    - cell: [0, 1]
+      ref: "long-drawer-3"
+    - cell: [1, 1]
+      ref: "long-drawer-4"
+    - cell: [0, 2]
+      ref: "long-drawer-5"
+    - cell: [1, 2]
+      ref: "long-drawer-6"
+    - cell: [0, 3]
+      ref: "long-drawer-7"
+    - cell: [1, 3]
+      ref: "long-drawer-8"
+    - cell: [0, 4]
+      ref: "long-drawer-9"
+    - cell: [1, 4]
+      ref: "long-drawer-10"
+
+- id: "long-drawer-1"
+  type: "box"
+
+  fit:
+    mode: "cell"
+    clearance: 1.0
+    depth: auto
+
+  faces:
+    - name: "top"
+      type: "open"
+
+  features:
+    - face: "front"
+      type: "cutout"
+      shape: "semicircle"
+      diameter: -25.0
+      position:
+        anchor: "top-center"
+        offset: [0.0, 0.0]
+    - face: "front"
+      type: "engraving"
+      text: "Energy"
+      size: 6.0
+      font: "DK Snemand"
+      style: "bold"
+      position:
+        anchor: "bottom-center"
+        offset: [0.0, 6.0]
+
+- id: "long-drawer-2"
+  type: "box"
+
+  fit:
+    mode: "cell"
+    clearance: 1.0
+    depth: auto
+
+  faces:
+    - name: "top"
+      type: "open"
+
+  features:
+    - face: "front"
+      type: "cutout"
+      shape: "semicircle"
+      diameter: -25.0
+      position:
+        anchor: "top-center"
+        offset: [0.0, 0.0]
+    - face: "front"
+      type: "engraving"
+      text: "Energy"
+      size: 6.0
+      font: "DK Snemand"
+      style: "bold"
+      position:
+        anchor: "bottom-center"
+        offset: [0.0, 6.0]
+
+- id: "long-drawer-3"
+  type: "box"
+
+  fit:
+    mode: "cell"
+    clearance: 1.0
+    depth: auto
+
+  faces:
+    - name: "top"
+      type: "open"
+
+  features:
+    - face: "front"
+      type: "cutout"
+      shape: "semicircle"
+      diameter: -25.0
+      position:
+        anchor: "top-center"
+        offset: [0.0, 0.0]
+    - face: "front"
+      type: "engraving"
+      text: "Fear"
+      size: 6.0
+      font: "DK Snemand"
+      style: "bold"
+      position:
+        anchor: "bottom-center"
+        offset: [0.0, 6.0]
+
+- id: "long-drawer-4"
+  type: "box"
+
+  fit:
+    mode: "cell"
+    clearance: 1.0
+    depth: auto
+
+  faces:
+    - name: "top"
+      type: "open"
+
+  features:
+    - face: "front"
+      type: "cutout"
+      shape: "semicircle"
+      diameter: -25.0
+      position:
+        anchor: "top-center"
+        offset: [0.0, 0.0]
+    - face: "front"
+      type: "engraving"
+      text: "Dahan"
+      size: 6.0
+      font: "DK Snemand"
+      style: "bold"
+      position:
+        anchor: "bottom-center"
+        offset: [0.0, 6.0]
+
+- id: "long-drawer-5"
+  type: "box"
+
+  fit:
+    mode: "cell"
+    clearance: 1.0
+    depth: auto
+
+  faces:
+    - name: "top"
+      type: "open"
+
+  features:
+    - face: "front"
+      type: "cutout"
+      shape: "semicircle"
+      diameter: -25.0
+      position:
+        anchor: "top-center"
+        offset: [0.0, 0.0]
+    - face: "front"
+      type: "engraving"
+      text: "Dahan"
+      size: 6.0
+      font: "DK Snemand"
+      style: "bold"
+      position:
+        anchor: "bottom-center"
+        offset: [0.0, 6.0]
+
+- id: "long-drawer-6"
+  type: "box"
+
+  fit:
+    mode: "cell"
+    clearance: 1.0
+    depth: auto
+
+  faces:
+    - name: "top"
+      type: "open"
+
+  features:
+    - face: "front"
+      type: "cutout"
+      shape: "semicircle"
+      diameter: -25.0
+      position:
+        anchor: "top-center"
+        offset: [0.0, 0.0]
+    - face: "front"
+      type: "engraving"
+      text: "Elements"
+      size: 6.0
+      font: "DK Snemand"
+      style: "bold"
+      position:
+        anchor: "bottom-center"
+        offset: [0.0, 6.0]
+
+- id: "long-drawer-7"
+  type: "box"
+
+  fit:
+    mode: "cell"
+    clearance: 1.0
+    depth: auto
+
+  faces:
+    - name: "top"
+      type: "open"
+
+  features:
+    - face: "front"
+      type: "cutout"
+      shape: "semicircle"
+      diameter: -25.0
+      position:
+        anchor: "top-center"
+        offset: [0.0, 0.0]
+    - face: "front"
+      type: "engraving"
+      text: "Scenario"
+      size: 6.0
+      font: "DK Snemand"
+      style: "bold"
+      position:
+        anchor: "bottom-center"
+        offset: [0.0, 6.0]
+
+- id: "long-drawer-8"
+  type: "box"
+
+  fit:
+    mode: "cell"
+    clearance: 1.0
+    depth: auto
+
+  faces:
+    - name: "top"
+      type: "open"
+
+  features:
+    - face: "front"
+      type: "cutout"
+      shape: "semicircle"
+      diameter: -25.0
+      position:
+        anchor: "top-center"
+        offset: [0.0, 0.0]
+    - face: "front"
+      type: "engraving"
+      text: "Adversary"
+      size: 6.0
+      font: "DK Snemand"
+      style: "bold"
+      position:
+        anchor: "bottom-center"
+        offset: [0.0, 6.0]
+
+- id: "long-drawer-9"
+  type: "box"
+
+  fit:
+    mode: "cell"
+    clearance: 1.0
+    depth: auto
+
+  faces:
+    - name: "top"
+      type: "open"
+
+  features:
+    - face: "front"
+      type: "cutout"
+      shape: "semicircle"
+      diameter: -25.0
+      position:
+        anchor: "top-center"
+        offset: [0.0, 0.0]
+    - face: "front"
+      type: "engraving"
+      text: "???"
+      size: 6.0
+      font: "DK Snemand"
+      style: "bold"
+      position:
+        anchor: "bottom-center"
+        offset: [0.0, 6.0]
+
+- id: "long-drawer-10"
+  type: "box"
+
+  fit:
+    mode: "cell"
+    clearance: 1.0
+    depth: auto
+
+  faces:
+    - name: "top"
+      type: "open"
+
+  features:
+    - face: "front"
+      type: "cutout"
+      shape: "semicircle"
+      diameter: -25.0
+      position:
+        anchor: "top-center"
+        offset: [0.0, 0.0]
+    - face: "front"
+      type: "engraving"
+      text: "!!!"
+      size: 6.0
+      font: "DK Snemand"
+      style: "bold"
+      position:
+        anchor: "bottom-center"
+        offset: [0.0, 6.0]

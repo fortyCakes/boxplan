@@ -416,6 +416,33 @@ public class ScoopTests
     }
 
     [Fact]
+    public void Scoop_panel_toe_and_heel_end_notches_include_oblique_relief()
+    {
+        var plan = ParseOk("""
+            shapes:
+              - id: "trough"
+                type: "box"
+                dimensions: [200, 100, 80]
+                scoops:
+                  - face: bottom
+                    edge: left
+                    inset: 25
+                    rise: 30
+            """);
+
+        var settings = Settings(kerf: 0);
+        var pieces = new BoxPlanLib().GetCuttableShapes(plan, settings);
+        var scoop = pieces.Single(p => p.Id == "trough.scoop-bottom-left");
+        var vertices = GetVertices(scoop.Outline);
+        var slant = Math.Sqrt(25.0 * 25.0 + 30.0 * 30.0);
+        var toeDepth = settings.MaterialThickness * slant / 25.0 * 1.2;
+        var heelDepth = settings.MaterialThickness * slant / 30.0 * 1.2;
+
+        Assert.Contains(vertices, v => Math.Abs(v.X - heelDepth) <= 1e-6);
+        Assert.Contains(vertices, v => Math.Abs(v.X - (slant - toeDepth)) <= 1e-6);
+    }
+
+    [Fact]
     public void Anchor_wall_has_heel_interior_cuts()
     {
         // Left face is the anchor wall for a Bottom+Left scoop; it should get interior
@@ -483,6 +510,120 @@ public class ScoopTests
     }
 
     [Fact]
+    public void Scooped_tray_emits_two_oblique_slot_sets_per_cap_face()
+    {
+        var plan = ParseOk("""
+            shapes:
+              - id: "scooped-tray"
+                type: "box"
+                dimensions: [50.0, 25.0, 50.0]
+                faces:
+                  - name: "top"
+                    type: "open"
+                scoops:
+                  - face: bottom
+                    edge: [front, back]
+                    inset: 15
+                    rise: 15
+            """);
+
+        var settings = Settings(kerf: 0);
+              var pieces = new BoxPlanLib().GetCuttableShapes(plan, settings);
+              var left = pieces.Single(p => p.Id == "scooped-tray.left");
+              var right = pieces.Single(p => p.Id == "scooped-tray.right");
+
+              Assert.Equal(2, left.InteriorCuts.Count);
+              Assert.Equal(2, right.InteriorCuts.Count);
+    }
+
+    [Fact]
+            public void Scooped_tray_oblique_slots_stay_at_least_thickness_from_part_edge()
+    {
+        var plan = ParseOk("""
+            shapes:
+              - id: "scooped-tray"
+                type: "box"
+                dimensions: [50.0, 25.0, 50.0]
+                faces:
+                  - name: "top"
+                    type: "open"
+                scoops:
+                  - face: bottom
+                    edge: [front, back]
+                    inset: 15
+                    rise: 15
+            """);
+
+          var settings = Settings(kerf: 0);
+          var pieces = new BoxPlanLib().GetCuttableShapes(plan, settings);
+
+          var left = pieces.Single(p => p.Id == "scooped-tray.left");
+          var right = pieces.Single(p => p.Id == "scooped-tray.right");
+
+          Assert.Equal(2, left.InteriorCuts.Count);
+          Assert.Equal(2, right.InteriorCuts.Count);
+
+          AssertCutsRespectEdgeClearance(left, settings.MaterialThickness);
+          AssertCutsRespectEdgeClearance(right, settings.MaterialThickness);
+    }
+
+      [Fact]
+      public void Scooped_tray_scoop_panels_clip_cap_edges_except_tab_interval()
+      {
+          var plan = ParseOk("""
+              shapes:
+                - id: "scooped-tray"
+                  type: "box"
+                  dimensions: [50.0, 25.0, 50.0]
+                  faces:
+                    - name: "top"
+                      type: "open"
+                  scoops:
+                    - face: bottom
+                      edge: [front, back]
+                      inset: 15
+                      rise: 15
+              """);
+
+          var pieces = new BoxPlanLib().GetCuttableShapes(plan, Settings(kerf: 0));
+          var frontScoop = pieces.Single(p => p.Id == "scooped-tray.scoop-bottom-front");
+          var backScoop = pieces.Single(p => p.Id == "scooped-tray.scoop-bottom-back");
+
+          Assert.Single(GetHorizontalIntervalsAtY(frontScoop.Outline, frontScoop.BoundingBoxMin.Y));
+          Assert.Single(GetHorizontalIntervalsAtY(frontScoop.Outline, frontScoop.BoundingBoxMax.Y));
+          Assert.Single(GetHorizontalIntervalsAtY(backScoop.Outline, backScoop.BoundingBoxMin.Y));
+          Assert.Single(GetHorizontalIntervalsAtY(backScoop.Outline, backScoop.BoundingBoxMax.Y));
+      }
+
+      [Fact]
+      public void Scooped_tray_cap_faces_keep_bottom_corner_tabs_when_bottom_is_shrunk_away()
+      {
+          var plan = ParseOk("""
+              shapes:
+                - id: "scooped-tray"
+                  type: "box"
+                  dimensions: [50.0, 25.0, 50.0]
+                  faces:
+                    - name: "top"
+                      type: "open"
+                  scoops:
+                    - face: bottom
+                      edge: [front, back]
+                      inset: 15
+                      rise: 15
+              """);
+
+          var pieces = new BoxPlanLib().GetCuttableShapes(plan, Settings(kerf: 0));
+          var front = pieces.Single(p => p.Id == "scooped-tray.front");
+          var back = pieces.Single(p => p.Id == "scooped-tray.back");
+
+          AssertCornerVertex(front, front.BoundingBoxMin.X, front.BoundingBoxMin.Y);
+          AssertCornerVertex(front, front.BoundingBoxMax.X, front.BoundingBoxMin.Y);
+          AssertCornerVertex(back, back.BoundingBoxMin.X, back.BoundingBoxMin.Y);
+          AssertCornerVertex(back, back.BoundingBoxMax.X, back.BoundingBoxMin.Y);
+      }
+
+    [Fact]
     public void Two_scoops_produce_cuts_on_both_anchor_walls()
     {
         var plan = ParseOk("""
@@ -506,5 +647,109 @@ public class ScoopTests
         var right = pieces.Single(p => p.Id == "trough.right");
         Assert.NotEmpty(left.InteriorCuts);
         Assert.NotEmpty(right.InteriorCuts);
+    }
+
+        private static void AssertCutsRespectEdgeClearance(BoxPlanCuttableShape piece, double minClearance)
+        {
+          var outlineSegments = GetLineSegments(piece.Outline);
+          foreach (var cut in piece.InteriorCuts)
+          {
+            var vertices = GetVertices(cut);
+            var samples = new List<Vec2>(vertices.Count * 2);
+            for (var i = 0; i < vertices.Count; i++)
+            {
+              var a = vertices[i];
+              var b = vertices[(i + 1) % vertices.Count];
+              samples.Add(a);
+              samples.Add(new Vec2((a.X + b.X) / 2.0, (a.Y + b.Y) / 2.0));
+            }
+
+            foreach (var sample in samples)
+            {
+              var distance = outlineSegments.Min(seg => DistancePointToSegment(sample, seg.Start, seg.End));
+              Assert.True(distance >= minClearance - 1e-6, $"Cut on {piece.Id} is only {distance:F3} mm from the outline.");
+            }
+          }
+        }
+
+    private static List<Vec2> GetVertices(CuttablePath path)
+    {
+        var vertices = new List<Vec2> { path.Start };
+        foreach (var segment in path.Segments)
+        {
+            Assert.IsType<LineSegment>(segment);
+            vertices.Add(((LineSegment)segment).To);
+        }
+
+        if (path.Closed && vertices.Count > 1 && NearlyEqual(vertices[^1], vertices[0]))
+            vertices.RemoveAt(vertices.Count - 1);
+
+        return vertices;
+    }
+
+    private static List<(Vec2 Start, Vec2 End)> GetLineSegments(CuttablePath path)
+    {
+        var vertices = GetVertices(path);
+        var segments = new List<(Vec2 Start, Vec2 End)>(vertices.Count);
+        for (var i = 0; i < vertices.Count; i++)
+        {
+            segments.Add((vertices[i], vertices[(i + 1) % vertices.Count]));
+        }
+
+        return segments;
+    }
+
+      private static List<(double Start, double End)> GetHorizontalIntervalsAtY(CuttablePath path, double y)
+      {
+        const double eps = 1e-6;
+        var intervals = GetLineSegments(path)
+          .Where(seg => Math.Abs(seg.Start.Y - seg.End.Y) <= eps && Math.Abs(seg.Start.Y - y) <= eps)
+          .Select(seg =>
+          {
+            var start = Math.Min(seg.Start.X, seg.End.X);
+            var end = Math.Max(seg.Start.X, seg.End.X);
+            return (Start: start, End: end);
+          })
+          .OrderBy(seg => seg.Start)
+          .ToList();
+
+        var merged = new List<(double Start, double End)>();
+        foreach (var interval in intervals)
+        {
+          if (merged.Count == 0 || interval.Start > merged[^1].End + eps)
+          {
+            merged.Add(interval);
+            continue;
+          }
+
+          merged[^1] = (merged[^1].Start, Math.Max(merged[^1].End, interval.End));
+        }
+
+        return merged;
+      }
+
+    private static bool NearlyEqual(Vec2 a, Vec2 b)
+        => Math.Abs(a.X - b.X) <= 1e-9 && Math.Abs(a.Y - b.Y) <= 1e-9;
+
+    private static void AssertCornerVertex(BoxPlanCuttableShape piece, double x, double y)
+    {
+      Assert.Contains(GetVertices(piece.Outline), v => Math.Abs(v.X - x) <= 1e-6 && Math.Abs(v.Y - y) <= 1e-6);
+    }
+
+    private static double DistancePointToSegment(Vec2 point, Vec2 start, Vec2 end)
+    {
+        var dx = end.X - start.X;
+        var dy = end.Y - start.Y;
+        var lenSq = dx * dx + dy * dy;
+        if (lenSq <= 1e-12)
+            return Math.Sqrt((point.X - start.X) * (point.X - start.X) + (point.Y - start.Y) * (point.Y - start.Y));
+
+        var t = ((point.X - start.X) * dx + (point.Y - start.Y) * dy) / lenSq;
+        t = Math.Max(0, Math.Min(1, t));
+        var projX = start.X + t * dx;
+        var projY = start.Y + t * dy;
+        var diffX = point.X - projX;
+        var diffY = point.Y - projY;
+        return Math.Sqrt(diffX * diffX + diffY * diffY);
     }
 }

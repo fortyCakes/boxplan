@@ -94,10 +94,7 @@ internal sealed class SvgGenerator
             {
                 sb.Append("<g id=\"").Append(Escape(placement.Shape.Id)).Append("\" transform=\"translate(")
                   .Append(F(settings.Margin + placement.X)).Append(' ').Append(F(settings.Margin + placement.Y)).Append(')');
-                if (placement.Rotated)
-                {
-                    sb.Append(" translate(").Append(F(Height(placement.Shape))).Append(" 0) rotate(90)");
-                }
+                AppendRotationTransform(sb, placement.Rotation, placement.Shape);
                 sb.Append("\">");
                 EmitPath(sb, placement.Shape.Outline, placement.Shape.BoundingBoxMin, OutlineColor);
                 foreach (var path in placement.Shape.InteriorCuts) EmitPath(sb, path, placement.Shape.BoundingBoxMin, InteriorColor);
@@ -147,11 +144,7 @@ internal sealed class SvgGenerator
         {
             sb.Append("<g id=\"").Append(Escape(placement.Shape.Id)).Append("\" transform=\"translate(")
                 .Append(F(settings.Margin + placement.X)).Append(' ').Append(F(settings.Margin + placement.Y)).Append(')');
-            if (placement.Rotated)
-            {
-                sb.Append(" translate(").Append(F(Height(placement.Shape))).Append(" 0) rotate(90)");
-            }
-
+            AppendRotationTransform(sb, placement.Rotation, placement.Shape);
             sb.Append("\">");
             EmitPath(sb, placement.Shape.Outline, placement.Shape.BoundingBoxMin, OutlineColor);
             foreach (var path in placement.Shape.InteriorCuts) EmitPath(sb, path, placement.Shape.BoundingBoxMin, InteriorColor);
@@ -197,7 +190,7 @@ internal sealed class SvgGenerator
             {
                 var advanced = new LayoutResult(
                     optimized.Items
-                    .Select(item => new ShapePlacement(item.Shape, item.PageIndex, item.X, item.Y, item.Rotated))
+                    .Select(item => new ShapePlacement(item.Shape, item.PageIndex, item.X, item.Y, item.Rotation))
                     .ToList(),
                     optimized.PageCount);
 
@@ -241,8 +234,8 @@ internal sealed class SvgGenerator
 
         foreach (var placement in layout.Items)
         {
-            var width = placement.Rotated ? Height(placement.Shape) : Width(placement.Shape);
-            var height = placement.Rotated ? Width(placement.Shape) : Height(placement.Shape);
+            var width = placement.Rotation is 90 or 270 ? Height(placement.Shape) : Width(placement.Shape);
+            var height = placement.Rotation is 90 or 270 ? Width(placement.Shape) : Height(placement.Shape);
 
             var right = placement.X + width;
             var top = placement.Y + height;
@@ -349,7 +342,7 @@ internal sealed class SvgGenerator
             .Where(fit => fit.Width <= usableWidth + 1e-6 && fit.Height <= usableHeight + 1e-6)
             .OrderBy(fit => fit.Width)
             .ThenByDescending(fit => fit.Height)
-            .ThenBy(fit => fit.Rotated)
+            .ThenBy(fit => fit.Rotation)
             .FirstOrDefault();
     }
 
@@ -359,7 +352,7 @@ internal sealed class SvgGenerator
             .Where(fit => fit.Height <= shelf.Height + 1e-6 && FitsOnShelf(fit.Width, shelf, usableWidth, spacing))
             .OrderBy(fit => fit.Width)
             .ThenBy(fit => fit.Height)
-            .ThenBy(fit => fit.Rotated)
+            .ThenBy(fit => fit.Rotation)
             .FirstOrDefault();
     }
 
@@ -369,17 +362,17 @@ internal sealed class SvgGenerator
             .Where(fit => CanCreateShelf(page, fit.Height, usableHeight, spacing))
             .OrderBy(fit => fit.Width)
             .ThenByDescending(fit => fit.Height)
-            .ThenBy(fit => fit.Rotated)
+            .ThenBy(fit => fit.Rotation)
             .FirstOrDefault();
     }
 
     private static IEnumerable<OrientationFit> EnumerateFits(IndexedShape item)
     {
-        yield return new OrientationFit(item.Width, item.Height, Rotated: false);
+        yield return new OrientationFit(item.Width, item.Height, Rotation: 0);
 
         if (Math.Abs(item.Width - item.Height) > 1e-6)
         {
-            yield return new OrientationFit(item.Height, item.Width, Rotated: true);
+            yield return new OrientationFit(item.Height, item.Width, Rotation: 90);
         }
     }
 
@@ -432,7 +425,7 @@ internal sealed class SvgGenerator
             x += spacing;
         }
 
-        placements.Add(new ShapePlacement(item.Shape, pageIndex, x, shelf.Y, fit.Rotated));
+        placements.Add(new ShapePlacement(item.Shape, pageIndex, x, shelf.Y, fit.Rotation));
         shelf.NextX = x + fit.Width;
         shelf.ItemCount++;
         page.UsedWidth = Math.Max(page.UsedWidth, shelf.NextX);
@@ -605,11 +598,27 @@ internal sealed class SvgGenerator
 
     private static string Escape(string s) => SecurityElement.Escape(s) ?? s;
 
+    private static void AppendRotationTransform(StringBuilder sb, int rotation, BoxPlanCuttableShape shape)
+    {
+        switch (rotation)
+        {
+            case 90:
+                sb.Append(" translate(").Append(F(Height(shape))).Append(" 0) rotate(90)");
+                break;
+            case 180:
+                sb.Append(" translate(").Append(F(Width(shape))).Append(' ').Append(F(Height(shape))).Append(") rotate(180)");
+                break;
+            case 270:
+                sb.Append(" translate(0 ").Append(F(Width(shape))).Append(") rotate(270)");
+                break;
+        }
+    }
+
     private sealed record IndexedShape(BoxPlanCuttableShape Shape, int Index, double Width, double Height);
 
-    private sealed record ShapePlacement(BoxPlanCuttableShape Shape, int PageIndex, double X, double Y, bool Rotated);
+    private sealed record ShapePlacement(BoxPlanCuttableShape Shape, int PageIndex, double X, double Y, int Rotation);
 
-    private sealed record OrientationFit(double Width, double Height, bool Rotated);
+    private sealed record OrientationFit(double Width, double Height, int Rotation);
 
     private sealed record LayoutResult(IReadOnlyList<ShapePlacement> Items, int PageCount);
 

@@ -5,6 +5,7 @@
         "ConvertTo-Json": true,
         "ForEach-Object": true,
         "dotnet build": true,
-        ".\\BoxPlanLib.Cli\\sample-plans\\triangular-tray.yml": true
+        ".\\BoxPlanLib.Cli\\sample-plans\\triangular-tray.yml": true,
+        "tee": true
     }
 }

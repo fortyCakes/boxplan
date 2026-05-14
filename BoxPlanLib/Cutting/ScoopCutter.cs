@@ -24,6 +24,8 @@ internal readonly record struct SmoothSegment(int EdgeIndex, double Start, doubl
 //   - Toes-meeting (combined inset == axis length) is not yet implemented.
 internal static class ScoopCutter
 {
+    private const double ObliqueNotchReliefFactor = 1.2;
+
     public static bool HasScoops(BoxShape box) => box.Scoops.Count > 0;
 
     // Returns smooth segments per face: edge regions where no finger joints or corner
@@ -117,7 +119,13 @@ internal static class ScoopCutter
     public static (
         IReadOnlyDictionary<FaceName, List<SlotSpec>> AxisAligned,
         IReadOnlyDictionary<FaceName, List<ObliqueSlotSpec>> Oblique)
-        CollectFaceSlots(BoxShape box, Vec3 dims, BoxPlanSettings settings)
+        CollectFaceSlots(
+            BoxShape box,
+            Vec3 dims,
+            BoxPlanSettings settings,
+            IReadOnlyDictionary<string, SharedEdge> edges,
+            IReadOnlySet<FaceName> openFaces,
+            IReadOnlyDictionary<FaceName, IReadOnlyList<SmoothSegment>> smoothEdges)
     {
         var axisAligned = new Dictionary<FaceName, List<SlotSpec>>();
         var oblique = new Dictionary<FaceName, List<ObliqueSlotSpec>>();
@@ -138,11 +146,13 @@ internal static class ScoopCutter
             foreach (var slot in BuildToeSlots(g, t, s))
                 AppendSlot(axisAligned, sc.Face, slot);
 
-            foreach (var obl in BuildCapObliques(g, t, s))
-            {
+            smoothEdges.TryGetValue(g.CapLow, out var capLowSmooth);
+            foreach (var obl in BuildCapObliques(g, g.CapLow, dims, t, s, edges, openFaces, capLowSmooth))
                 AppendOblique(oblique, g.CapLow, obl);
+
+            smoothEdges.TryGetValue(g.CapHigh, out var capHighSmooth);
+            foreach (var obl in BuildCapObliques(g, g.CapHigh, dims, t, s, edges, openFaces, capHighSmooth))
                 AppendOblique(oblique, g.CapHigh, obl);
-            }
         }
 
         return (axisAligned, oblique);
@@ -153,6 +163,9 @@ internal static class ScoopCutter
         BoxShape box,
         Vec3 dims,
         BoxPlanSettings settings,
+        IReadOnlyDictionary<string, SharedEdge> edges,
+        IReadOnlySet<FaceName> openFaces,
+        IReadOnlyDictionary<FaceName, IReadOnlyList<SmoothSegment>> smoothEdges,
         PipelineLogger? logger = null)
     {
         foreach (var sc in box.Scoops)
@@ -160,7 +173,7 @@ internal static class ScoopCutter
             EnsureSupportedHost(sc);
             var g = ScoopGeometry.Compute(sc, dims);
             var id = $"{shapeId}.scoop-{sc.Face.ToString().ToLowerInvariant()}-{sc.Edge.ToString().ToLowerInvariant()}";
-            yield return BuildScoopPanel(id, g, settings, logger);
+            yield return BuildScoopPanel(id, g, dims, settings, edges, openFaces, smoothEdges, logger);
         }
     }
 
@@ -213,9 +226,9 @@ internal static class ScoopCutter
     // by t/cos(theta) where cos(theta) = rise/slant.
     private static IReadOnlyList<SlotSpec> BuildHeelSlots(ScoopGeometry g, double t, double s)
     {
-        var effectiveT = t * g.Slant / g.Scoop.Rise - t / 2.0;
+        var effectiveT = t * g.Slant / g.Scoop.Rise * 1.5;
         return DividerJointBuilder.BuildFingerSlots(
-            g.EdgeAxisLength / 2.0, g.Scoop.Rise,
+            g.EdgeAxisLength / 2.0, g.Scoop.Rise - 0.5 * t,
             w: g.EdgeAxisLength, h: effectiveT,
             t, s, dividerOwnsPrimary: true);
     }
@@ -253,10 +266,18 @@ internal static class ScoopCutter
     // ── Cap oblique slots (cap panels) ────────────────────────────────────────
 
     // Both CapLow and CapHigh see the same local-coord diagonal, so the same specs
-    // are added to both faces. In cap face local coords the scoop runs from
+    // are measured from the same local-coord diagonal. In cap face local coords the scoop runs from
     // (0, rise) to (inset, 0) when EdgeAtHigh=false, or from (capU, rise) to
     // (capU-inset, 0) when EdgeAtHigh=true.
-    private static IReadOnlyList<ObliqueSlotSpec> BuildCapObliques(ScoopGeometry g, double t, double s)
+    private static IReadOnlyList<ObliqueSlotSpec> BuildCapObliques(
+        ScoopGeometry g,
+        FaceName face,
+        Vec3 dims,
+        double t,
+        double s,
+        IReadOnlyDictionary<string, SharedEdge> edges,
+        IReadOnlySet<FaceName> openFaces,
+        IReadOnlyList<SmoothSegment>? smoothSegments)
     {
         var inset = g.Scoop.Inset;
         var rise = g.Scoop.Rise;
@@ -266,23 +287,295 @@ internal static class ScoopCutter
         var dir = new Vec2(dirU, -rise / slant); // always pointing downward in V
         var perp = new Vec2(-dir.Y, dir.X);       // 90° CCW from dir
 
-        var centerU = g.EdgeAtHigh ? g.InsetAxisLength - inset / 2.0 : inset / 2.0;
-        var centerV = rise / 2.0;
-
-        var spans = DividerJointBuilder.BuildSpans(slant, t, s, joined: true, dividerOwnsPrimary: true);
+        var anchorPoint = new Vec2(g.EdgeAtHigh ? g.InsetAxisLength : 0.0, rise);
+        var spans = BuildCapJointSpans(g, face, dims, t, s, edges, openFaces, smoothSegments);
         var obliques = new List<ObliqueSlotSpec>();
         var cursor = 0.0;
         foreach (var span in spans)
         {
+            var spanStart = cursor;
+            var spanEnd = cursor + span.Length;
             if (span.Kind == DividerJointSpanKind.FaceSlot)
             {
-                var offset = cursor + span.Length / 2.0 - slant / 2.0;
-                var slotCenter = new Vec2(centerU + offset * dir.X, centerV + offset * dir.Y);
+                var centerDistance = spanStart + span.Length / 2.0;
+                var slotCenter = new Vec2(
+                    anchorPoint.X + centerDistance * dir.X,
+                    anchorPoint.Y + centerDistance * dir.Y);
                 obliques.Add(new ObliqueSlotSpec(slotCenter, dir, perp, span.Length, t));
             }
-            cursor += span.Length;
+            cursor = spanEnd;
         }
         return obliques;
+    }
+
+    private static IReadOnlyList<DividerJointSpan> BuildCapJointSpans(
+        ScoopGeometry g,
+        FaceName face,
+        Vec3 dims,
+        double t,
+        double s,
+        IReadOnlyDictionary<string, SharedEdge> edges,
+        IReadOnlySet<FaceName> openFaces,
+        IReadOnlyList<SmoothSegment>? smoothSegments)
+    {
+        var slant = g.Slant;
+        var inset = g.Scoop.Inset;
+        var rise = g.Scoop.Rise;
+        var dir = new Vec2(
+            g.EdgeAtHigh ? -inset / slant : inset / slant,
+            -rise / slant);
+        var anchorPoint = new Vec2(g.EdgeAtHigh ? g.InsetAxisLength : 0.0, rise);
+        var hostPoint = new Vec2(g.EdgeAtHigh ? g.InsetAxisLength - inset : inset, 0.0);
+
+        var anchorExcluded = ExcludedLengthFromFaceTab(
+            face,
+            g.Anchor,
+            anchorPoint,
+            dir,
+            dims,
+            t,
+            edges,
+            openFaces,
+            smoothSegments);
+        var hostExcluded = ExcludedLengthFromFaceTab(
+            face,
+            g.Scoop.Face,
+            hostPoint,
+            new Vec2(-dir.X, -dir.Y),
+            dims,
+            t,
+            edges,
+            openFaces,
+            smoothSegments);
+
+        var anchorHasTabs = EdgeHasFaceTabs(face, g.Anchor, edges, openFaces);
+        var hostHasTabs = EdgeHasFaceTabs(face, g.Scoop.Face, edges, openFaces);
+        if (anchorHasTabs)
+            anchorExcluded = Math.Max(anchorExcluded, ProjectedThicknessAlong(face, g.Anchor, dir, dims, t));
+        if (hostHasTabs)
+            hostExcluded = Math.Max(hostExcluded, ProjectedThicknessAlong(face, g.Scoop.Face, new Vec2(-dir.X, -dir.Y), dims, t));
+
+        if (!anchorHasTabs && !hostHasTabs)
+            return DividerJointBuilder.BuildSpans(slant, t, s, joined: true, dividerOwnsPrimary: true);
+
+        var usableLength = Math.Max(0, slant - anchorExcluded - hostExcluded);
+        if (usableLength <= 1e-9)
+            return [new DividerJointSpan(slant, DividerJointSpanKind.Smooth)];
+
+        var spans = new List<DividerJointSpan>();
+        AddSpan(spans, anchorExcluded, DividerJointSpanKind.EndInset);
+
+        var blocks = FingerJointPattern.Build(usableLength, s, t);
+        const bool dividerOwnsPrimary = false;
+        foreach (var block in blocks)
+        {
+            var dividerOwns = block.PrimaryOwns == dividerOwnsPrimary;
+            AddSpan(spans, block.Length, dividerOwns ? DividerJointSpanKind.FaceSlot : DividerJointSpanKind.DividerTab);
+        }
+
+        if (!spans.Any(span => span.Kind == DividerJointSpanKind.FaceSlot))
+            return [new DividerJointSpan(slant, DividerJointSpanKind.Smooth)];
+
+        AddSpan(spans, hostExcluded, DividerJointSpanKind.EndInset);
+        return spans;
+    }
+
+    private static bool EdgeHasFaceTabs(
+        FaceName face,
+        FaceName neighbor,
+        IReadOnlyDictionary<string, SharedEdge> edges,
+        IReadOnlySet<FaceName> openFaces)
+    {
+        if (openFaces.Contains(face) || openFaces.Contains(neighbor))
+            return false;
+
+        var edgeIndex = FindEdgeIndex(face, neighbor);
+        if (edgeIndex < 0)
+            return false;
+
+        var edgeMap = FaceLayout.EdgesCcw(face)[edgeIndex];
+        var shared = edges[SharedEdgeTable.Id(edgeMap.Face, edgeMap.Neighbor)];
+        return shared.Blocks.Any(block => block.Owner == face);
+    }
+
+    private static double ProjectedThicknessAlong(
+        FaceName face,
+        FaceName neighbor,
+        Vec2 inwardDir,
+        Vec3 dims,
+        double t)
+    {
+        var edgeIndex = FindEdgeIndex(face, neighbor);
+        if (edgeIndex < 0)
+            return 0;
+
+        var inwardRate = InwardDistanceRate(edgeIndex, inwardDir);
+        return inwardRate <= 1e-9 ? 0 : t / inwardRate;
+    }
+
+    private static void AddSpan(List<DividerJointSpan> spans, double length, DividerJointSpanKind kind)
+    {
+        if (length <= 1e-9)
+            return;
+
+        if (spans.Count > 0 && spans[^1].Kind == kind)
+        {
+            spans[^1] = spans[^1] with { Length = spans[^1].Length + length };
+            return;
+        }
+
+        spans.Add(new DividerJointSpan(length, kind));
+    }
+
+    private static double ExcludedLengthFromFaceTab(
+        FaceName face,
+        FaceName neighbor,
+        Vec2 edgePoint,
+        Vec2 inwardDir,
+        Vec3 dims,
+        double t,
+        IReadOnlyDictionary<string, SharedEdge> edges,
+        IReadOnlySet<FaceName> openFaces,
+        IReadOnlyList<SmoothSegment>? smoothSegments)
+    {
+        if (openFaces.Contains(face) || openFaces.Contains(neighbor))
+            return 0;
+
+        var edgeIndex = FindEdgeIndex(face, neighbor);
+        if (edgeIndex < 0)
+            return 0;
+
+        var (panelU, panelV) = FaceLayout.PanelSize(face, dims);
+        var edgeCoord = EdgeCoordinate(edgeIndex, edgePoint, panelU, panelV);
+        var tabSpan = FindFaceTabSpan(face, edgeIndex, edgeCoord, t, edges, smoothSegments);
+        if (tabSpan is null)
+            return 0;
+
+        var inwardRate = InwardDistanceRate(edgeIndex, inwardDir);
+        if (inwardRate <= 1e-9)
+            return 0;
+
+        var edgeRate = EdgeCoordinateRate(edgeIndex, inwardDir);
+        var edgeLimit = EdgeExitDistance(edgeCoord, edgeRate, tabSpan.Value.Start, tabSpan.Value.End);
+        var depthLimit = t / inwardRate;
+        return Math.Max(0, Math.Min(depthLimit, edgeLimit));
+    }
+
+    private static (double Start, double End)? FindFaceTabSpan(
+        FaceName face,
+        int edgeIndex,
+        double edgeCoord,
+        double t,
+        IReadOnlyDictionary<string, SharedEdge> edges,
+        IReadOnlyList<SmoothSegment>? smoothSegments)
+    {
+        const double eps = 1e-9;
+
+        var edgeMap = FaceLayout.EdgesCcw(face)[edgeIndex];
+        var shared = edges[SharedEdgeTable.Id(edgeMap.Face, edgeMap.Neighbor)];
+        var ordered = edgeMap.ForwardAlongShared
+            ? shared.Blocks
+            : shared.Blocks.Reverse().ToList();
+
+        var cursor = t;
+        foreach (var block in ordered)
+        {
+            var spanStart = cursor;
+            var spanEnd = cursor + block.Length;
+            cursor = spanEnd;
+
+            if (block.Owner != face)
+                continue;
+
+            var trimmed = TrimmedSpanContainingPoint(edgeIndex, spanStart, spanEnd, edgeCoord, smoothSegments);
+            if (trimmed is { } match)
+                return match;
+
+            if (edgeCoord < spanStart - eps)
+                break;
+        }
+
+        return null;
+    }
+
+    private static (double Start, double End)? TrimmedSpanContainingPoint(
+        int edgeIndex,
+        double start,
+        double end,
+        double point,
+        IReadOnlyList<SmoothSegment>? smoothSegments)
+    {
+        const double eps = 1e-9;
+
+        var cursor = start;
+        foreach (var smooth in (smoothSegments ?? Array.Empty<SmoothSegment>())
+            .Where(seg => seg.EdgeIndex == edgeIndex)
+            .OrderBy(seg => seg.Start))
+        {
+            if (smooth.End <= cursor + eps)
+                continue;
+            if (smooth.Start >= end - eps)
+                break;
+
+            var pieceEnd = Math.Min(end, smooth.Start);
+            if (point >= cursor - eps && point < pieceEnd - eps)
+                return (cursor, pieceEnd);
+
+            cursor = Math.Max(cursor, smooth.End);
+            if (cursor >= end - eps)
+                return null;
+        }
+
+        return point >= cursor - eps && point < end - eps ? (cursor, end) : null;
+    }
+
+    private static int FindEdgeIndex(FaceName face, FaceName neighbor)
+    {
+        var ccw = FaceLayout.EdgesCcw(face);
+        for (var i = 0; i < ccw.Length; i++)
+        {
+            if (ccw[i].Neighbor == neighbor)
+                return i;
+        }
+
+        return -1;
+    }
+
+    private static double EdgeCoordinate(int edgeIndex, Vec2 point, double panelU, double panelV) => edgeIndex switch
+    {
+        0 => point.X,
+        1 => point.Y,
+        2 => panelU - point.X,
+        3 => panelV - point.Y,
+        _ => throw new InvalidOperationException(),
+    };
+
+    private static double EdgeCoordinateRate(int edgeIndex, Vec2 dir) => edgeIndex switch
+    {
+        0 => dir.X,
+        1 => dir.Y,
+        2 => -dir.X,
+        3 => -dir.Y,
+        _ => throw new InvalidOperationException(),
+    };
+
+    private static double InwardDistanceRate(int edgeIndex, Vec2 dir) => edgeIndex switch
+    {
+        0 => dir.Y,
+        1 => -dir.X,
+        2 => -dir.Y,
+        3 => dir.X,
+        _ => throw new InvalidOperationException(),
+    };
+
+    private static double EdgeExitDistance(double point, double rate, double start, double end)
+    {
+        if (Math.Abs(rate) <= 1e-9)
+            return double.PositiveInfinity;
+
+        return rate > 0
+            ? Math.Max(0, (end - point) / rate)
+            : Math.Max(0, (point - start) / -rate);
     }
 
     // ── Scoop panel construction ──────────────────────────────────────────────
@@ -290,7 +583,11 @@ internal static class ScoopCutter
     private static BoxPlanCuttableShape BuildScoopPanel(
         string id,
         ScoopGeometry g,
+        Vec3 dims,
         BoxPlanSettings settings,
+        IReadOnlyDictionary<string, SharedEdge> edges,
+        IReadOnlySet<FaceName> openFaces,
+        IReadOnlyDictionary<FaceName, IReadOnlyList<SmoothSegment>> smoothEdges,
         PipelineLogger? logger)
     {
         logger?.Log($"[scoop] Building scoop panel {id} slant={g.Slant:F3} edge={g.EdgeAxisLength:F3}");
@@ -303,11 +600,15 @@ internal static class ScoopCutter
         // Edge 1 (U=slant, Toe):        joint with host face; meets at oblique angle
         // Edge 2 (V=edgeAxis, CapHigh): joint with CapHigh cap panel, spanning slant
         // Edge 3 (U=0, Heel):           joint with anchor wall; meets at oblique angle
-        var toeT  = t * g.Slant / g.Scoop.Inset;
-        var heelT = t * g.Slant / g.Scoop.Rise;
-        SubtractDividerEdge(builder, 0, g.Slant,          t,     t, s);
+        var toeT  = WithObliqueNotchRelief(t * g.Slant / g.Scoop.Inset);
+        var heelT = WithObliqueNotchRelief(t * g.Slant / g.Scoop.Rise);
+        smoothEdges.TryGetValue(g.CapLow, out var capLowSmooth);
+        var capLowSpans = BuildCapJointSpans(g, g.CapLow, dims, t, s, edges, openFaces, capLowSmooth);
+        SubtractDividerEdge(builder, 0, capLowSpans,       t,     t);
         SubtractDividerEdge(builder, 1, g.EdgeAxisLength, toeT,  t, s);
-        SubtractDividerEdge(builder, 2, g.Slant,          t,     t, s);
+        smoothEdges.TryGetValue(g.CapHigh, out var capHighSmooth);
+        var capHighSpans = BuildCapJointSpans(g, g.CapHigh, dims, t, s, edges, openFaces, capHighSmooth);
+        SubtractDividerEdge(builder, 2, capHighSpans,      t,     t);
         SubtractDividerEdge(builder, 3, g.EdgeAxisLength, heelT, t, s);
 
         var polygon = builder.Build();
@@ -324,22 +625,30 @@ internal static class ScoopCutter
         };
     }
 
-    // tabDepth: how deep to cut the DividerTab notches (= t for straight joints,
+    // tabDepth: how deep to cut the edge recesses (= t for straight joints,
     //           effectiveT for oblique joints where the mating panel is angled).
-    // patternT: t used for end-inset sizing and finger spacing — always the raw
-    //           material thickness so corners stay consistent across the panel.
+    // patternT: raw material thickness used only for span sizing and spacing.
     private static void SubtractDividerEdge(
         PanelShapeBuilder builder, int edgeIndex, double length,
         double tabDepth, double patternT, double s)
     {
         var spans = DividerJointBuilder.BuildSpans(length, patternT, s, joined: true, dividerOwnsPrimary: true);
+        SubtractDividerEdge(builder, edgeIndex, spans, tabDepth, patternT);
+    }
+
+    private static void SubtractDividerEdge(
+        PanelShapeBuilder builder,
+        int edgeIndex,
+        IReadOnlyList<DividerJointSpan> spans,
+        double tabDepth,
+        double patternT)
+    {
         var cursor = 0.0;
         foreach (var span in spans)
         {
             if (span.Kind is DividerJointSpanKind.DividerTab or DividerJointSpanKind.EndInset)
             {
-                var depth = span.Kind == DividerJointSpanKind.EndInset ? patternT : tabDepth;
-                builder.SubtractEdgeNotch(edgeIndex, cursor, span.Length, depth);
+                builder.SubtractEdgeNotch(edgeIndex, cursor, span.Length, tabDepth);
             }
             cursor += span.Length;
         }
@@ -351,6 +660,9 @@ internal static class ScoopCutter
             dict[face] = list = new List<SlotSpec>();
         list.Add(slot);
     }
+
+    private static double WithObliqueNotchRelief(double projectedDepth)
+        => projectedDepth * ObliqueNotchReliefFactor;
 
     private static void AppendOblique(Dictionary<FaceName, List<ObliqueSlotSpec>> dict, FaceName face, ObliqueSlotSpec obl)
     {

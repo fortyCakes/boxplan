@@ -312,9 +312,9 @@ public sealed class CuttingPipeline
         ScoopCutter.Validate(box, dims, settings);
         var scoopShrink = ScoopCutter.HostShrinkByEdge(box, dims, settings.MaterialThickness);
         var scoopSmoothEdges = ScoopCutter.CollectSmoothEdges(box, dims, settings.MaterialThickness);
-        var (scoopAxisSlots, scoopObliqueSlots) = ScoopCutter.CollectFaceSlots(box, dims, settings);
         var edges = SharedEdgeTable.Build(dims, settings, logger);
         var openFaces = box.Faces.Where(f => f.Type == FaceType.Open).Select(f => f.Name).ToHashSet();
+        var (scoopAxisSlots, scoopObliqueSlots) = ScoopCutter.CollectFaceSlots(box, dims, settings, edges, openFaces, scoopSmoothEdges);
         var slotsByFace = BuildSlotsByFace(box.Dividers, dims, settings.MaterialThickness, settings.FingerJointSize);
 
         foreach (var face in box.Faces)
@@ -325,13 +325,12 @@ public sealed class CuttingPipeline
             var extraSlots = scoopAxisSlots.TryGetValue(face.Name, out var ss) ? ss : null;
             var allSlots = extraSlots is null ? dividerSlots : dividerSlots.Concat(extraSlots).ToArray();
             var obliqueSlots = scoopObliqueSlots.TryGetValue(face.Name, out var os) ? os : null;
-            scoopShrink.TryGetValue(face.Name, out var hostShrink);
             scoopSmoothEdges.TryGetValue(face.Name, out var smoothSegments);
-            output.Add(BuildFacePiece(idPrefix, face.Name, dims, edges, openFaces, faceFeatures, allSlots, hostShrink, smoothSegments, obliqueSlots, settings, logger));
+            output.Add(BuildFacePiece(idPrefix, face.Name, dims, edges, openFaces, faceFeatures, allSlots, scoopShrink, smoothSegments, obliqueSlots, settings, logger));
         }
 
         EmitDividerPanels(idPrefix, box, dims, openFaces, output, settings, logger);
-        output.AddRange(ScoopCutter.BuildScoopPanels(idPrefix, box, dims, settings, logger));
+        output.AddRange(ScoopCutter.BuildScoopPanels(idPrefix, box, dims, settings, edges, openFaces, scoopSmoothEdges, logger));
     }
 
     private static IReadOnlyDictionary<FaceName, IReadOnlyList<SlotSpec>> BuildSlotsByFace(
@@ -413,15 +412,61 @@ public sealed class CuttingPipeline
     private static IReadOnlyList<SlotSpec> BuildFingerSlots(double u, double v, double w, double h, double t, double s, bool dividerOwnsPrimary)
         => DividerJointBuilder.BuildFingerSlots(u, v, w, h, t, s, dividerOwnsPrimary);
 
-    // True when `face` is the lowest-priority of the present faces meeting at this
-    // panel corner. Open neighbors are treated as absent — they don't contribute a
-    // panel and therefore can't claim the corner cube.
-    private static bool OwnsCorner(FaceName face, FaceName neighborPrev, FaceName neighborNext, IReadOnlySet<FaceName> openFaces)
+    // True when `face` is the lowest-priority face that still reaches this 3D corner.
+    // Open neighbors and faces trimmed away from the corner by scoop host shrink are
+    // treated as absent.
+    private static bool OwnsCorner(
+        FaceName face,
+        FaceName neighborPrev,
+        FaceName neighborNext,
+        IReadOnlySet<FaceName> openFaces,
+        IReadOnlyDictionary<FaceName, double[]> hostShrinkByFace)
     {
+        if (!FaceReachesCorner(face, neighborPrev, neighborNext, hostShrinkByFace))
+            return false;
+
         var p = FacePriority.Of(face);
-        if (!openFaces.Contains(neighborPrev) && FacePriority.Of(neighborPrev) < p) return false;
-        if (!openFaces.Contains(neighborNext) && FacePriority.Of(neighborNext) < p) return false;
+        if (!openFaces.Contains(neighborPrev)
+            && FaceReachesCorner(neighborPrev, neighborNext, face, hostShrinkByFace)
+            && FacePriority.Of(neighborPrev) < p)
+            return false;
+
+        if (!openFaces.Contains(neighborNext)
+            && FaceReachesCorner(neighborNext, face, neighborPrev, hostShrinkByFace)
+            && FacePriority.Of(neighborNext) < p)
+            return false;
+
         return true;
+    }
+
+    private static bool FaceReachesCorner(
+        FaceName face,
+        FaceName adjacentA,
+        FaceName adjacentB,
+        IReadOnlyDictionary<FaceName, double[]> hostShrinkByFace)
+    {
+        if (!hostShrinkByFace.TryGetValue(face, out var shrink))
+            return true;
+
+        var cornerIndex = FindCornerIndex(face, adjacentA, adjacentB);
+        var prevEdgeIndex = (cornerIndex + 3) % 4;
+        return shrink[prevEdgeIndex] <= 0 && shrink[cornerIndex] <= 0;
+    }
+
+    private static int FindCornerIndex(FaceName face, FaceName adjacentA, FaceName adjacentB)
+    {
+        var ccw = FaceLayout.EdgesCcw(face);
+        for (var i = 0; i < 4; i++)
+        {
+            var prevNeighbor = ccw[(i + 3) % 4].Neighbor;
+            var nextNeighbor = ccw[i].Neighbor;
+            if ((prevNeighbor == adjacentA && nextNeighbor == adjacentB)
+                || (prevNeighbor == adjacentB && nextNeighbor == adjacentA))
+                return i;
+        }
+
+        throw new InvalidOperationException(
+            $"Faces '{adjacentA}' and '{adjacentB}' do not meet at a corner of face '{face}'.");
     }
 
     private static bool InSmooth(IReadOnlyList<SmoothSegment>? segs, int edgeIndex, double start, double end)
@@ -440,7 +485,7 @@ public sealed class CuttingPipeline
         IReadOnlySet<FaceName> openFaces,
         IReadOnlyList<Feature> features,
         IEnumerable<SlotSpec> slots,
-        double[]? hostShrink,
+        IReadOnlyDictionary<FaceName, double[]> hostShrinkByFace,
         IReadOnlyList<SmoothSegment>? smoothSegments,
         IReadOnlyList<ObliqueSlotSpec>? obliqueSlots,
         BoxPlanSettings settings,
@@ -457,7 +502,7 @@ public sealed class CuttingPipeline
         {
             var prevNeighbor = ccw[(i + 3) % 4].Neighbor;
             var nextNeighbor = ccw[i].Neighbor;
-            cornerOwned[i] = OwnsCorner(face, prevNeighbor, nextNeighbor, openFaces);
+            cornerOwned[i] = OwnsCorner(face, prevNeighbor, nextNeighbor, openFaces, hostShrinkByFace);
         }
 
         var builder = new PanelShapeBuilder(panelU, panelV, logger);
@@ -465,7 +510,7 @@ public sealed class CuttingPipeline
         // Scoop shrink: remove a full-edge strip on each scooped edge so the host
         // face panel is reduced to fit between the scoop toe lines. Joinery on the
         // new edge (toe joint to the scoop) is not generated in Phase 1.
-        if (hostShrink is not null)
+        if (hostShrinkByFace.TryGetValue(face, out var hostShrink))
         {
             for (var i = 0; i < 4; i++)
             {
