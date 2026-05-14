@@ -5,6 +5,10 @@ namespace BoxPlanLib.Cutting;
 
 public sealed class CuttingPipeline
 {
+    private const double Eps = 1e-9;
+
+    private readonly record struct AxisAlignedRect(double MinU, double MinV, double MaxU, double MaxV);
+
     public BoxPlanCuttableShape[] Run(BoxPlan plan, BoxPlanSettings settings)
     {
         var logger = new PipelineLogger(settings.Debug);
@@ -108,12 +112,14 @@ public sealed class CuttingPipeline
                 var (panelU, panelV) = DividerPanelSize(dset.Axis, dims, dset.Facing, t);
                 var edges = BuildDividerEdges(dset.Axis, dset.Facing, openFaces);
                 var dividerSlots = BuildDividerAssemblySlots(dset.Axis, parent.Dividers, panelV, t, settings.Kerf);
+                var scoopClips = BuildDividerScoopClipPolygons(dset.Axis, pos, dims, dset.Facing, parent.Scoops, t);
                 output.Add(BuildDividerPanel(
                     $"{parentId}.divider-{dset.Axis.ToString().ToLowerInvariant()}@{pos}",
                     panelU,
                     panelV,
                     edges,
                     dividerSlots,
+                    scoopClips,
                     settings,
                     logger));
             }
@@ -144,6 +150,49 @@ public sealed class CuttingPipeline
         return (uExt, vExt);
     }
 
+    private static (double Center, double Length) DividerSpan(
+        double fullLength,
+        FaceName? facingFace,
+        FaceName lowFace,
+        FaceName highFace,
+        double thickness)
+    {
+        if (facingFace == lowFace)
+        {
+            return ((fullLength - thickness) / 2.0, fullLength - thickness);
+        }
+
+        if (facingFace == highFace)
+        {
+            return ((fullLength + thickness) / 2.0, fullLength - thickness);
+        }
+
+        return (fullLength / 2.0, fullLength);
+    }
+
+    private static (double U, double V) DividerPanelStart(Axis axis, Vec3 dims, FaceName? facing, double t)
+    {
+        return axis switch
+        {
+            Axis.X =>
+                (DividerSpan(dims.Y, facing, FaceName.Bottom, FaceName.Top, t).Center
+                    - DividerSpan(dims.Y, facing, FaceName.Bottom, FaceName.Top, t).Length / 2.0,
+                 DividerSpan(dims.Z, facing, FaceName.Front, FaceName.Back, t).Center
+                    - DividerSpan(dims.Z, facing, FaceName.Front, FaceName.Back, t).Length / 2.0),
+            Axis.Y =>
+                (DividerSpan(dims.X, facing, FaceName.Left, FaceName.Right, t).Center
+                    - DividerSpan(dims.X, facing, FaceName.Left, FaceName.Right, t).Length / 2.0,
+                 DividerSpan(dims.Z, facing, FaceName.Front, FaceName.Back, t).Center
+                    - DividerSpan(dims.Z, facing, FaceName.Front, FaceName.Back, t).Length / 2.0),
+            Axis.Z =>
+                (DividerSpan(dims.X, facing, FaceName.Left, FaceName.Right, t).Center
+                    - DividerSpan(dims.X, facing, FaceName.Left, FaceName.Right, t).Length / 2.0,
+                 DividerSpan(dims.Y, facing, FaceName.Bottom, FaceName.Top, t).Center
+                    - DividerSpan(dims.Y, facing, FaceName.Bottom, FaceName.Top, t).Length / 2.0),
+            _ => (0.0, 0.0),
+        };
+    }
+
     private static DividerEdgeSpec[] BuildDividerEdges(Axis axis, FaceName? facing, IReadOnlySet<FaceName> openFaces)
     {
         var faces = axis switch
@@ -165,6 +214,7 @@ public sealed class CuttingPipeline
         double v,
         IReadOnlyList<DividerEdgeSpec> edges,
         IReadOnlyList<SlotSpec> dividerSlots,
+        IReadOnlyList<IReadOnlyList<Vec2>> scoopClips,
         BoxPlanSettings settings,
         PipelineLogger? logger = null)
     {
@@ -196,9 +246,19 @@ public sealed class CuttingPipeline
         }
 
         var polygon = builder.Build();
+        if (scoopClips.Count > 0)
+        {
+            var polygonBuilder = new PolygonPanelShapeBuilder(polygon, logger);
+            foreach (var scoopClip in scoopClips)
+            {
+                polygonBuilder.SubtractPolygon(scoopClip);
+            }
+            polygon = polygonBuilder.Build();
+        }
+
         var (path, bbMin, bbMax, translation) = KerfOffset.OffsetOutwardAndTranslate(polygon, settings.Kerf, logger);
         var interiorCuts = dividerSlots
-            .Select(slot => CutoutBuilder.BuildSlotRectangle(slot, settings.Kerf, translation, logger))
+            .SelectMany(slot => CutoutClipper.ClipToOutline(CutoutBuilder.BuildSlotRectangle(slot, settings.Kerf, translation, logger), path, logger))
             .ToArray();
         return new BoxPlanCuttableShape
         {
@@ -237,6 +297,315 @@ public sealed class CuttingPipeline
             logger?.Log(
                 $"[divider-joint] {id} edge={edges[index].Face} tabs=[{string.Join(", ", tabSizes)}] slots=[{string.Join(", ", slotSizes)}]");
         }
+    }
+
+    private static IReadOnlyList<IReadOnlyList<Vec2>> BuildDividerScoopClipPolygons(
+        Axis dividerAxis,
+        double dividerPos,
+        Vec3 dims,
+        FaceName? facing,
+        IReadOnlyList<Scoop> scoops,
+        double t)
+    {
+        var clips = new List<IReadOnlyList<Vec2>>();
+        var start = DividerPanelStart(dividerAxis, dims, facing, t);
+
+        foreach (var scoop in scoops)
+        {
+            if (scoop.Face != FaceName.Bottom) continue;
+
+            var section = BuildScoopSectionPolygon(scoop, t);
+            switch (dividerAxis)
+            {
+                case Axis.Z:
+                    switch (scoop.Edge)
+                    {
+                        case FaceName.Left:
+                            clips.Add(TranslatePolygon(section.Select(p => new Vec2(p.X, p.Y)), start));
+                            break;
+                        case FaceName.Right:
+                            clips.Add(TranslatePolygon(section.Select(p => new Vec2(dims.X - p.X, p.Y)), start));
+                            break;
+                        case FaceName.Front:
+                            AppendRectClip(clips, IntersectPolygonWithVerticalLine(section, dividerPos), 0.0, dims.X, start);
+                            break;
+                        case FaceName.Back:
+                            AppendRectClip(clips, IntersectPolygonWithVerticalLine(section, dims.Z - dividerPos), 0.0, dims.X, start);
+                            break;
+                    }
+                    break;
+                case Axis.X:
+                    switch (scoop.Edge)
+                    {
+                        case FaceName.Front:
+                            clips.Add(TranslatePolygon(section.Select(p => new Vec2(p.Y, p.X)), start));
+                            break;
+                        case FaceName.Back:
+                            clips.Add(TranslatePolygon(section.Select(p => new Vec2(p.Y, dims.Z - p.X)), start));
+                            break;
+                        case FaceName.Left:
+                            AppendRectClip(clips, IntersectPolygonWithVerticalLine(section, dividerPos), 0.0, dims.Z, start, swapAxes: true);
+                            break;
+                        case FaceName.Right:
+                            AppendRectClip(clips, IntersectPolygonWithVerticalLine(section, dims.X - dividerPos), 0.0, dims.Z, start, swapAxes: true);
+                            break;
+                    }
+                    break;
+                case Axis.Y:
+                    switch (scoop.Edge)
+                    {
+                        case FaceName.Left:
+                            AppendHorizontalClip(clips, IntersectPolygonWithHorizontalLine(section, dividerPos), 0.0, dims.Z, start, mirrorHighAxis: false);
+                            break;
+                        case FaceName.Right:
+                            AppendHorizontalClip(clips, IntersectPolygonWithHorizontalLine(section, dividerPos), 0.0, dims.Z, start, mirrorHighAxis: true, highAxisExtent: dims.X);
+                            break;
+                        case FaceName.Front:
+                            AppendVerticalBandClip(clips, IntersectPolygonWithHorizontalLine(section, dividerPos), 0.0, dims.X, start, bandAlongV: true);
+                            break;
+                        case FaceName.Back:
+                            AppendVerticalBandClip(clips, IntersectPolygonWithHorizontalLine(section, dividerPos), 0.0, dims.X, start, bandAlongV: true, mirrorHighAxis: true, highAxisExtent: dims.Z);
+                            break;
+                    }
+                    break;
+            }
+        }
+
+        return clips;
+    }
+
+    private static IReadOnlyDictionary<FaceName, IReadOnlyList<AxisAlignedRect>> BuildScoopFaceSlotExclusions(
+        BoxShape box,
+        Vec3 dims,
+        double t)
+    {
+        var exclusions = new Dictionary<FaceName, List<AxisAlignedRect>>();
+        foreach (var scoop in box.Scoops)
+        {
+            if (scoop.Face != FaceName.Bottom) continue;
+
+            var section = BuildScoopSectionPolygon(scoop, t);
+            var toe = IntersectPolygonWithHorizontalLine(section, 0.0);
+            var heel = IntersectPolygonWithVerticalLine(section, 0.0);
+
+            switch (scoop.Edge)
+            {
+                case FaceName.Left:
+                    AppendFaceExclusion(exclusions, FaceName.Bottom, toe, 0.0, dims.Z);
+                    AppendFaceExclusion(exclusions, FaceName.Left, heel, 0.0, dims.Z, intervalOnV: true);
+                    break;
+                case FaceName.Right:
+                    AppendFaceExclusion(exclusions, FaceName.Bottom, MirrorInterval(toe, dims.X), 0.0, dims.Z);
+                    AppendFaceExclusion(exclusions, FaceName.Right, heel, 0.0, dims.Z, intervalOnV: true);
+                    break;
+                case FaceName.Front:
+                    AppendFaceExclusion(exclusions, FaceName.Bottom, toe, 0.0, dims.X, intervalOnV: true);
+                    AppendFaceExclusion(exclusions, FaceName.Front, heel, 0.0, dims.X, intervalOnV: true);
+                    break;
+                case FaceName.Back:
+                    AppendFaceExclusion(exclusions, FaceName.Bottom, MirrorInterval(toe, dims.Z), 0.0, dims.X, intervalOnV: true);
+                    AppendFaceExclusion(exclusions, FaceName.Back, heel, 0.0, dims.X, intervalOnV: true);
+                    break;
+            }
+        }
+
+        return exclusions.ToDictionary(kv => kv.Key, kv => (IReadOnlyList<AxisAlignedRect>)kv.Value);
+    }
+
+    private static IReadOnlyList<Vec2> BuildScoopSectionPolygon(Scoop scoop, double t)
+    {
+        var slant = Math.Sqrt(scoop.Inset * scoop.Inset + scoop.Rise * scoop.Rise);
+        var toeDepth = t * slant / scoop.Inset;
+        var toeStart = scoop.Inset - t;
+        var toeEnd = toeStart + toeDepth;
+        var heelDepth = t * slant / scoop.Rise * 1.5;
+        var heelStart = scoop.Rise - 0.5 * t - heelDepth / 2.0;
+        var heelEnd = heelStart + heelDepth;
+
+        return NormalizePolygon(new[]
+        {
+            new Vec2(0.0, heelStart),
+            new Vec2(0.0, heelEnd),
+            new Vec2(toeEnd, 0.0),
+            new Vec2(toeStart, 0.0),
+        });
+    }
+
+    private static IReadOnlyList<Vec2> TranslatePolygon(IEnumerable<Vec2> polygon, (double U, double V) start)
+        => NormalizePolygon(polygon.Select(p => new Vec2(p.X - start.U, p.Y - start.V)).ToArray());
+
+    private static IReadOnlyList<Vec2> NormalizePolygon(IReadOnlyList<Vec2> polygon)
+    {
+        if (polygon.Count < 3) return polygon;
+        return SignedArea(polygon) >= 0 ? polygon : polygon.Reverse().ToArray();
+    }
+
+    private static double SignedArea(IReadOnlyList<Vec2> polygon)
+    {
+        var area = 0.0;
+        for (var i = 0; i < polygon.Count; i++)
+        {
+            var a = polygon[i];
+            var b = polygon[(i + 1) % polygon.Count];
+            area += a.X * b.Y - b.X * a.Y;
+        }
+
+        return area / 2.0;
+    }
+
+    private static (double Min, double Max)? IntersectPolygonWithVerticalLine(IReadOnlyList<Vec2> polygon, double x)
+    {
+        var hits = new List<double>();
+        for (var i = 0; i < polygon.Count; i++)
+        {
+            var a = polygon[i];
+            var b = polygon[(i + 1) % polygon.Count];
+            if (Math.Abs(a.X - b.X) <= Eps)
+            {
+                if (Math.Abs(x - a.X) <= Eps)
+                {
+                    hits.Add(a.Y);
+                    hits.Add(b.Y);
+                }
+                continue;
+            }
+
+            var minX = Math.Min(a.X, b.X) - Eps;
+            var maxX = Math.Max(a.X, b.X) + Eps;
+            if (x < minX || x > maxX) continue;
+
+            var t = (x - a.X) / (b.X - a.X);
+            if (t < -Eps || t > 1 + Eps) continue;
+            hits.Add(a.Y + (b.Y - a.Y) * t);
+        }
+
+        return NormalizeHits(hits);
+    }
+
+    private static (double Min, double Max)? IntersectPolygonWithHorizontalLine(IReadOnlyList<Vec2> polygon, double y)
+    {
+        var hits = new List<double>();
+        for (var i = 0; i < polygon.Count; i++)
+        {
+            var a = polygon[i];
+            var b = polygon[(i + 1) % polygon.Count];
+            if (Math.Abs(a.Y - b.Y) <= Eps)
+            {
+                if (Math.Abs(y - a.Y) <= Eps)
+                {
+                    hits.Add(a.X);
+                    hits.Add(b.X);
+                }
+                continue;
+            }
+
+            var minY = Math.Min(a.Y, b.Y) - Eps;
+            var maxY = Math.Max(a.Y, b.Y) + Eps;
+            if (y < minY || y > maxY) continue;
+
+            var t = (y - a.Y) / (b.Y - a.Y);
+            if (t < -Eps || t > 1 + Eps) continue;
+            hits.Add(a.X + (b.X - a.X) * t);
+        }
+
+        return NormalizeHits(hits);
+    }
+
+    private static (double Min, double Max)? NormalizeHits(List<double> hits)
+    {
+        if (hits.Count == 0) return null;
+
+        hits.Sort();
+        var unique = new List<double>();
+        foreach (var hit in hits)
+        {
+            if (unique.Count == 0 || Math.Abs(hit - unique[^1]) > 1e-6)
+            {
+                unique.Add(hit);
+            }
+        }
+
+        return unique.Count >= 2 ? (unique.First(), unique.Last()) : null;
+    }
+
+    private static (double Min, double Max)? MirrorInterval((double Min, double Max)? interval, double extent)
+        => interval is { } value ? (extent - value.Max, extent - value.Min) : null;
+
+    private static void AppendRectClip(
+        List<IReadOnlyList<Vec2>> clips,
+        (double Min, double Max)? interval,
+        double fixedMin,
+        double fixedMax,
+        (double U, double V) start,
+        bool swapAxes = false)
+    {
+        if (interval is not { } yRange || yRange.Max - yRange.Min <= Eps) return;
+        var polygon = swapAxes
+            ? RectPolygon(yRange.Min, fixedMin, yRange.Max, fixedMax)
+            : RectPolygon(fixedMin, yRange.Min, fixedMax, yRange.Max);
+        clips.Add(TranslatePolygon(polygon, start));
+    }
+
+    private static void AppendHorizontalClip(
+        List<IReadOnlyList<Vec2>> clips,
+        (double Min, double Max)? interval,
+        double fixedMin,
+        double fixedMax,
+        (double U, double V) start,
+        bool mirrorHighAxis,
+        double highAxisExtent = 0.0)
+    {
+        if (interval is not { } value || value.Max - value.Min <= Eps) return;
+        var uMin = mirrorHighAxis ? highAxisExtent - value.Max : value.Min;
+        var uMax = mirrorHighAxis ? highAxisExtent - value.Min : value.Max;
+        clips.Add(TranslatePolygon(RectPolygon(uMin, fixedMin, uMax, fixedMax), start));
+    }
+
+    private static void AppendVerticalBandClip(
+        List<IReadOnlyList<Vec2>> clips,
+        (double Min, double Max)? interval,
+        double fixedMin,
+        double fixedMax,
+        (double U, double V) start,
+        bool bandAlongV,
+        bool mirrorHighAxis = false,
+        double highAxisExtent = 0.0)
+    {
+        if (interval is not { } value || value.Max - value.Min <= Eps) return;
+        var vMin = mirrorHighAxis ? highAxisExtent - value.Max : value.Min;
+        var vMax = mirrorHighAxis ? highAxisExtent - value.Min : value.Max;
+        var polygon = bandAlongV
+            ? RectPolygon(fixedMin, vMin, fixedMax, vMax)
+            : RectPolygon(vMin, fixedMin, vMax, fixedMax);
+        clips.Add(TranslatePolygon(polygon, start));
+    }
+
+    private static IReadOnlyList<Vec2> RectPolygon(double minU, double minV, double maxU, double maxV)
+        => new[]
+        {
+            new Vec2(minU, minV),
+            new Vec2(maxU, minV),
+            new Vec2(maxU, maxV),
+            new Vec2(minU, maxV),
+        };
+
+    private static void AppendFaceExclusion(
+        Dictionary<FaceName, List<AxisAlignedRect>> exclusions,
+        FaceName face,
+        (double Min, double Max)? interval,
+        double fixedMin,
+        double fixedMax,
+        bool intervalOnV = false)
+    {
+        if (interval is not { } value || value.Max - value.Min <= Eps) return;
+        var rect = intervalOnV
+            ? new AxisAlignedRect(fixedMin, value.Min, fixedMax, value.Max)
+            : new AxisAlignedRect(value.Min, fixedMin, value.Max, fixedMax);
+        if (!exclusions.TryGetValue(face, out var list))
+        {
+            exclusions[face] = list = new List<AxisAlignedRect>();
+        }
+        list.Add(rect);
     }
 
     private static IReadOnlyList<SlotSpec> BuildDividerAssemblySlots(
@@ -316,6 +685,7 @@ public sealed class CuttingPipeline
         var openFaces = box.Faces.Where(f => f.Type == FaceType.Open).Select(f => f.Name).ToHashSet();
         var (scoopAxisSlots, scoopObliqueSlots) = ScoopCutter.CollectFaceSlots(box, dims, settings, edges, openFaces, scoopSmoothEdges);
         var slotsByFace = BuildSlotsByFace(box.Dividers, dims, settings.MaterialThickness, settings.FingerJointSize);
+        var scoopFaceSlotExclusions = BuildScoopFaceSlotExclusions(box, dims, settings.MaterialThickness);
 
         foreach (var face in box.Faces)
         {
@@ -323,10 +693,23 @@ public sealed class CuttingPipeline
             var faceFeatures = box.Features.Where(f => f.Face == face.Name).ToArray();
             var dividerSlots = slotsByFace.TryGetValue(face.Name, out var ds) ? ds : Array.Empty<SlotSpec>();
             var extraSlots = scoopAxisSlots.TryGetValue(face.Name, out var ss) ? ss : null;
-            var allSlots = extraSlots is null ? dividerSlots : dividerSlots.Concat(extraSlots).ToArray();
             var obliqueSlots = scoopObliqueSlots.TryGetValue(face.Name, out var os) ? os : null;
             scoopSmoothEdges.TryGetValue(face.Name, out var smoothSegments);
-            output.Add(BuildFacePiece(idPrefix, face.Name, dims, edges, openFaces, faceFeatures, allSlots, scoopShrink, smoothSegments, obliqueSlots, settings, logger));
+            output.Add(BuildFacePiece(
+                idPrefix,
+                face.Name,
+                dims,
+                edges,
+                openFaces,
+                faceFeatures,
+                dividerSlots,
+                extraSlots,
+                scoopFaceSlotExclusions,
+                scoopShrink,
+                smoothSegments,
+                obliqueSlots,
+                settings,
+                logger));
         }
 
         EmitDividerPanels(idPrefix, box, dims, openFaces, output, settings, logger);
@@ -365,42 +748,27 @@ public sealed class CuttingPipeline
             }
         }
 
-        static (double Center, double Length) Span(double fullLength, FaceName? facingFace, FaceName lowFace, FaceName highFace, double thickness)
-        {
-            if (facingFace == lowFace)
-            {
-                return ((fullLength - thickness) / 2.0, fullLength - thickness);
-            }
-
-            if (facingFace == highFace)
-            {
-                return ((fullLength + thickness) / 2.0, fullLength - thickness);
-            }
-
-            return (fullLength / 2.0, fullLength);
-        }
-
         switch (axis)
         {
             case Axis.X:
-                var xOnBottomTop = Span(dims.Z, facing, FaceName.Front, FaceName.Back, t);
-                var xOnFrontBack = Span(dims.Y, facing, FaceName.Bottom, FaceName.Top, t);
+                var xOnBottomTop = DividerSpan(dims.Z, facing, FaceName.Front, FaceName.Back, t);
+                var xOnFrontBack = DividerSpan(dims.Y, facing, FaceName.Bottom, FaceName.Top, t);
                 Add(FaceName.Bottom, pos, xOnBottomTop.Center, t, xOnBottomTop.Length, dividerOwnsPrimary: false);
                 Add(FaceName.Top,    pos, xOnBottomTop.Center, t, xOnBottomTop.Length, dividerOwnsPrimary: false);
                 Add(FaceName.Front,  pos, xOnFrontBack.Center, t, xOnFrontBack.Length, dividerOwnsPrimary: true);
                 Add(FaceName.Back,   pos, xOnFrontBack.Center, t, xOnFrontBack.Length, dividerOwnsPrimary: true);
                 break;
             case Axis.Y:
-                var yOnFrontBack = Span(dims.X, facing, FaceName.Left, FaceName.Right, t);
-                var yOnLeftRight = Span(dims.Z, facing, FaceName.Front, FaceName.Back, t);
+                var yOnFrontBack = DividerSpan(dims.X, facing, FaceName.Left, FaceName.Right, t);
+                var yOnLeftRight = DividerSpan(dims.Z, facing, FaceName.Front, FaceName.Back, t);
                 Add(FaceName.Front, yOnFrontBack.Center, pos, yOnFrontBack.Length, t, dividerOwnsPrimary: true);
                 Add(FaceName.Back,  yOnFrontBack.Center, pos, yOnFrontBack.Length, t, dividerOwnsPrimary: true);
                 Add(FaceName.Left,  yOnLeftRight.Center, pos, yOnLeftRight.Length, t, dividerOwnsPrimary: false);
                 Add(FaceName.Right, yOnLeftRight.Center, pos, yOnLeftRight.Length, t, dividerOwnsPrimary: false);
                 break;
             case Axis.Z:
-                var zOnBottomTop = Span(dims.X, facing, FaceName.Left, FaceName.Right, t);
-                var zOnLeftRight = Span(dims.Y, facing, FaceName.Bottom, FaceName.Top, t);
+                var zOnBottomTop = DividerSpan(dims.X, facing, FaceName.Left, FaceName.Right, t);
+                var zOnLeftRight = DividerSpan(dims.Y, facing, FaceName.Bottom, FaceName.Top, t);
                 Add(FaceName.Bottom, zOnBottomTop.Center, pos, zOnBottomTop.Length, t, dividerOwnsPrimary: true);
                 Add(FaceName.Top,    zOnBottomTop.Center, pos, zOnBottomTop.Length, t, dividerOwnsPrimary: true);
                 Add(FaceName.Left,   pos, zOnLeftRight.Center, t, zOnLeftRight.Length, dividerOwnsPrimary: false);
@@ -484,7 +852,9 @@ public sealed class CuttingPipeline
         IReadOnlyDictionary<string, SharedEdge> edges,
         IReadOnlySet<FaceName> openFaces,
         IReadOnlyList<Feature> features,
-        IEnumerable<SlotSpec> slots,
+        IReadOnlyList<SlotSpec> dividerSlots,
+        IReadOnlyList<SlotSpec>? scoopSlots,
+        IReadOnlyDictionary<FaceName, IReadOnlyList<AxisAlignedRect>> scoopFaceSlotExclusions,
         IReadOnlyDictionary<FaceName, double[]> hostShrinkByFace,
         IReadOnlyList<SmoothSegment>? smoothSegments,
         IReadOnlyList<ObliqueSlotSpec>? obliqueSlots,
@@ -605,14 +975,29 @@ public sealed class CuttingPipeline
                 }
             }
         }
-        foreach (var slot in slots)
+        var clippedDividerSlots = scoopFaceSlotExclusions.TryGetValue(face, out var exclusions)
+            ? FilterSlotsByExclusions(dividerSlots, exclusions)
+            : dividerSlots;
+        foreach (var slot in clippedDividerSlots)
         {
-            interiorCuts.Add(CutoutBuilder.BuildSlotRectangle(slot, settings.Kerf, translation, logger));
+            var slotPath = CutoutBuilder.BuildSlotRectangle(slot, settings.Kerf, translation, logger);
+            interiorCuts.AddRange(CutoutClipper.ClipToOutline(slotPath, path, logger));
+        }
+        if (scoopSlots is not null)
+        {
+            foreach (var slot in scoopSlots)
+            {
+                var slotPath = CutoutBuilder.BuildSlotRectangle(slot, settings.Kerf, translation, logger);
+                interiorCuts.AddRange(CutoutClipper.ClipToOutline(slotPath, path, logger));
+            }
         }
         if (obliqueSlots is not null)
         {
             foreach (var obl in obliqueSlots)
-                interiorCuts.Add(CutoutBuilder.BuildObliqueSlotRectangle(obl, settings.Kerf, translation));
+            {
+                var slotPath = CutoutBuilder.BuildObliqueSlotRectangle(obl, settings.Kerf, translation);
+                interiorCuts.AddRange(CutoutClipper.ClipToOutline(slotPath, path, logger));
+            }
         }
 
         return new BoxPlanCuttableShape
@@ -626,4 +1011,44 @@ public sealed class CuttingPipeline
             TextEngravings = textEngravings,
         };
     }
+
+    private static IReadOnlyList<SlotSpec> FilterSlotsByExclusions(
+        IReadOnlyList<SlotSpec> slots,
+        IReadOnlyList<AxisAlignedRect> exclusions)
+    {
+        if (slots.Count == 0 || exclusions.Count == 0) return slots;
+
+        var result = new List<SlotSpec>();
+        foreach (var slot in slots)
+        {
+            var bounds = SlotBounds(slot);
+            var fullyCovered = false;
+            foreach (var exclusion in exclusions)
+            {
+                if (ContainsRect(exclusion, bounds))
+                {
+                    fullyCovered = true;
+                    break;
+                }
+            }
+
+            if (!fullyCovered)
+                result.Add(slot);
+        }
+
+        return result;
+    }
+
+    private static AxisAlignedRect SlotBounds(SlotSpec slot)
+    {
+        var halfW = Math.Abs(slot.Width) / 2.0;
+        var halfH = Math.Abs(slot.Height) / 2.0;
+        return new AxisAlignedRect(slot.U - halfW, slot.V - halfH, slot.U + halfW, slot.V + halfH);
+    }
+
+    private static bool ContainsRect(AxisAlignedRect outer, AxisAlignedRect inner)
+        => outer.MinU <= inner.MinU + Eps
+        && outer.MinV <= inner.MinV + Eps
+        && outer.MaxU >= inner.MaxU - Eps
+        && outer.MaxV >= inner.MaxV - Eps;
 }

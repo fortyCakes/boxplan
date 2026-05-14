@@ -94,6 +94,12 @@ internal sealed class PolygonPanelShapeBuilder
         });
     }
 
+    public void SubtractPolygon(IReadOnlyList<Vec2> polygon)
+    {
+        if (polygon.Count < 3) return;
+        _notchClips.Add(new PathD(polygon.Select(p => new PointD(p.X, p.Y))));
+    }
+
     public List<Vec2> Build()
     {
         var subjects = new PathsD

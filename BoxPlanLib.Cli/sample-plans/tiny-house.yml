@@ -1,0 +1,13 @@
+shapes:
+- id: "cube"
+  type: "box" 
+  dimensions: [25.4, 25.4, 25.4]
+  location: [0.0, 0.0, 0.0]
+  origin: "bottom-left-front"
+- id: "triangular-prism"
+  type: "triangle"
+  width: 25.4
+  height: 12.7
+  depth: 25.4
+  location: [0.0, 25.4, 0.0]
+  origin: "bottom-left-front"
