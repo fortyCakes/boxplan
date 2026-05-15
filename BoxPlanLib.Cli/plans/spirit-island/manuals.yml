@@ -2,7 +2,30 @@ shapes:
 # This lays at the bottom of the organiser, and is used to hold the various manuals and rulebooks that come with the game.
 - id: "manuals-compartment"
   type: "box" 
-  dimensions: [282.0, 16.0, 316.0]
+  dimensions: [290.0, 16.0, 316.0]
+  faces:
+    - name: "front"
+      type: "open"
+  features:
+    - type: "cutout"
+      face: "top"
+      shape: "circle" 
+      diameter: 50.0
+      position: 
+        anchor: "bottom-center"
+        offset: [0.0, 0.0]
+    - type: "cutout"
+      face: "bottom"
+      shape: "circle" 
+      diameter: 50.0
+      position: 
+        anchor: "bottom-center"
+        offset: [0.0, 0.0]
+
+# This goes over the rest of the organiser, and is used to hold the game boards.
+- id: "board-compartment"
+  type: "box" 
+  dimensions: [290.0, 30.0, 316.0]
   faces:
     - name: "front"
       type: "open"

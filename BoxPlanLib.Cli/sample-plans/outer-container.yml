@@ -1,0 +1,13 @@
+shapes:
+- id: "outer-container"
+  type: "box" 
+  dimensions: [316.0, 236.0, 290.0]
+  features:
+  - face: "top"
+    type: "engraving"
+    text: "Spirit Island"
+    size: 12.0
+    font: "DK Snemand"
+    style: "bold"
+    position:
+      anchor: "center"

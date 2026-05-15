@@ -172,7 +172,7 @@ internal static class CliSettings
         Labels = false,
         UseAdvancedLayoutOptimizer = true,
         UseOrToolsSequenceOptimization = true,
-        LayoutSearchIterations = 5,
+        LayoutSearchIterations = 2,
         LayoutRandomSeed = Random.Shared.Next(),
         FlexLineSpacing = 0.8,
         FlexLineLengthFraction = 0.3,

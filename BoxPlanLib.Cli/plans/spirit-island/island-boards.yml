@@ -2,7 +2,7 @@
 shapes:
 - id: "island-boards-compartment"
   type: "box" 
-  dimensions: [26.0, 196.0, 316.0]
+  dimensions: [34.0, 196.0, 316.0]
   faces:
     - name: "top"
       type: "open"
