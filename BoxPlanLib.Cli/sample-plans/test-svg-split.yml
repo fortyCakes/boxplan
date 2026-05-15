@@ -1,7 +1,7 @@
 shapes:
 - id: "outer-container"
   type: "box" 
-  dimensions: [40.0, 40.0, 40.0]
+  dimensions: [80.0, 40.0, 80.0]
   features:
   - face: "top"
     type: "engraving"
