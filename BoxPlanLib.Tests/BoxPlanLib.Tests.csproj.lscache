@@ -70,6 +70,7 @@ CuttingTests/
  PrismFaceTests.cs
  ScoopTests.cs
  SharedEdgeBlockTests.cs
+ SplitCutTests.cs
 FitResolverTests.cs
 obj/Debug/net9.0/
  .NETCoreApp,Version=v9.0.AssemblyAttributes.cs

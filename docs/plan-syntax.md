@@ -478,6 +478,54 @@ A square grid engraved across the entire face.
 | `cell-size` | **Required.** Grid spacing in mm. Must be positive.                                          |
 | `center`    | `space` (default) — center the gridlines, `corner` — start in the corner, `maximize` — fit as many cells as possible. |
 
+### `type: split-cut`
+
+Adds an internal cut line (blue) on a side face (`front`, `back`, `left`, `right`) to split
+the assembled box into base/lid while still keeping each panel as one layout piece.
+
+Curve X coordinates are automatically scaled across the full width of each side face.
+No explicit split-curve width parameter is required.
+
+On tabbed side edges (the default for closed neighboring faces), split-cut endpoints are
+snapped to the nearest slot top/bottom boundary and the curve is emitted only across the
+inner span between edge strips (`t..u-t`). On smooth/open side edges, split-cut keeps the
+full-width behavior.
+When snapping is applied, the existing split curve is translated vertically as a whole
+rather than warping endpoint points independently.
+
+When `validate-separation` is enabled (default), the resolver checks the split can separate:
+
+- Exactly one validated split-cut must exist on each side face (`front`, `back`, `left`, `right`).
+- All validated split-cut features must use the same `height`, `amplitude`, and curve shape.
+
+| Field                 | Description |
+| --------------------- | ----------- |
+| `height`              | **Required.** Baseline split height in mm above the face bottom edge. |
+| `amplitude`           | Optional. Vertical scale (mm) for curve variation. Defaults to `0` (straight line). |
+| `validate-separation` | Optional. Defaults to `true`. Set to `false` to allow partial/non-matching cuts without separation checks. |
+| `curve`               | Optional. Curve definition. If omitted, a straight horizontal line is used. |
+| `curve.level-ends`    | Optional. Defaults to `true`. Rotates the source curve so its first/last points are level before normalization. |
+
+`curve.type` supports:
+
+- `straight` (or omitted)
+- `cubic-bezier` with `control-1: [x, y]`, `control-2: [x, y]`, optional `samples`
+- `polyline` with `points: [[x, y], ...]`
+- `svg-path` with `svg-path-data: "M ... C ..."`, optional `samples`
+
+Example:
+
+```yaml
+- face: "front"
+  type: "split-cut"
+  height: 50.0
+  amplitude: 10.0
+  curve:
+    type: "svg-path"
+    samples: 24
+    svg-path-data: "M 0 0 C 25 10 75 -10 100 0"
+```
+
 ### Position
 
 ```yaml

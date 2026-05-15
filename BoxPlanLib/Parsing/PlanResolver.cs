@@ -1,10 +1,14 @@
 using BoxPlanLib.Cutting;
 using BoxPlanLib.Model;
+using System.Globalization;
+using System.Text.RegularExpressions;
 
 namespace BoxPlanLib.Parsing;
 
 public sealed class PlanResolver
 {
+    private const double SplitCurveEps = 1e-6;
+
     public ParseResult<BoxPlan> Resolve(RawPlan raw)
     {
         var errors = new List<PlanError>();
@@ -117,6 +121,7 @@ public sealed class PlanResolver
         var dividers = ResolveDividers(raw.Dividers, dimensions, $"{path}.dividers", errors);
         var inserts = ResolveInserts(raw.Inserts, dividers, faces, $"{path}.inserts", errors, pendingRefs);
         var features = ResolveFeatures(raw.Features, faces, $"{path}.features", errors);
+        ValidateBoxSplitCuts(features, $"{path}.features", errors, raw);
         var scoops = ResolveScoops(raw.Scoops, dimensions, $"{path}.scoops", errors);
 
         return new BoxShape
@@ -1276,6 +1281,10 @@ public sealed class PlanResolver
                     var gridFeature = ResolveEngravingGrid(grid, face.Value, fpath, errors);
                     if (gridFeature is not null) result.Add(gridFeature);
                     break;
+                case RawSplitCutFeature splitCut:
+                    var splitCutFeature = ResolveSplitCut(splitCut, face.Value, fpath, errors);
+                    if (splitCutFeature is not null) result.Add(splitCutFeature);
+                    break;
                 default:
                     errors.Add(Err($"Unsupported feature type '{rf.Type}'.", fpath, rf));
                     break;
@@ -1478,6 +1487,545 @@ public sealed class PlanResolver
             CellSize = cellSize,
             Center = center,
         };
+    }
+
+    private static SplitCutFeature? ResolveSplitCut(
+        RawSplitCutFeature raw,
+        FaceName face,
+        string path,
+        List<PlanError> errors)
+    {
+        if (raw.Height is not { } height || height <= 0)
+        {
+            errors.Add(Err("Split cut requires a positive 'height'.", $"{path}.height", raw));
+            return null;
+        }
+
+        var amplitude = raw.Amplitude ?? 0.0;
+        if (amplitude < 0)
+        {
+            errors.Add(Err("Split cut 'amplitude' must be non-negative.", $"{path}.amplitude", raw));
+            return null;
+        }
+
+        var normalizedCurve = ResolveSplitCurve(raw.Curve, amplitude, $"{path}.curve", errors);
+        if (normalizedCurve is null)
+        {
+            return null;
+        }
+
+        return new SplitCutFeature
+        {
+            Face = face,
+            Height = height,
+            Amplitude = amplitude,
+            NormalizedCurve = normalizedCurve,
+            ValidateSeparation = raw.ValidateSeparation ?? true,
+        };
+    }
+
+    private static IReadOnlyList<Vec2>? ResolveSplitCurve(
+        RawSplitCurve? raw,
+        double amplitude,
+        string path,
+        List<PlanError> errors)
+    {
+        var levelEndsByRotation = raw?.LevelEnds ?? true;
+
+        if (raw is null || string.IsNullOrWhiteSpace(raw.Type) || raw.Type.Equals("straight", StringComparison.OrdinalIgnoreCase))
+        {
+            return new[] { new Vec2(0, 0), new Vec2(1, 0) };
+        }
+
+        if (raw.Type.Equals("cubic-bezier", StringComparison.OrdinalIgnoreCase))
+        {
+            var c1 = ResolveVec2(raw.Control1, $"{path}.control-1", errors, raw);
+            var c2 = ResolveVec2(raw.Control2, $"{path}.control-2", errors, raw);
+            if (c1 is null || c2 is null)
+            {
+                errors.Add(Err("cubic-bezier requires 'control-1' and 'control-2'.", path, raw));
+                return null;
+            }
+
+            var samples = Math.Clamp(raw.Samples ?? 64, 8, 1024);
+            var points = SampleCubicCurvePoints(c1.Value, c2.Value, samples);
+            return BuildNormalizedSplitCurve(points, amplitude, levelEndsByRotation, path, errors, raw);
+        }
+
+        if (raw.Type.Equals("polyline", StringComparison.OrdinalIgnoreCase))
+        {
+            if (raw.Points is null || raw.Points.Count < 2)
+            {
+                errors.Add(Err("polyline requires at least 2 'points'.", $"{path}.points", raw));
+                return null;
+            }
+
+            var points = new List<Vec2>(raw.Points.Count);
+            for (var i = 0; i < raw.Points.Count; i++)
+            {
+                var p = ResolveVec2(raw.Points[i], $"{path}.points[{i}]", errors, raw);
+                if (p is null) return null;
+                points.Add(p.Value);
+            }
+            return BuildNormalizedSplitCurve(points, amplitude, levelEndsByRotation, path, errors, raw);
+        }
+
+        if (raw.Type.Equals("svg-path", StringComparison.OrdinalIgnoreCase))
+        {
+            if (string.IsNullOrWhiteSpace(raw.SvgPathData))
+            {
+                errors.Add(Err("svg-path requires 'svg-path-data'.", $"{path}.svg-path-data", raw));
+                return null;
+            }
+
+            var samples = Math.Clamp(raw.Samples ?? 24, 4, 256);
+            if (!TrySampleSvgPathCurve(raw.SvgPathData, samples, out var sampled, out var parseError))
+            {
+                errors.Add(Err($"Invalid split curve svg path: {parseError}", $"{path}.svg-path-data", raw));
+                return null;
+            }
+
+            return BuildNormalizedSplitCurve(sampled, amplitude, levelEndsByRotation, path, errors, raw);
+        }
+
+        errors.Add(Err(
+            $"Unknown split curve type '{raw.Type}'. Expected 'straight', 'cubic-bezier', 'polyline', or 'svg-path'.",
+            $"{path}.type",
+            raw));
+        return null;
+    }
+
+    private static IReadOnlyList<Vec2>? BuildNormalizedSplitCurve(
+        IReadOnlyList<Vec2> points,
+        double amplitude,
+        bool levelEndsByRotation,
+        string path,
+        List<PlanError> errors,
+        IRawLocated? at)
+    {
+        if (points.Count < 2)
+        {
+            errors.Add(Err("Split curve needs at least 2 points.", path, at));
+            return null;
+        }
+
+        var working = points.ToList();
+        if (levelEndsByRotation)
+        {
+            var start = working[0];
+            var end = working[^1];
+            var angle = -Math.Atan2(end.Y - start.Y, end.X - start.X);
+            var cos = Math.Cos(angle);
+            var sin = Math.Sin(angle);
+
+            // Rotate around the start point so the first/last points become level.
+            working = working
+                .Select(p =>
+                {
+                    var relX = p.X - start.X;
+                    var relY = p.Y - start.Y;
+                    return new Vec2(
+                        relX * cos - relY * sin,
+                        relX * sin + relY * cos);
+                })
+                .ToList();
+        }
+
+        var minX = working.Min(p => p.X);
+        var maxX = working.Max(p => p.X);
+        var spanX = maxX - minX;
+        if (spanX <= SplitCurveEps)
+        {
+            errors.Add(Err("Split curve must span a non-zero X range.", path, at));
+            return null;
+        }
+
+        var sorted = working
+            .Select(p => new Vec2((p.X - minX) / spanX, p.Y))
+            .OrderBy(p => p.X)
+            .ToList();
+
+        var deduped = new List<Vec2>(sorted.Count);
+        foreach (var p in sorted)
+        {
+            if (deduped.Count > 0 && Math.Abs(p.X - deduped[^1].X) <= SplitCurveEps)
+            {
+                // Average duplicate-X samples to keep a single-valued curve y(x).
+                var prev = deduped[^1];
+                deduped[^1] = new Vec2(prev.X, (prev.Y + p.Y) / 2.0);
+            }
+            else
+            {
+                deduped.Add(p);
+            }
+        }
+
+        if (deduped.Count < 2)
+        {
+            errors.Add(Err("Split curve collapsed after X normalization.", path, at));
+            return null;
+        }
+
+        // Force exact endpoints for predictable edge matching around corners.
+        deduped[0] = new Vec2(0, deduped[0].Y);
+        deduped[^1] = new Vec2(1, deduped[^1].Y);
+
+        var maxAbs = deduped.Max(p => Math.Abs(p.Y));
+        var normalized = maxAbs <= SplitCurveEps
+            ? deduped.Select(p => new Vec2(p.X, 0)).ToList()
+            : deduped.Select(p => new Vec2(p.X, p.Y / maxAbs)).ToList();
+
+        if (amplitude > 0)
+        {
+            var peak = normalized.Max(p => Math.Abs(p.Y));
+            if (peak <= SplitCurveEps)
+            {
+                errors.Add(Err("Split curve has no vertical variation; use a non-flat curve or set amplitude to 0.", path, at));
+                return null;
+            }
+        }
+
+        return normalized;
+    }
+
+    private static IReadOnlyList<Vec2> SampleCubicCurvePoints(Vec2 c1, Vec2 c2, int samples)
+    {
+        var points = new List<Vec2>(samples + 1);
+        for (var i = 0; i <= samples; i++)
+        {
+            var t = (double)i / samples;
+            var u = 1.0 - t;
+            points.Add(new Vec2(
+                3 * u * u * t * c1.X + 3 * u * t * t * c2.X + t * t * t,
+                3 * u * u * t * c1.Y + 3 * u * t * t * c2.Y));
+        }
+        return points;
+    }
+
+    private static bool TrySampleSvgPathCurve(
+        string d,
+        int samplesPerBezier,
+        out IReadOnlyList<Vec2> points,
+        out string error)
+    {
+        points = Array.Empty<Vec2>();
+        error = string.Empty;
+
+        var tokens = Regex.Matches(d, @"[A-Za-z]|[-+]?(?:\d+\.?\d*|\.\d+)(?:[eE][-+]?\d+)?")
+            .Select(m => m.Value)
+            .ToList();
+
+        if (tokens.Count == 0)
+        {
+            error = "path has no commands.";
+            return false;
+        }
+
+        var result = new List<Vec2>();
+        var index = 0;
+        var current = Vec2.Zero;
+        var subpathStart = Vec2.Zero;
+        var hasCurrent = false;
+        var command = '\0';
+        var lastWasCubic = false;
+        var lastCubicControl2 = Vec2.Zero;
+
+        bool IsCommandToken(string token) => token.Length == 1 && char.IsLetter(token[0]);
+
+        bool TryReadDouble(out double value)
+        {
+            value = 0;
+            if (index >= tokens.Count || IsCommandToken(tokens[index]))
+                return false;
+            if (!double.TryParse(tokens[index], NumberStyles.Float, CultureInfo.InvariantCulture, out value))
+                return false;
+            index++;
+            return true;
+        }
+
+        bool TryReadPoint(bool relative, out Vec2 point)
+        {
+            point = Vec2.Zero;
+            if (!TryReadDouble(out var x) || !TryReadDouble(out var y))
+                return false;
+            point = relative ? new Vec2(current.X + x, current.Y + y) : new Vec2(x, y);
+            return true;
+        }
+
+        while (index < tokens.Count)
+        {
+            if (IsCommandToken(tokens[index]))
+            {
+                command = tokens[index][0];
+                index++;
+            }
+            else if (command == '\0')
+            {
+                error = "path starts with numbers before a command.";
+                return false;
+            }
+
+            var lower = char.ToLowerInvariant(command);
+            var relative = char.IsLower(command);
+
+            if (lower == 'z')
+            {
+                if (!hasCurrent)
+                {
+                    error = "'Z' used before any point.";
+                    return false;
+                }
+                if (Math.Abs(current.X - subpathStart.X) > SplitCurveEps || Math.Abs(current.Y - subpathStart.Y) > SplitCurveEps)
+                {
+                    result.Add(subpathStart);
+                    current = subpathStart;
+                }
+                command = '\0';
+                lastWasCubic = false;
+                continue;
+            }
+
+            if (lower == 'm')
+            {
+                if (!TryReadPoint(relative, out var moveTo))
+                {
+                    error = "'M' requires an x,y pair.";
+                    return false;
+                }
+                current = moveTo;
+                subpathStart = moveTo;
+                hasCurrent = true;
+                result.Add(moveTo);
+
+                command = relative ? 'l' : 'L';
+                lastWasCubic = false;
+                continue;
+            }
+
+            if (!hasCurrent)
+            {
+                error = $"'{command}' used before move command.";
+                return false;
+            }
+
+            if (lower == 'l')
+            {
+                var consumed = false;
+                while (TryReadPoint(relative, out var lineTo))
+                {
+                    result.Add(lineTo);
+                    current = lineTo;
+                    consumed = true;
+                }
+                if (!consumed)
+                {
+                    error = "'L' requires one or more x,y pairs.";
+                    return false;
+                }
+                lastWasCubic = false;
+                continue;
+            }
+
+            if (lower == 'c')
+            {
+                var consumed = false;
+                while (true)
+                {
+                    var save = index;
+                    if (!TryReadPoint(relative, out var c1)
+                        || !TryReadPoint(relative, out var c2)
+                        || !TryReadPoint(relative, out var to))
+                    {
+                        index = save;
+                        break;
+                    }
+
+                    consumed = true;
+                    for (var i = 1; i <= samplesPerBezier; i++)
+                    {
+                        var t = (double)i / samplesPerBezier;
+                        var u = 1.0 - t;
+                        result.Add(new Vec2(
+                            u * u * u * current.X + 3 * u * u * t * c1.X + 3 * u * t * t * c2.X + t * t * t * to.X,
+                            u * u * u * current.Y + 3 * u * u * t * c1.Y + 3 * u * t * t * c2.Y + t * t * t * to.Y));
+                    }
+                    current = to;
+                            lastCubicControl2 = c2;
+                            lastWasCubic = true;
+                }
+
+                if (!consumed)
+                {
+                    error = "'C' requires control-1, control-2, and end point for at least one segment.";
+                    return false;
+                }
+                continue;
+            }
+
+            if (lower == 's')
+            {
+                var consumed = false;
+                while (true)
+                {
+                    var save = index;
+                    if (!TryReadPoint(relative, out var c2)
+                        || !TryReadPoint(relative, out var to))
+                    {
+                        index = save;
+                        break;
+                    }
+
+                    consumed = true;
+                    var c1 = lastWasCubic
+                        ? new Vec2(2 * current.X - lastCubicControl2.X, 2 * current.Y - lastCubicControl2.Y)
+                        : current;
+
+                    for (var i = 1; i <= samplesPerBezier; i++)
+                    {
+                        var t = (double)i / samplesPerBezier;
+                        var u = 1.0 - t;
+                        result.Add(new Vec2(
+                            u * u * u * current.X + 3 * u * u * t * c1.X + 3 * u * t * t * c2.X + t * t * t * to.X,
+                            u * u * u * current.Y + 3 * u * u * t * c1.Y + 3 * u * t * t * c2.Y + t * t * t * to.Y));
+                    }
+                    current = to;
+                    lastCubicControl2 = c2;
+                    lastWasCubic = true;
+                }
+
+                if (!consumed)
+                {
+                    error = "'S' requires control-2 and end point for at least one segment.";
+                    return false;
+                }
+                continue;
+            }
+
+            if (lower == 'a')
+            {
+                var consumed = false;
+                while (true)
+                {
+                    var save = index;
+                    if (!TryReadDouble(out _)
+                        || !TryReadDouble(out _)
+                        || !TryReadDouble(out _)
+                        || !TryReadDouble(out _)
+                        || !TryReadDouble(out _)
+                        || !TryReadDouble(out var x)
+                        || !TryReadDouble(out var y))
+                    {
+                        index = save;
+                        break;
+                    }
+
+                    consumed = true;
+                    var end = relative ? new Vec2(current.X + x, current.Y + y) : new Vec2(x, y);
+                    // For split-curve extraction we only need a robust 1D profile, so
+                    // we approximate elliptical-arc commands as endpoint-connected segments.
+                    result.Add(end);
+                    current = end;
+                    lastWasCubic = false;
+                }
+
+                if (!consumed)
+                {
+                    error = "'A' requires 7 parameters per segment (rx ry rot largeArc sweep x y).";
+                    return false;
+                }
+                continue;
+            }
+
+            lastWasCubic = false;
+
+            error = $"unsupported SVG command '{command}' (supported: M, L, C, S, A, Z and lowercase variants).";
+            return false;
+        }
+
+        if (result.Count < 2)
+        {
+            error = "path must produce at least two points.";
+            return false;
+        }
+
+        points = result;
+        return true;
+    }
+
+    private static void ValidateBoxSplitCuts(
+        IReadOnlyList<Feature> features,
+        string path,
+        List<PlanError> errors,
+        IRawLocated? at)
+    {
+        var cuts = features.OfType<SplitCutFeature>().ToList();
+        if (cuts.Count == 0)
+            return;
+
+        foreach (var cut in cuts.Where(c => c.Face is FaceName.Top or FaceName.Bottom))
+        {
+            errors.Add(Err("split-cut is only valid on side faces: left, right, front, back.", path, at));
+            _ = cut;
+        }
+
+        var validated = cuts.Where(c => c.ValidateSeparation).ToList();
+        if (validated.Count == 0)
+            return;
+
+        var sideFaces = new[] { FaceName.Front, FaceName.Back, FaceName.Left, FaceName.Right };
+        foreach (var face in sideFaces)
+        {
+            var count = validated.Count(c => c.Face == face);
+            if (count == 0)
+                errors.Add(Err($"split-cut with validation enabled is missing on face '{face.ToString().ToLowerInvariant()}'.", path, at));
+            else if (count > 1)
+                errors.Add(Err($"split-cut with validation enabled must be unique per face; '{face.ToString().ToLowerInvariant()}' has {count}.", path, at));
+        }
+
+        if (validated.Count != 4)
+            return;
+
+        var reference = validated[0];
+        foreach (var cut in validated.Skip(1))
+        {
+            if (Math.Abs(cut.Height - reference.Height) > SplitCurveEps)
+            {
+                errors.Add(Err("All validated split-cut features must use the same 'height' so the lid/base can separate.", path, at));
+                break;
+            }
+        }
+
+        foreach (var cut in validated.Skip(1))
+        {
+            if (Math.Abs(cut.Amplitude - reference.Amplitude) > SplitCurveEps)
+            {
+                errors.Add(Err("All validated split-cut features must use the same 'amplitude' so the lid/base can separate.", path, at));
+                break;
+            }
+        }
+
+        foreach (var cut in validated.Skip(1))
+        {
+            if (!CurvesEquivalent(reference.NormalizedCurve, cut.NormalizedCurve))
+            {
+                errors.Add(Err("All validated split-cut features must use the same curve shape so the lid/base can separate.", path, at));
+                break;
+            }
+        }
+    }
+
+    private static bool CurvesEquivalent(IReadOnlyList<Vec2> a, IReadOnlyList<Vec2> b)
+    {
+        if (a.Count != b.Count)
+            return false;
+
+        for (var i = 0; i < a.Count; i++)
+        {
+            if (Math.Abs(a[i].X - b[i].X) > SplitCurveEps || Math.Abs(a[i].Y - b[i].Y) > SplitCurveEps)
+                return false;
+        }
+
+        return true;
     }
 
     private static Position? ResolvePosition(RawPosition raw, string path, List<PlanError> errors)

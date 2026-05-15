@@ -8,6 +8,7 @@ public sealed class CuttingPipeline
     private const double Eps = 1e-9;
 
     private readonly record struct AxisAlignedRect(double MinU, double MinV, double MaxU, double MaxV);
+    private readonly record struct EdgeSlotSpan(double Start, double End);
 
     public BoxPlanCuttableShape[] Run(BoxPlan plan, BoxPlanSettings settings)
     {
@@ -924,12 +925,20 @@ public sealed class CuttingPipeline
         var polygon = builder.Build();
         var (path, bbMin, bbMax, translation) = KerfOffset.OffsetOutwardAndTranslate(polygon, settings.Kerf, logger);
 
+        var leftEdgeSlots = CollectEdgeSlotSpans(face, edgeIndex: 3, ccw, edges, openFaces, smoothSegments, t);
+        var rightEdgeSlots = CollectEdgeSlotSpans(face, edgeIndex: 1, ccw, edges, openFaces, smoothSegments, t);
+
         var interiorCuts = new List<CuttablePath>();
         var engravings = new List<CuttablePath>();
         var textEngravings = new List<TextEngraving>();
         foreach (var feature in features)
         {
-            if (feature is CutoutFeature cutout)
+            if (feature is SplitCutFeature splitCut)
+            {
+                var splitPath = BuildSplitCutPath(splitCut, panelU, panelV, t, translation, leftEdgeSlots, rightEdgeSlots, logger);
+                interiorCuts.AddRange(CutoutClipper.ClipToOutline(splitPath, path, logger));
+            }
+            else if (feature is CutoutFeature cutout)
             {
                 var seed = CutoutBuilder.ResolvePlacementCenter(cutout.Position, cutout.Shape, cutout.Width, cutout.Height, panelU, panelV, settings.Kerf, logger);
                 var zone = new CutoutBuilder.SafeZone(
@@ -1010,6 +1019,269 @@ public sealed class CuttingPipeline
             Engravings = engravings,
             TextEngravings = textEngravings,
         };
+    }
+
+    private static CuttablePath BuildSplitCutPath(
+        SplitCutFeature splitCut,
+        double panelU,
+        double panelV,
+        double t,
+        Vec2 translation,
+        IReadOnlyList<EdgeSlotSpan> leftEdgeSlots,
+        IReadOnlyList<EdgeSlotSpan> rightEdgeSlots,
+        PipelineLogger? logger = null)
+    {
+        var leftTabbed = leftEdgeSlots.Count > 0;
+        var rightTabbed = rightEdgeSlots.Count > 0;
+
+        var startU = leftTabbed ? t : 0.0;
+        var endU = rightTabbed ? panelU - t : panelU;
+        if (endU - startU <= Eps)
+        {
+            startU = 0.0;
+            endU = panelU;
+        }
+
+        var spanU = endU - startU;
+        var points = splitCut.NormalizedCurve
+            .Select(p => new Vec2(
+                translation.X + startU + p.X * spanU,
+                translation.Y + splitCut.Height + splitCut.Amplitude * p.Y))
+            .ToList();
+
+        logger?.Log($"[split-cut] Building split cut on {splitCut.Face} at height={splitCut.Height:F3} with {points.Count} samples");
+
+        if (points.Count < 2)
+        {
+            points = new List<Vec2>
+            {
+                new(translation.X + startU, translation.Y + Math.Clamp(splitCut.Height, 0.0, panelV)),
+                new(translation.X + endU, translation.Y + Math.Clamp(splitCut.Height, 0.0, panelV)),
+            };
+        }
+
+        var leftOriginal = points[0].Y - translation.Y;
+        var rightOriginal = points[^1].Y - translation.Y;
+
+        if (TryComputeSplitCutVerticalShift(leftOriginal, rightOriginal, leftEdgeSlots, rightEdgeSlots, out var shiftY)
+            && Math.Abs(shiftY) > Eps)
+        {
+            for (var i = 0; i < points.Count; i++)
+            {
+                points[i] = new Vec2(points[i].X, points[i].Y + shiftY);
+            }
+
+            if (leftTabbed)
+            {
+                var leftShifted = points[0].Y - translation.Y;
+                if (TrySnapToNearestSlotBoundary(leftShifted, leftEdgeSlots, out var snapped, out var side))
+                    LogSplitSnap("left", leftOriginal, leftShifted, snapped, side, logger);
+            }
+
+            if (rightTabbed)
+            {
+                var rightShifted = points[^1].Y - translation.Y;
+                if (TrySnapToNearestSlotBoundary(rightShifted, rightEdgeSlots, out var snapped, out var side))
+                    LogSplitSnap("right", rightOriginal, rightShifted, snapped, side, logger);
+            }
+        }
+
+        return new CuttablePath
+        {
+            Start = points[0],
+            Segments = points.Skip(1).Select(p => (PathSegment)new LineSegment(p)).ToList(),
+            Closed = false,
+        };
+    }
+
+    private static IReadOnlyList<EdgeSlotSpan> CollectEdgeSlotSpans(
+        FaceName face,
+        int edgeIndex,
+        IReadOnlyList<FaceEdgeMap> ccw,
+        IReadOnlyDictionary<string, SharedEdge> edges,
+        IReadOnlySet<FaceName> openFaces,
+        IReadOnlyList<SmoothSegment>? smoothSegments,
+        double t)
+    {
+        var edgeMap = ccw[edgeIndex];
+        if (openFaces.Contains(edgeMap.Neighbor))
+            return Array.Empty<EdgeSlotSpan>();
+
+        var shared = edges[SharedEdgeTable.Id(edgeMap.Face, edgeMap.Neighbor)];
+        var ordered = edgeMap.ForwardAlongShared
+            ? shared.Blocks
+            : shared.Blocks.Reverse().ToList();
+
+        var spans = new List<EdgeSlotSpan>();
+        var cursor = t;
+        foreach (var block in ordered)
+        {
+            var start = cursor;
+            var end = cursor + block.Length;
+            if (block.Owner != face && !InSmooth(smoothSegments, edgeIndex, start, end))
+                spans.Add(new EdgeSlotSpan(start, end));
+            cursor = end;
+        }
+
+        return spans;
+    }
+
+    private static bool TrySnapToNearestSlotBoundary(
+        double v,
+        IReadOnlyList<EdgeSlotSpan> spans,
+        out double snapped,
+        out string side)
+    {
+        snapped = v;
+        side = "bottom";
+        if (spans.Count == 0)
+            return false;
+
+        var bestDelta = double.MaxValue;
+        foreach (var span in spans)
+        {
+            var dStart = Math.Abs(v - span.Start);
+            if (dStart < bestDelta)
+            {
+                bestDelta = dStart;
+                snapped = span.Start;
+                side = "bottom";
+            }
+
+            var dEnd = Math.Abs(v - span.End);
+            if (dEnd < bestDelta)
+            {
+                bestDelta = dEnd;
+                snapped = span.End;
+                side = "top";
+            }
+        }
+
+        return true;
+    }
+
+    private static bool TryComputeSplitCutVerticalShift(
+        double leftY,
+        double rightY,
+        IReadOnlyList<EdgeSlotSpan> leftSpans,
+        IReadOnlyList<EdgeSlotSpan> rightSpans,
+        out double shiftY)
+    {
+        shiftY = 0;
+        var hasLeft = leftSpans.Count > 0;
+        var hasRight = rightSpans.Count > 0;
+        if (!hasLeft && !hasRight)
+            return false;
+
+        var leftBoundaries = EnumerateSlotBoundaries(leftSpans).ToList();
+        var rightBoundaries = EnumerateSlotBoundaries(rightSpans).ToList();
+
+        if (hasLeft && !hasRight)
+        {
+            var target = NearestBoundary(leftY, leftBoundaries);
+            shiftY = target - leftY;
+            return true;
+        }
+
+        if (!hasLeft && hasRight)
+        {
+            var target = NearestBoundary(rightY, rightBoundaries);
+            shiftY = target - rightY;
+            return true;
+        }
+
+        // Try to find a single translation that snaps both endpoints exactly.
+        const double snapTol = 1e-6;
+        var bestExact = double.MaxValue;
+        var foundExact = false;
+        foreach (var leftBoundary in leftBoundaries)
+        {
+            foreach (var rightBoundary in rightBoundaries)
+            {
+                var leftShift = leftBoundary - leftY;
+                var rightShift = rightBoundary - rightY;
+                if (Math.Abs(leftShift - rightShift) <= snapTol)
+                {
+                    var candidate = (leftShift + rightShift) / 2.0;
+                    var abs = Math.Abs(candidate);
+                    if (!foundExact || abs < bestExact)
+                    {
+                        foundExact = true;
+                        bestExact = abs;
+                        shiftY = candidate;
+                    }
+                }
+            }
+        }
+
+        if (foundExact)
+            return true;
+
+        // Fallback: pick the translation that best matches both nearest boundaries.
+        var candidates = leftBoundaries.Select(b => b - leftY)
+            .Concat(rightBoundaries.Select(b => b - rightY))
+            .Distinct()
+            .ToList();
+
+        var bestError = double.MaxValue;
+        var bestAbsShift = double.MaxValue;
+        foreach (var candidate in candidates)
+        {
+            var shiftedLeft = leftY + candidate;
+            var shiftedRight = rightY + candidate;
+            var error = Math.Abs(shiftedLeft - NearestBoundary(shiftedLeft, leftBoundaries))
+                + Math.Abs(shiftedRight - NearestBoundary(shiftedRight, rightBoundaries));
+            var abs = Math.Abs(candidate);
+            if (error < bestError - Eps || (Math.Abs(error - bestError) <= Eps && abs < bestAbsShift))
+            {
+                bestError = error;
+                bestAbsShift = abs;
+                shiftY = candidate;
+            }
+        }
+
+        return true;
+    }
+
+    private static IEnumerable<double> EnumerateSlotBoundaries(IReadOnlyList<EdgeSlotSpan> spans)
+    {
+        foreach (var span in spans)
+        {
+            yield return span.Start;
+            yield return span.End;
+        }
+    }
+
+    private static double NearestBoundary(double v, IReadOnlyList<double> boundaries)
+    {
+        var best = boundaries[0];
+        var bestDelta = Math.Abs(v - best);
+        for (var i = 1; i < boundaries.Count; i++)
+        {
+            var delta = Math.Abs(v - boundaries[i]);
+            if (delta < bestDelta)
+            {
+                bestDelta = delta;
+                best = boundaries[i];
+            }
+        }
+
+        return best;
+    }
+
+    private static void LogSplitSnap(
+        string endpoint,
+        double original,
+        double shifted,
+        double snapped,
+        string slotSide,
+        PipelineLogger? logger)
+    {
+        if (Math.Abs(shifted - original) <= Eps)
+            return;
+
+        var direction = shifted > original ? "up" : "down";
+        logger?.Log($"[split-cut] Shifted {endpoint} endpoint {direction} toward slot {slotSide}: {original:F3} -> {shifted:F3} (target {snapped:F3})");
     }
 
     private static IReadOnlyList<SlotSpec> FilterSlotsByExclusions(

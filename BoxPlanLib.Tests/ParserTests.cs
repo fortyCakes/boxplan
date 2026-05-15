@@ -157,6 +157,40 @@ public class ParserTests
     }
 
     [Fact]
+    public void Parses_split_cut_feature_with_svg_curve()
+    {
+        var yaml = """
+            shapes:
+              - id: "box"
+                type: "box"
+                dimensions: [100.0, 80.0, 60.0]
+                features:
+                  - face: "front"
+                    type: "split-cut"
+                    height: 25.0
+                    amplitude: 8.0
+                    validate-separation: true
+                    curve:
+                      type: "svg-path"
+                      level-ends: false
+                      samples: 16
+                      svg-path-data: "M 0 0 C 25 10 75 -10 100 0"
+            """;
+
+        var raw = ParseOk(yaml);
+
+        var feature = Assert.Single(Assert.Single(raw.Shapes).Features!);
+        var split = Assert.IsType<RawSplitCutFeature>(feature);
+        Assert.Equal(25.0, split.Height);
+        Assert.Equal(8.0, split.Amplitude);
+        Assert.True(split.ValidateSeparation);
+        Assert.NotNull(split.Curve);
+        Assert.Equal("svg-path", split.Curve!.Type);
+        Assert.False(split.Curve!.LevelEnds);
+        Assert.Equal(16, split.Curve!.Samples);
+    }
+
+    [Fact]
     public void Parses_fit_with_auto_depth()
     {
         var yaml = """

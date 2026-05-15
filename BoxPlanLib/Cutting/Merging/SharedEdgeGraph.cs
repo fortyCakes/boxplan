@@ -76,7 +76,6 @@ internal static class SharedEdgeGraph
         }
 
         return output;
-        logger?.Log($"[merge] Shared edge graph contains {output.Count} segments");
     }
 
     private static SharedSegment MakeSegment(

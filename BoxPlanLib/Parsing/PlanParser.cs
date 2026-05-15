@@ -58,6 +58,7 @@ public sealed class PlanParser
                         { "engraving", typeof(RawEngravingFeature) },
                         { "line-engraving", typeof(RawLineEngravingFeature) },
                         { "engraving-grid", typeof(RawEngravingGridFeature) },
+                        { "split-cut", typeof(RawSplitCutFeature) },
                     });
             })
             .WithNodeDeserializer(

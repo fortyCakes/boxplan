@@ -150,6 +150,19 @@ public sealed class EngravingGridFeature : Feature
     public GridCenter Center { get; init; } = GridCenter.Space;
 }
 
+// A non-closed cut line that splits a side panel into lid/base parts while
+// remaining one physical panel in layout.
+public sealed class SplitCutFeature : Feature
+{
+    // Height above the panel base in mm.
+    public required double Height { get; init; }
+    // Vertical deviation in mm applied to the normalised curve Y values.
+    public double Amplitude { get; init; }
+    // Polyline points with X normalised to [0,1], monotonic in X.
+    public required IReadOnlyList<Vec2> NormalizedCurve { get; init; }
+    public bool ValidateSeparation { get; init; } = true;
+}
+
 public sealed record Position(Anchor Anchor, Vec2 Offset);
 
 public sealed class Fit
