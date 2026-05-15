@@ -15,6 +15,8 @@ public class BoxPlanSettings
     public bool UseOrToolsSequenceOptimization { get; set; }
     public int LayoutSearchIterations { get; set; }
     public int LayoutRandomSeed { get; set; }
+    public bool EmbedRasterEngravings { get; set; }
+    public string RasterEngravingAssetFolder { get; set; } = "assets";
 
     // Flex cut pattern settings (used for curved prism faces)
     public double FlexLineSpacing { get; set; }
@@ -38,6 +40,8 @@ public class BoxPlanSettings
         UseOrToolsSequenceOptimization = false,
         LayoutSearchIterations = 24,
         LayoutRandomSeed = 1337,
+        EmbedRasterEngravings = true,
+        RasterEngravingAssetFolder = "assets",
         FlexLineSpacing = 3.0,
         FlexLineLengthFraction = 0.75,
         FlexLengthCompensationFactor = 1.0,

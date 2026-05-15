@@ -1277,6 +1277,10 @@ public sealed class PlanResolver
                     var lineEngravingFeature = ResolveLineEngraving(lineEngraving, face.Value, position, fpath, errors);
                     if (lineEngravingFeature is not null) result.Add(lineEngravingFeature);
                     break;
+                case RawRasterEngravingFeature rasterEngraving:
+                    var rasterEngravingFeature = ResolveRasterEngraving(rasterEngraving, face.Value, position, fpath, errors);
+                    if (rasterEngravingFeature is not null) result.Add(rasterEngravingFeature);
+                    break;
                 case RawEngravingGridFeature grid:
                     var gridFeature = ResolveEngravingGrid(grid, face.Value, fpath, errors);
                     if (gridFeature is not null) result.Add(gridFeature);
@@ -1454,6 +1458,47 @@ public sealed class PlanResolver
             Face = face,
             Position = position,
             Shape = shape,
+            Width = width,
+            Height = height,
+        };
+    }
+
+    private static RasterEngravingFeature? ResolveRasterEngraving(
+        RawRasterEngravingFeature raw,
+        FaceName face,
+        Position? position,
+        string path,
+        List<PlanError> errors)
+    {
+        var source = raw.Source;
+        if (string.IsNullOrWhiteSpace(source))
+        {
+            source = raw.Image;
+        }
+
+        if (string.IsNullOrWhiteSpace(source))
+        {
+            errors.Add(Err("Raster engraving requires 'source' (or 'image').", $"{path}.source", raw));
+            return null;
+        }
+
+        if (raw.Width is not { } width || width <= 0)
+        {
+            errors.Add(Err("Raster engraving requires a positive 'width'.", $"{path}.width", raw));
+            return null;
+        }
+
+        if (raw.Height is not { } height || height <= 0)
+        {
+            errors.Add(Err("Raster engraving requires a positive 'height'.", $"{path}.height", raw));
+            return null;
+        }
+
+        return new RasterEngravingFeature
+        {
+            Face = face,
+            Position = position,
+            Source = source,
             Width = width,
             Height = height,
         };

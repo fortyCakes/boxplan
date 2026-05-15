@@ -45,7 +45,7 @@ These fields are accepted on every shape type.
 | `faces`    | list of face overrides              | all closed           | See [Faces](#faces).                                                                         |
 | `dividers` | list of divider sets                | none                 | Internal partitions (box only — see [Dividers](#dividers)).                                  |
 | `inserts`  | list of inserts                     | none                 | Nest other shapes inside this one. See [Inserts](#inserts).                                  |
-| `features` | list of features                    | none                 | Cutouts, engravings, grids on faces. See [Features](#features). Box and panel shapes only.   |
+| `features` | list of features                    | none                 | Cutouts, engravings (text/raster), grids on faces. See [Features](#features). Box and panel shapes only.   |
 | `fit`      | fit object                          | none                 | Auto-sized to a parent cell. See [Fit](#fit). Mutually exclusive with explicit sizing.       |
 
 ---
@@ -161,8 +161,8 @@ shapes:
         size: 12
 ```
 
-Panel shapes accept `features` (cutouts, engravings, line-engravings, engraving-
-grids). Features default to `face: front` and may omit the field entirely. The
+Panel shapes accept `features` (cutouts, engravings, raster-engravings,
+line-engravings, engraving-grids). Features default to `face: front` and may omit the field entirely. The
 only supported face name is `front`; marking it open suppresses the panel
 entirely. Panels do not support `dividers`, `inserts`, or `fit`.
 
@@ -455,6 +455,26 @@ that anchor (`left-center` starts at the point, `right-center` ends at it,
 | `size`  | **Required.** Font height in mm.                                                             |
 | `font`  | Optional font family. Defaults to `sans-serif`.                                              |
 | `style` | Optional space-separated styles. Recognised values: `bold`, `italic` (combinable).            |
+
+### `type: raster-engraving`
+
+A raster image (for example PNG/JPEG/WebP) engraved onto the face.
+
+If `position` is omitted, the image is centered on the face. If `position` is
+provided, the anchor refers to the matching point on the image bounding box,
+the same way cutout anchors do.
+
+| Field    | Description                                                                                  |
+| -------- | -------------------------------------------------------------------------------------------- |
+| `source` | **Required.** Image path or URI. Relative paths are resolved from the plan file location.   |
+| `image`  | Alias of `source`.                                                                            |
+| `width`  | **Required.** Rendered image width in mm. Must be positive.                                  |
+| `height` | **Required.** Rendered image height in mm. Must be positive.                                 |
+
+CLI output behavior is controlled by settings:
+
+- `embed-raster-engravings: true` (default) embeds each image as base64 in SVG.
+- `embed-raster-engravings: false` copies source files to `raster-engraving-asset-folder` (default `assets`) and references them from SVG.
 
 ### `type: line-engraving`
 

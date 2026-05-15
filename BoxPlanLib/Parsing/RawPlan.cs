@@ -146,6 +146,14 @@ public sealed class RawLineEngravingFeature : RawFeature
     public double? Height { get; set; }
 }
 
+public sealed class RawRasterEngravingFeature : RawFeature
+{
+    public string? Source { get; set; }
+    public string? Image { get; set; }
+    public double? Width { get; set; }
+    public double? Height { get; set; }
+}
+
 public sealed class RawEngravingGridFeature : RawFeature
 {
     public double? CellSize { get; set; }

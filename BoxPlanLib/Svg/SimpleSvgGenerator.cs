@@ -54,6 +54,7 @@ internal sealed class SvgGenerator
             foreach (var p in s.InteriorCuts) EmitPath(sb, p, s.BoundingBoxMin, InteriorColor);
             foreach (var p in s.Engravings) EmitPath(sb, p, s.BoundingBoxMin, LineEngravingColor);
             foreach (var t in s.TextEngravings) EmitTextEngraving(sb, t, s.BoundingBoxMin);
+            foreach (var r in s.RasterEngravings) EmitRasterEngraving(sb, r, s.BoundingBoxMin);
             if (settings.Labels) EmitLabel(sb, s);
             sb.Append("</g>");
             xCursor += widths[i] + settings.Spacing;
@@ -100,6 +101,7 @@ internal sealed class SvgGenerator
                 foreach (var path in placement.Shape.InteriorCuts) EmitPath(sb, path, placement.Shape.BoundingBoxMin, InteriorColor);
                 foreach (var path in placement.Shape.Engravings) EmitPath(sb, path, placement.Shape.BoundingBoxMin, LineEngravingColor);
                 foreach (var t in placement.Shape.TextEngravings) EmitTextEngraving(sb, t, placement.Shape.BoundingBoxMin);
+                foreach (var r in placement.Shape.RasterEngravings) EmitRasterEngraving(sb, r, placement.Shape.BoundingBoxMin);
                 if (settings.Labels) EmitLabel(sb, placement.Shape);
                 sb.Append("</g>");
             }
@@ -150,6 +152,7 @@ internal sealed class SvgGenerator
             foreach (var path in placement.Shape.InteriorCuts) EmitPath(sb, path, placement.Shape.BoundingBoxMin, InteriorColor);
             foreach (var path in placement.Shape.Engravings) EmitPath(sb, path, placement.Shape.BoundingBoxMin, LineEngravingColor);
             foreach (var t in placement.Shape.TextEngravings) EmitTextEngraving(sb, t, placement.Shape.BoundingBoxMin);
+            foreach (var r in placement.Shape.RasterEngravings) EmitRasterEngraving(sb, r, placement.Shape.BoundingBoxMin);
             if (settings.Labels) EmitLabel(sb, placement.Shape);
             sb.Append("</g>");
         }
@@ -516,6 +519,41 @@ internal sealed class SvgGenerator
           .Append(Escape(engraving.Text)).Append("</text>");
         sb.Append("</g>");
     }
+
+        private static void EmitRasterEngraving(StringBuilder sb, RasterEngraving engraving, Vec2 origin)
+        {
+                var x = engraving.X - origin.X;
+                var y = engraving.Y - origin.Y;
+                var (offsetX, offsetY) = AnchorOffset(engraving.Anchor, engraving.Width, engraving.Height);
+
+                sb.Append("<g transform=\"translate(")
+                    .Append(F(x)).Append(' ').Append(F(y))
+                    .Append(") scale(1 -1)\">");
+                sb.Append("<image x=\"").Append(F(offsetX))
+                    .Append("\" y=\"").Append(F(offsetY))
+                    .Append("\" width=\"").Append(F(engraving.Width))
+                    .Append("\" height=\"").Append(F(engraving.Height))
+                    .Append("\" preserveAspectRatio=\"none\" href=\"").Append(Escape(engraving.Href))
+                    .Append("\"/>");
+                sb.Append("</g>");
+        }
+
+        private static (double X, double Y) AnchorOffset(Anchor anchor, double width, double height)
+        {
+                return anchor switch
+                {
+                        Anchor.TopLeft => (0.0, 0.0),
+                        Anchor.TopCenter => (-width * 0.5, 0.0),
+                        Anchor.TopRight => (-width, 0.0),
+                        Anchor.LeftCenter => (0.0, -height * 0.5),
+                        Anchor.Center => (-width * 0.5, -height * 0.5),
+                        Anchor.RightCenter => (-width, -height * 0.5),
+                        Anchor.BottomLeft => (0.0, -height),
+                        Anchor.BottomCenter => (-width * 0.5, -height),
+                        Anchor.BottomRight => (-width, -height),
+                        _ => (-width * 0.5, -height * 0.5),
+                };
+        }
 
     private static double ComputeLabelFontSize(double width, double height, string label)
     {

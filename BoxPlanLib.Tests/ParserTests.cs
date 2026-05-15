@@ -103,6 +103,36 @@ public class ParserTests
     }
 
     [Fact]
+    public void Parses_raster_engraving_feature_via_polymorphic_type()
+    {
+        var yaml = """
+            shapes:
+              - id: "d"
+                type: "box"
+                dimensions: [10.0, 10.0, 10.0]
+                features:
+                  - face: "front"
+                    type: "raster-engraving"
+                    source: "Spirit-Island-Logo.png"
+                    width: 20.0
+                    height: 12.0
+                    position:
+                      anchor: "bottom-right"
+                      offset: [-2.0, 3.0]
+            """;
+
+        var raw = ParseOk(yaml);
+
+        var feature = Assert.Single(Assert.Single(raw.Shapes).Features!);
+        var raster = Assert.IsType<RawRasterEngravingFeature>(feature);
+        Assert.Equal("Spirit-Island-Logo.png", raster.Source);
+        Assert.Equal(20.0, raster.Width);
+        Assert.Equal(12.0, raster.Height);
+        Assert.Equal("bottom-right", raster.Position!.Anchor);
+        Assert.Equal(new[] { -2.0, 3.0 }, raster.Position!.Offset);
+    }
+
+    [Fact]
     public void Parses_top_left_anchor_in_feature_position()
     {
         var yaml = """

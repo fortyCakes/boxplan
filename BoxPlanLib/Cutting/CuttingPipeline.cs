@@ -270,6 +270,7 @@ public sealed class CuttingPipeline
             InteriorCuts = interiorCuts,
             Engravings = Array.Empty<CuttablePath>(),
             TextEngravings = Array.Empty<TextEngraving>(),
+            RasterEngravings = Array.Empty<RasterEngraving>(),
         };
     }
 
@@ -931,6 +932,7 @@ public sealed class CuttingPipeline
         var interiorCuts = new List<CuttablePath>();
         var engravings = new List<CuttablePath>();
         var textEngravings = new List<TextEngraving>();
+        var rasterEngravings = new List<RasterEngraving>();
         foreach (var feature in features)
         {
             if (feature is SplitCutFeature splitCut)
@@ -983,6 +985,33 @@ public sealed class CuttingPipeline
                     });
                 }
             }
+            else if (feature is RasterEngravingFeature raster)
+            {
+                var anchor = raster.Position?.Anchor ?? Anchor.Center;
+                var center = CutoutBuilder.ResolvePlacementCenter(
+                    raster.Position,
+                    CutoutShape.Rectangle,
+                    raster.Width,
+                    raster.Height,
+                    panelU,
+                    panelV,
+                    kerf: 0,
+                    logger);
+                var localAnchor = EngravingBuilder.AnchorPointFromCenter(center, anchor, raster.Width, raster.Height);
+                var anchorPoint = new Vec2(localAnchor.X + translation.X, localAnchor.Y + translation.Y);
+                if (CutoutClipper.IsInsideOutline(anchorPoint, path))
+                {
+                    rasterEngravings.Add(new RasterEngraving
+                    {
+                        Href = raster.Source,
+                        X = anchorPoint.X,
+                        Y = anchorPoint.Y,
+                        Anchor = anchor,
+                        Width = raster.Width,
+                        Height = raster.Height,
+                    });
+                }
+            }
         }
         var clippedDividerSlots = scoopFaceSlotExclusions.TryGetValue(face, out var exclusions)
             ? FilterSlotsByExclusions(dividerSlots, exclusions)
@@ -1018,6 +1047,7 @@ public sealed class CuttingPipeline
             InteriorCuts = interiorCuts,
             Engravings = engravings,
             TextEngravings = textEngravings,
+            RasterEngravings = rasterEngravings,
         };
     }
 

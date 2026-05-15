@@ -61,4 +61,24 @@ internal static class EngravingBuilder
         if (offset < -1e-9) offset += cellSize;
         return offset < 1e-9 ? 0.0 : offset;
     }
+
+    public static Vec2 AnchorPointFromCenter(Vec2 center, Anchor anchor, double width, double height)
+    {
+        var halfW = width * 0.5;
+        var halfH = height * 0.5;
+        var (dx, dy) = anchor switch
+        {
+            Anchor.TopLeft => (-halfW, halfH),
+            Anchor.TopCenter => (0.0, halfH),
+            Anchor.TopRight => (halfW, halfH),
+            Anchor.LeftCenter => (-halfW, 0.0),
+            Anchor.Center => (0.0, 0.0),
+            Anchor.RightCenter => (halfW, 0.0),
+            Anchor.BottomLeft => (-halfW, -halfH),
+            Anchor.BottomCenter => (0.0, -halfH),
+            Anchor.BottomRight => (halfW, -halfH),
+            _ => (0.0, 0.0),
+        };
+        return new Vec2(center.X + dx, center.Y + dy);
+    }
 }

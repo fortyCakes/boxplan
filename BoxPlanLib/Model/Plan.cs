@@ -137,6 +137,13 @@ public sealed class LineEngravingFeature : Feature
     public required double Height { get; init; }
 }
 
+public sealed class RasterEngravingFeature : Feature
+{
+    public required string Source { get; init; }
+    public required double Width { get; init; }
+    public required double Height { get; init; }
+}
+
 public enum GridCenter
 {
     Space,

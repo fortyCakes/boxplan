@@ -4,13 +4,13 @@ shapes:
   dimensions: [80.0, 40.0, 80.0]
   features:
   - face: "top"
-    type: "engraving"
-    text: "Spirit Island"
-    size: 6.0
-    font: "DK Snemand"
-    style: "bold"
+    type: "raster-engraving"
+    source: "Spirit-Island-Logo.png"
+    width: 60.0
+    height: 20.0
     position:
       anchor: "center"
+      offset: [0.0, 0.0]
   - face: "front"
     type: "split-cut"
     height: 25.0

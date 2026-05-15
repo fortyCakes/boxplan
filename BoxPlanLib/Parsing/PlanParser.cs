@@ -57,6 +57,8 @@ public sealed class PlanParser
                         { "cutout", typeof(RawCutoutFeature) },
                         { "engraving", typeof(RawEngravingFeature) },
                         { "line-engraving", typeof(RawLineEngravingFeature) },
+                        { "raster-engraving", typeof(RawRasterEngravingFeature) },
+                        { "image-engraving", typeof(RawRasterEngravingFeature) },
                         { "engraving-grid", typeof(RawEngravingGridFeature) },
                         { "split-cut", typeof(RawSplitCutFeature) },
                     });

@@ -68,6 +68,7 @@ CuttingTests/
  MergedShapeTests.cs
  PanelShapeTests.cs
  PrismFaceTests.cs
+ RasterEngravingTests.cs
  ScoopTests.cs
  SharedEdgeBlockTests.cs
  SplitCutTests.cs
