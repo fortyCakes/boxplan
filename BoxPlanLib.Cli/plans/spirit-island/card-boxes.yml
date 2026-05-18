@@ -9,15 +9,21 @@ shapes:
   features:
     - type: "cutout"
       face: "front"
-      shape: "semicircle" 
-      diameter: -50.0
+      shape: "edge-dip" 
+      width: 40.0
+      height: 80.0
+      radius: 10.0
+      inner-radius: 10.0
       position: 
         anchor: "top-center"
         offset: [0.0, 0.0]
     - type: "cutout"
       face: "back"
-      shape: "semicircle" 
-      diameter: -50.0
+      shape: "edge-dip" 
+      width: 40.0
+      height: 80.0
+      radius: 10.0
+      inner-radius: 10.0
       position: 
         anchor: "top-center"
         offset: [0.0, 0.0]
@@ -28,8 +34,9 @@ shapes:
       height: 12
       position:
         anchor: "top-center"
+        offset: [0.0, 0.0]
       repeat:
-        spacing: [6, 0]
+        spacing: [6.0, 0.0]
     - type: "cutout"
       face: "right"
       shape: "rectangle"
@@ -37,8 +44,9 @@ shapes:
       height: 12
       position:
         anchor: "top-center"
+        offset: [0.0, 0.0]
       repeat:
-        spacing: [6, 0]
+        spacing: [6.0, 0.0]
 
 - id: "card-holder-2"
   type: "box" 
@@ -49,15 +57,21 @@ shapes:
   features:
     - type: "cutout"
       face: "front"
-      shape: "semicircle" 
-      diameter: -50.0
+      shape: "edge-dip" 
+      width: 40.0
+      height: 80.0
+      radius: 10.0
+      inner-radius: 10.0
       position: 
         anchor: "top-center"
         offset: [0.0, 0.0]
     - type: "cutout"
       face: "back"
-      shape: "semicircle" 
-      diameter: -50.0
+      shape: "edge-dip" 
+      width: 40.0
+      height: 80.0
+      radius: 10.0
+      inner-radius: 10.0
       position: 
         anchor: "top-center"
         offset: [0.0, 0.0]
@@ -68,8 +82,9 @@ shapes:
       height: 12
       position:
         anchor: "top-center"
+        offset: [0.0, 0.0]
       repeat:
-        spacing: [6, 0]
+        spacing: [6.0, 0.0]
     - type: "cutout"
       face: "right"
       shape: "rectangle"
@@ -77,5 +92,6 @@ shapes:
       height: 12
       position:
         anchor: "top-center"
+        offset: [0.0, 0.0]
       repeat:
-        spacing: [6, 0]
+        spacing: [6.0, 0.0]

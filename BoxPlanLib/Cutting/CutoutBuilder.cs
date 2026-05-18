@@ -294,7 +294,7 @@ internal static class CutoutBuilder
         segs.Add(new LineSegment(T(+halfW + R, 0)));
 
         if (R > 0)
-            segs.Add(new ArcSegment(T(+halfW, -R), R, cw, LargeArc: false));
+            segs.Add(new ArcSegment(T(+halfW, -R), R, !cw, LargeArc: false));
 
         segs.Add(new LineSegment(T(+halfW, -(H - r))));
 
@@ -309,7 +309,7 @@ internal static class CutoutBuilder
         segs.Add(new LineSegment(T(-halfW, -R)));
 
         if (R > 0)
-            segs.Add(new ArcSegment(T(-halfW - R, 0), R, cw, LargeArc: false));
+            segs.Add(new ArcSegment(T(-halfW - R, 0), R, !cw, LargeArc: false));
 
         return new CuttablePath
         {

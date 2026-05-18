@@ -368,7 +368,8 @@ public class DividerTests
         var pieces = new BoxPlanLib().GetCuttableShapes(plan, Settings());
         var xDivider = pieces.First(p => p.Id.Contains("divider-x"));
         var pts = Points(xDivider);
-        var topRight = new Vec2(xDivider.BoundingBoxMax.X, xDivider.BoundingBoxMax.Y);
+        var maxX = xDivider.BoundingBoxMax.X;
+        var topRight = pts.Where(p => Math.Abs(p.X - maxX) < 1e-6).MaxBy(p => p.Y)!;
         var cornerIndex = FindPointIndex(pts, topRight);
         var next = pts[cornerIndex + 1];
 
@@ -392,7 +393,8 @@ public class DividerTests
         var pieces = new BoxPlanLib().GetCuttableShapes(plan, Settings());
         var xDivider = pieces.First(p => p.Id.Contains("divider-x"));
         var pts = Points(xDivider);
-        var topRight = new Vec2(xDivider.BoundingBoxMax.X, xDivider.BoundingBoxMax.Y);
+        var maxX = xDivider.BoundingBoxMax.X;
+        var topRight = pts.Where(p => Math.Abs(p.X - maxX) < 1e-6).MaxBy(p => p.Y)!;
         var cornerIndex = FindPointIndex(pts, topRight);
         var afterClearance = pts[cornerIndex + 1];
         var secondAfterCorner = pts[cornerIndex + 2];
@@ -423,7 +425,8 @@ public class DividerTests
         var pieces = new BoxPlanLib().GetCuttableShapes(plan, Settings());
         var xDivider = pieces.First(p => p.Id.Contains("divider-x"));
         var pts = Points(xDivider);
-        var topRight = new Vec2(xDivider.BoundingBoxMax.X, xDivider.BoundingBoxMax.Y);
+        var maxX = xDivider.BoundingBoxMax.X;
+        var topRight = pts.Where(p => Math.Abs(p.X - maxX) < 1e-6).MaxBy(p => p.Y)!;
         var cornerIndex = FindPointIndex(pts, topRight);
         var next = pts[cornerIndex + 1];
 
