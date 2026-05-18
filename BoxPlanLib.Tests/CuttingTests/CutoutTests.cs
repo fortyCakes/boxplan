@@ -341,8 +341,9 @@ public class CutoutTests
     public void Repeat_emits_one_cutout_per_fitting_step_along_spacing()
     {
         // Panel size (left face) is depth × height = 100 × 100. Material thickness
-        // = 3.0, so the safe inner zone along U is [3, 97]. Spacing [6, 0] centered
-        // at u = 50 fits ⌊((97 - 3.1/2) - 50) / 6⌋ = 7 copies each side + seed = 15.
+        // = 3.0. Repeat margin is 2t on closed sides, so repeat zone along U is
+        // [6, 94]. Spacing [6, 0] centred at u=50 fits ⌊(94 - 50 - 1.55) / 6⌋ = 7
+        // copies each side + seed = 15.
         var plan = ParseOk("""
             shapes:
               - id: "box"

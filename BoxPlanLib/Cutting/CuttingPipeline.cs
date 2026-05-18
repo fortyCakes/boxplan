@@ -943,11 +943,12 @@ public sealed class CuttingPipeline
             else if (feature is CutoutFeature cutout)
             {
                 var seed = CutoutBuilder.ResolvePlacementCenter(cutout.Position, cutout.Shape, cutout.Width, cutout.Height, panelU, panelV, settings.Kerf, logger);
+                var margin = cutout.Repeat is null ? t : 2 * t;
                 var zone = new CutoutBuilder.SafeZone(
-                    UMin: openFaces.Contains(ccw[3].Neighbor) ? 0 : t,
-                    UMax: openFaces.Contains(ccw[1].Neighbor) ? panelU : panelU - t,
-                    VMin: openFaces.Contains(ccw[0].Neighbor) ? 0 : t,
-                    VMax: openFaces.Contains(ccw[2].Neighbor) ? panelV : panelV - t);
+                    UMin: openFaces.Contains(ccw[3].Neighbor) ? 0 : margin,
+                    UMax: openFaces.Contains(ccw[1].Neighbor) ? panelU : panelU - margin,
+                    VMin: openFaces.Contains(ccw[0].Neighbor) ? 0 : margin,
+                    VMax: openFaces.Contains(ccw[2].Neighbor) ? panelV : panelV - margin);
                 foreach (var center in CutoutBuilder.ExpandCenters(cutout, seed, zone, settings.Kerf))
                 {
                     var cutPath = CutoutBuilder.Build(cutout, center, settings.Kerf, translation, logger);
