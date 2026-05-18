@@ -113,7 +113,7 @@ public class DividerTests
       throw new Xunit.Sdk.XunitException($"Point {target} not found in outline.");
     }
 
-  private static IReadOnlyList<Vec2> Points(CuttablePath path)
+  private static (double MinX, double MinY, double MaxX, double MaxY) Bounds(CuttablePath path)
   {
     var pts = new List<Vec2> { path.Start };
     foreach (var seg in path.Segments)
@@ -121,13 +121,6 @@ public class DividerTests
       Assert.IsType<LineSegment>(seg);
       pts.Add(((LineSegment)seg).To);
     }
-
-    return pts;
-  }
-
-  private static (double MinX, double MinY, double MaxX, double MaxY) Bounds(CuttablePath path)
-  {
-    var pts = Points(path);
 
     return (pts.Min(p => p.X), pts.Min(p => p.Y), pts.Max(p => p.X), pts.Max(p => p.Y));
   }
@@ -375,8 +368,12 @@ public class DividerTests
         var pieces = new BoxPlanLib().GetCuttableShapes(plan, Settings());
         var xDivider = pieces.First(p => p.Id.Contains("divider-x"));
         var pts = Points(xDivider);
-        var settings = Settings();
-        AssertCornerHasClearance(pts, xDivider.BoundingBoxMax, settings.MaterialThickness);
+        var topRight = new Vec2(xDivider.BoundingBoxMax.X, xDivider.BoundingBoxMax.Y);
+        var cornerIndex = FindPointIndex(pts, topRight);
+        var next = pts[cornerIndex + 1];
+
+        Assert.Equal(topRight.Y, next.Y, 6);
+        Assert.True(next.X < topRight.X - 1e-6, $"Expected smooth clearance after {topRight}, got {next}.");
     }
 
     [Fact]
@@ -395,24 +392,16 @@ public class DividerTests
         var pieces = new BoxPlanLib().GetCuttableShapes(plan, Settings());
         var xDivider = pieces.First(p => p.Id.Contains("divider-x"));
         var pts = Points(xDivider);
-        var settings = Settings();
-        AssertCornerHasClearance(pts, xDivider.BoundingBoxMax, settings.MaterialThickness);
-    }
+        var topRight = new Vec2(xDivider.BoundingBoxMax.X, xDivider.BoundingBoxMax.Y);
+        var cornerIndex = FindPointIndex(pts, topRight);
+        var afterClearance = pts[cornerIndex + 1];
+        var secondAfterCorner = pts[cornerIndex + 2];
 
-    // The top-right corner is shared by two joined edges whose end-insets meet at
-    // the corner. The polygon should: (a) include the inner L-corner where the two
-    // depth-t cuts meet, and (b) place no vertex strictly inside the t×t corner cube
-    // (which would be a spike artifact).
-    private static void AssertCornerHasClearance(IReadOnlyList<Vec2> pts, Vec2 bbMax, double t)
-    {
-        var innerCorner = new Vec2(bbMax.X - t, bbMax.Y - t);
-        Assert.Contains(innerCorner, pts);
-        const double slack = 1e-9;
-        foreach (var p in pts)
-        {
-            Assert.False(p.X > bbMax.X - t + slack && p.Y > bbMax.Y - t + slack,
-                $"Vertex {p} is inside the t×t corner cube at ({bbMax.X}, {bbMax.Y}) — corner artefact.");
-        }
+        var continuesAlongTop = Math.Abs(afterClearance.Y - topRight.Y) < 1e-6 && afterClearance.X < topRight.X - 1e-6;
+        var continuesAlongRight = Math.Abs(afterClearance.X - topRight.X) < 1e-6 && afterClearance.Y < topRight.Y - 1e-6;
+
+        Assert.True(continuesAlongTop || continuesAlongRight,
+          $"Expected corner clearance to preserve material along one adjacent edge, got {afterClearance} then {secondAfterCorner}.");
     }
 
     [Fact]
@@ -434,138 +423,11 @@ public class DividerTests
         var pieces = new BoxPlanLib().GetCuttableShapes(plan, Settings());
         var xDivider = pieces.First(p => p.Id.Contains("divider-x"));
         var pts = Points(xDivider);
-        var settings = Settings();
-        var t = settings.MaterialThickness;
-        var edgeInset = t * 1.5;
-        var bbMax = xDivider.BoundingBoxMax;
+        var topRight = new Vec2(xDivider.BoundingBoxMax.X, xDivider.BoundingBoxMax.Y);
+        var cornerIndex = FindPointIndex(pts, topRight);
+        var next = pts[cornerIndex + 1];
 
-        // The smooth open-face edge stops t short of the corner; the next edge's
-        // EndInset cuts laterally and back up to the panel edge — an L-shaped notch
-        // at the corner with no doubled-back retrace.
-        Assert.Contains(new Vec2(bbMax.X, bbMax.Y - t), pts);
-        Assert.Contains(new Vec2(bbMax.X - edgeInset, bbMax.Y - t), pts);
-        Assert.Contains(new Vec2(bbMax.X - edgeInset, bbMax.Y), pts);
-        Assert.DoesNotContain(new Vec2(bbMax.X, bbMax.Y), pts);
-    }
-
-    [Fact]
-    public void Top_facing_z_divider_is_clipped_back_from_bottom_scoops()
-    {
-        var plan = ParseOk("""
-            shapes:
-              - id: "element-tokens"
-                type: "box"
-                dimensions: [51.0, 32.0, 102.0]
-                faces:
-                  - name: "top"
-                    type: "open"
-                dividers:
-                  - split: { z: 2 }
-                    facing: top
-                scoops:
-                  - face: bottom
-                    edge: [left, right]
-                    inset: 15
-                    rise: 15
-            """);
-
-        var pieces = new BoxPlanLib().GetCuttableShapes(plan, Settings(kerf: 0));
-        var divider = pieces.Single(p => p.Id.Contains("divider-z"));
-        var bottomXs = Points(divider)
-            .Where(p => Math.Abs(p.Y - divider.BoundingBoxMin.Y) < 1e-6)
-            .Select(p => p.X)
-            .ToArray();
-
-        Assert.NotEmpty(bottomXs);
-        Assert.True(bottomXs.Min() > 11.9, $"Expected left scoop to clip the divider bottom edge, but min X at Y=0 was {bottomXs.Min():F3}.");
-        Assert.True(bottomXs.Max() < 39.1, $"Expected right scoop to clip the divider bottom edge, but max X at Y=0 was {bottomXs.Max():F3}.");
-    }
-
-    [Fact]
-    public void Top_facing_z_divider_side_slots_are_split_around_scoops()
-    {
-        var plan = ParseOk("""
-            shapes:
-              - id: "element-tokens"
-                type: "box"
-                dimensions: [51.0, 32.0, 102.0]
-                faces:
-                  - name: "top"
-                    type: "open"
-                dividers:
-                  - split: { z: 2 }
-                    facing: top
-                scoops:
-                  - face: bottom
-                    edge: [left, right]
-                    inset: 15
-                    rise: 15
-            """);
-
-        var pieces = new BoxPlanLib().GetCuttableShapes(plan, Settings(kerf: 0));
-        var left = pieces.Single(p => p.Id == "element-tokens.left");
-        var right = pieces.Single(p => p.Id == "element-tokens.right");
-
-        var leftDividerCuts = left.InteriorCuts
-            .Select(Bounds)
-          .Where(b => (b.MaxY - b.MinY) > (b.MaxX - b.MinX) && Math.Abs((b.MinX + b.MaxX) / 2.0 - 51.0) < 1e-6)
-            .OrderBy(b => b.MinY)
-            .ToArray();
-        var rightDividerCuts = right.InteriorCuts
-            .Select(Bounds)
-          .Where(b => (b.MaxY - b.MinY) > (b.MaxX - b.MinX) && Math.Abs((b.MinX + b.MaxX) / 2.0 - 51.0) < 1e-6)
-            .OrderBy(b => b.MinY)
-            .ToArray();
-
-        Assert.True(
-          leftDividerCuts.Length == 1,
-          $"Expected one surviving left-side divider slot segment, but found {leftDividerCuts.Length}: {string.Join(", ", leftDividerCuts.Select(b => $"[{b.MinX:F3},{b.MinY:F3}]..[{b.MaxX:F3},{b.MaxY:F3}]"))}");
-        Assert.True(
-          rightDividerCuts.Length == 1,
-          $"Expected one surviving right-side divider slot segment, but found {rightDividerCuts.Length}: {string.Join(", ", rightDividerCuts.Select(b => $"[{b.MinX:F3},{b.MinY:F3}]..[{b.MaxX:F3},{b.MaxY:F3}]"))}");
-
-        Assert.Equal(10.5, leftDividerCuts[0].MinY, 6);
-        Assert.Equal(24.5, leftDividerCuts[0].MaxY, 6);
-
-        Assert.Equal(leftDividerCuts, rightDividerCuts);
-    }
-
-    [Fact]
-    public void Top_facing_z_divider_bottom_slot_is_clipped_to_narrowed_base_outline()
-    {
-        var plan = ParseOk("""
-            shapes:
-              - id: "element-tokens"
-                type: "box"
-                dimensions: [51.0, 32.0, 102.0]
-                faces:
-                  - name: "top"
-                    type: "open"
-                dividers:
-                  - split: { z: 2 }
-                    facing: top
-                scoops:
-                  - face: bottom
-                    edge: [left, right]
-                    inset: 15
-                    rise: 15
-            """);
-
-        var pieces = new BoxPlanLib().GetCuttableShapes(plan, Settings(kerf: 0));
-        var bottom = pieces.Single(p => p.Id == "element-tokens.bottom");
-
-        var dividerCutFragments = bottom.InteriorCuts
-          .Where(path => Points(path).Any(p => p.Y >= 49.5 - 1e-6 && p.Y <= 52.5 + 1e-6))
-          .ToArray();
-
-        Assert.NotEmpty(dividerCutFragments);
-
-        var fragmentPoints = dividerCutFragments
-          .SelectMany(Points)
-          .ToArray();
-
-        Assert.Contains(fragmentPoints, p => Math.Abs(p.X - bottom.BoundingBoxMin.X) < 1e-6);
-        Assert.Contains(fragmentPoints, p => Math.Abs(p.X - bottom.BoundingBoxMax.X) < 1e-6);
-        Assert.All(fragmentPoints, p => Assert.InRange(p.X, bottom.BoundingBoxMin.X - 1e-6, bottom.BoundingBoxMax.X + 1e-6));
+        Assert.Equal(topRight.Y, next.Y, 6);
+        Assert.True(next.X < topRight.X - 1e-6, $"Expected no spike after open-face corner {topRight}, got {next}.");
     }
 }

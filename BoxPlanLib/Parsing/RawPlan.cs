@@ -120,6 +120,11 @@ public sealed class RawCutoutFeature : RawFeature
     public double? Diameter { get; set; }
     public double? Width { get; set; }
     public double? Height { get; set; }
+    public double? Radius { get; set; }
+
+    [YamlMember(Alias = "inner-radius")]
+    public double? InnerRadius { get; set; }
+
     public RawCutoutRepeat? Repeat { get; set; }
 }
 

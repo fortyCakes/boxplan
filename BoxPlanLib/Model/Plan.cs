@@ -47,6 +47,7 @@ public enum CutoutShape
     Circle,
     Semicircle,
     Rectangle,
+    EdgeDip,
 }
 
 public enum FitMode
@@ -116,6 +117,8 @@ public sealed class CutoutFeature : Feature
     public required CutoutShape Shape { get; init; }
     public required double Width { get; init; }
     public required double Height { get; init; }
+    public double Radius { get; init; }
+    public double InnerRadius { get; init; }
     public CutoutRepeat? Repeat { get; init; }
 }
 

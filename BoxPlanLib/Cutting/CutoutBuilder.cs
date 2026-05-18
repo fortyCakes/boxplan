@@ -41,6 +41,10 @@ internal static class CutoutBuilder
             return new Vec2(panelU / 2, panelV / 2);
         }
 
+        // EdgeDip: the anchor point IS the center (mouth center on the edge).
+        if (shape == CutoutShape.EdgeDip)
+            return ResolveCenter(position, panelU, panelV, logger);
+
         var anchorPoint = ResolveCenter(position, panelU, panelV, logger);
         var bounds = GetLocalBounds(shape, width, height, kerf);
         var featureAnchor = GetFeatureAnchorPoint(bounds, position.Anchor);
@@ -48,7 +52,14 @@ internal static class CutoutBuilder
     }
 
     public static CuttablePath Build(CutoutFeature feature, Vec2 center, double kerf, Vec2 translation, PipelineLogger? logger = null)
-        => Build(feature.Shape, feature.Width, feature.Height, center, kerf, translation, logger);
+    {
+        if (feature.Shape == CutoutShape.EdgeDip)
+        {
+            var anchor = feature.Position?.Anchor ?? Anchor.TopCenter;
+            return BuildEdgeDip(center, feature.Width, feature.Height, feature.Radius, feature.InnerRadius, anchor, kerf, translation, logger);
+        }
+        return Build(feature.Shape, feature.Width, feature.Height, center, kerf, translation, logger);
+    }
 
     public readonly record struct SafeZone(double UMin, double UMax, double VMin, double VMax);
 
@@ -118,6 +129,7 @@ internal static class CutoutBuilder
             CutoutShape.Semicircle => width >= 0
                 ? new LocalBounds(-w / 2.0, w / 2.0, 0, w / 2.0)
                 : new LocalBounds(-w / 2.0, w / 2.0, -w / 2.0, 0),
+            CutoutShape.EdgeDip => new LocalBounds(-w / 2.0, w / 2.0, -h, 0),
             _ => throw new InvalidOperationException($"Unsupported shape {shape}"),
         };
     }
@@ -238,6 +250,71 @@ internal static class CutoutBuilder
                 new ArcSegment(end, radius, Clockwise: false, LargeArc: false),
                 new LineSegment(start),
             },
+            Closed = true,
+        };
+    }
+
+    private static CuttablePath BuildEdgeDip(
+        Vec2 center,
+        double width,
+        double height,
+        double radius,
+        double innerRadius,
+        Anchor anchor,
+        double kerf,
+        Vec2 translation,
+        PipelineLogger? logger = null)
+    {
+        logger?.Log($"[cutout] Building edge-dip at center=({center.X},{center.Y}) anchor={anchor}");
+        var halfW = Math.Max(0, width - kerf) / 2.0;
+        var H = Math.Max(0, height - kerf);
+        var R = radius;
+        var r = innerRadius;
+        const double Overshoot = 2.0;
+
+        var cx = center.X + translation.X;
+        var cy = center.Y + translation.Y;
+
+        Vec2 T(double x, double y) => anchor switch
+        {
+            Anchor.BottomCenter => new Vec2(cx + x, cy - y),
+            Anchor.LeftCenter   => new Vec2(cx - y, cy + x),
+            Anchor.RightCenter  => new Vec2(cx + y, cy + x),
+            _                   => new Vec2(cx + x, cy + y), // TopCenter
+        };
+
+        // bottom-center and right-center have det=-1 (orientation-reversing), so flip arc direction
+        var cw = anchor is not (Anchor.BottomCenter or Anchor.RightCenter);
+
+        var segs = new List<PathSegment>();
+
+        // Overshoot past edge so clipper trims cleanly
+        segs.Add(new LineSegment(T(-halfW - R, Overshoot)));
+        segs.Add(new LineSegment(T(+halfW + R, Overshoot)));
+        segs.Add(new LineSegment(T(+halfW + R, 0)));
+
+        if (R > 0)
+            segs.Add(new ArcSegment(T(+halfW, -R), R, cw, LargeArc: false));
+
+        segs.Add(new LineSegment(T(+halfW, -(H - r))));
+
+        if (r > 0)
+            segs.Add(new ArcSegment(T(+(halfW - r), -H), r, cw, LargeArc: false));
+
+        segs.Add(new LineSegment(T(-(halfW - r), -H)));
+
+        if (r > 0)
+            segs.Add(new ArcSegment(T(-halfW, -(H - r)), r, cw, LargeArc: false));
+
+        segs.Add(new LineSegment(T(-halfW, -R)));
+
+        if (R > 0)
+            segs.Add(new ArcSegment(T(-halfW - R, 0), R, cw, LargeArc: false));
+
+        return new CuttablePath
+        {
+            Start = T(-halfW - R, 0),
+            Segments = segs,
             Closed = true,
         };
     }

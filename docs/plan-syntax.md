@@ -411,11 +411,38 @@ A hole cut all the way through the face.
 
 | Field      | Description                                                                                       |
 | ---------- | ------------------------------------------------------------------------------------------------- |
-| `shape`    | **Required.** `circle`, `semicircle`, or `rectangle`.                                              |
-| `diameter` | Sets width = height = diameter. Mutually exclusive with `width`+`height`.                          |
+| `shape`    | **Required.** `circle`, `semicircle`, `rectangle`, or `edge-dip`.                                 |
+| `diameter` | Sets width = height = diameter. Mutually exclusive with `width`+`height`. Not supported for `edge-dip`. |
 | `width`    | Required together with `height` (unless `diameter` is used).                                       |
 | `height`   | Required together with `width`.                                                                    |
-| `repeat`   | Optional array block. See [Repeat](#repeat).                                                       |
+| `repeat`   | Optional array block. See [Repeat](#repeat). Not supported for `edge-dip`.                         |
+
+#### `shape: edge-dip`
+
+A smooth U-shaped cutout opening at a panel edge, used to allow fingers to lift items out of a box. The path overhangs the panel edge and is clipped cleanly at the boundary.
+
+| Field          | Description                                                                                                  |
+| -------------- | ------------------------------------------------------------------------------------------------------------ |
+| `width`        | **Required.** Wall-to-wall inner distance of the U (between the two straight walls). Must be positive.       |
+| `height`       | **Required.** Depth of the dip from the edge inward. Must be positive.                                       |
+| `radius`       | Outer fillet radius at the two top corners where the walls meet the panel edge. Defaults to `0`.             |
+| `inner-radius` | Inner fillet radius at the two bottom corners. Defaults to `0`.                                              |
+
+`width` must be ≥ `2 × radius`. `height` must be ≥ `radius + inner-radius`.
+
+The `position.anchor` must be one of `top-center`, `bottom-center`, `left-center`, or `right-center`; it selects which edge the dip opens toward. Defaults to `top-center`.
+
+```yaml
+- type: "cutout"
+  face: "front"
+  shape: "edge-dip"
+  width: 40
+  height: 15
+  radius: 5
+  inner-radius: 3
+  position:
+    anchor: "top-center"
+```
 
 #### Repeat
 

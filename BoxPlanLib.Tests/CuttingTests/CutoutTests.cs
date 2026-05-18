@@ -515,4 +515,240 @@ public class CutoutTests
         Assert.False(result.Success);
         Assert.Contains(result.Errors, e => e.Message.Contains("non-zero"));
     }
+
+    [Fact]
+    public void EdgeDip_top_center_clips_to_panel_edge_and_stays_within_bounds()
+    {
+        var plan = ParseOk("""
+            shapes:
+              - id: "box"
+                type: "box"
+                dimensions: [100.0, 100.0, 100.0]
+                features:
+                  - face: "front"
+                    type: "cutout"
+                    shape: "edge-dip"
+                    width: 40.0
+                    height: 15.0
+                    radius: 5.0
+                    inner-radius: 3.0
+                    position:
+                      anchor: "top-center"
+            """);
+
+        var front = new BoxPlanLib().GetCuttableShapes(plan, Settings()).Single(p => p.Id == "box.front");
+        Assert.NotEmpty(front.InteriorCuts);
+        Assert.All(front.InteriorCuts.SelectMany(SamplePoints), point =>
+        {
+            Assert.True(point.X >= front.BoundingBoxMin.X - 1e-6 && point.X <= front.BoundingBoxMax.X + 1e-6,
+                $"point {point} outside X bounds [{front.BoundingBoxMin.X}, {front.BoundingBoxMax.X}]");
+            Assert.True(point.Y >= front.BoundingBoxMin.Y - 1e-6 && point.Y <= front.BoundingBoxMax.Y + 1e-6,
+                $"point {point} outside Y bounds [{front.BoundingBoxMin.Y}, {front.BoundingBoxMax.Y}]");
+        });
+        var deepest = front.InteriorCuts.SelectMany(SamplePoints).Min(p => p.Y);
+        Assert.True(deepest < front.BoundingBoxMax.Y - 10.0,
+            $"dip bottom at {deepest} does not reach expected depth below {front.BoundingBoxMax.Y}");
+    }
+
+    [Fact]
+    public void EdgeDip_no_radii_produces_only_line_segments()
+    {
+        var plan = ParseOk("""
+            shapes:
+              - id: "box"
+                type: "box"
+                dimensions: [100.0, 100.0, 100.0]
+                features:
+                  - face: "front"
+                    type: "cutout"
+                    shape: "edge-dip"
+                    width: 30.0
+                    height: 12.0
+                    position:
+                      anchor: "top-center"
+            """);
+
+        var front = new BoxPlanLib().GetCuttableShapes(plan, Settings()).Single(p => p.Id == "box.front");
+        Assert.NotEmpty(front.InteriorCuts);
+        Assert.All(front.InteriorCuts.SelectMany(c => c.Segments), s => Assert.IsType<LineSegment>(s));
+    }
+
+    [Fact]
+    public void EdgeDip_bottom_center_dips_from_bottom_edge()
+    {
+        var plan = ParseOk("""
+            shapes:
+              - id: "box"
+                type: "box"
+                dimensions: [100.0, 100.0, 100.0]
+                features:
+                  - face: "front"
+                    type: "cutout"
+                    shape: "edge-dip"
+                    width: 30.0
+                    height: 12.0
+                    position:
+                      anchor: "bottom-center"
+            """);
+
+        var front = new BoxPlanLib().GetCuttableShapes(plan, Settings()).Single(p => p.Id == "box.front");
+        Assert.NotEmpty(front.InteriorCuts);
+        Assert.All(front.InteriorCuts.SelectMany(SamplePoints), point =>
+        {
+            Assert.True(point.X >= front.BoundingBoxMin.X - 1e-6 && point.X <= front.BoundingBoxMax.X + 1e-6,
+                $"point {point} outside X bounds");
+            Assert.True(point.Y >= front.BoundingBoxMin.Y - 1e-6 && point.Y <= front.BoundingBoxMax.Y + 1e-6,
+                $"point {point} outside Y bounds");
+        });
+        var highest = front.InteriorCuts.SelectMany(SamplePoints).Max(p => p.Y);
+        Assert.True(highest > front.BoundingBoxMin.Y + 10.0,
+            $"dip top at {highest} does not reach expected depth above {front.BoundingBoxMin.Y}");
+    }
+
+    [Fact]
+    public void EdgeDip_left_center_dips_from_left_edge()
+    {
+        var plan = ParseOk("""
+            shapes:
+              - id: "box"
+                type: "box"
+                dimensions: [100.0, 100.0, 100.0]
+                features:
+                  - face: "front"
+                    type: "cutout"
+                    shape: "edge-dip"
+                    width: 30.0
+                    height: 12.0
+                    position:
+                      anchor: "left-center"
+            """);
+
+        var front = new BoxPlanLib().GetCuttableShapes(plan, Settings()).Single(p => p.Id == "box.front");
+        Assert.NotEmpty(front.InteriorCuts);
+        Assert.All(front.InteriorCuts.SelectMany(SamplePoints), point =>
+        {
+            Assert.True(point.X >= front.BoundingBoxMin.X - 1e-6 && point.X <= front.BoundingBoxMax.X + 1e-6,
+                $"point {point} outside X bounds");
+            Assert.True(point.Y >= front.BoundingBoxMin.Y - 1e-6 && point.Y <= front.BoundingBoxMax.Y + 1e-6,
+                $"point {point} outside Y bounds");
+        });
+        var rightmost = front.InteriorCuts.SelectMany(SamplePoints).Max(p => p.X);
+        Assert.True(rightmost > front.BoundingBoxMin.X + 10.0,
+            $"dip right side at {rightmost} does not reach expected depth from left edge");
+    }
+
+    [Fact]
+    public void EdgeDip_right_center_dips_from_right_edge()
+    {
+        var plan = ParseOk("""
+            shapes:
+              - id: "box"
+                type: "box"
+                dimensions: [100.0, 100.0, 100.0]
+                features:
+                  - face: "front"
+                    type: "cutout"
+                    shape: "edge-dip"
+                    width: 30.0
+                    height: 12.0
+                    position:
+                      anchor: "right-center"
+            """);
+
+        var front = new BoxPlanLib().GetCuttableShapes(plan, Settings()).Single(p => p.Id == "box.front");
+        Assert.NotEmpty(front.InteriorCuts);
+        Assert.All(front.InteriorCuts.SelectMany(SamplePoints), point =>
+        {
+            Assert.True(point.X >= front.BoundingBoxMin.X - 1e-6 && point.X <= front.BoundingBoxMax.X + 1e-6,
+                $"point {point} outside X bounds");
+            Assert.True(point.Y >= front.BoundingBoxMin.Y - 1e-6 && point.Y <= front.BoundingBoxMax.Y + 1e-6,
+                $"point {point} outside Y bounds");
+        });
+        var leftmost = front.InteriorCuts.SelectMany(SamplePoints).Min(p => p.X);
+        Assert.True(leftmost < front.BoundingBoxMax.X - 10.0,
+            $"dip left side at {leftmost} does not reach expected depth from right edge");
+    }
+
+    [Fact]
+    public void EdgeDip_rejects_invalid_anchor()
+    {
+        var result = new BoxPlanLib().ParsePlan("""
+            shapes:
+              - id: "box"
+                type: "box"
+                dimensions: [100.0, 100.0, 100.0]
+                features:
+                  - face: "front"
+                    type: "cutout"
+                    shape: "edge-dip"
+                    width: 30.0
+                    height: 12.0
+                    position:
+                      anchor: "center"
+            """);
+        Assert.False(result.Success);
+        Assert.Contains(result.Errors, e => e.Message.Contains("anchor"));
+    }
+
+    [Fact]
+    public void EdgeDip_rejects_width_less_than_2_times_radius()
+    {
+        var result = new BoxPlanLib().ParsePlan("""
+            shapes:
+              - id: "box"
+                type: "box"
+                dimensions: [100.0, 100.0, 100.0]
+                features:
+                  - face: "front"
+                    type: "cutout"
+                    shape: "edge-dip"
+                    width: 8.0
+                    height: 12.0
+                    radius: 5.0
+            """);
+        Assert.False(result.Success);
+        Assert.Contains(result.Errors, e => e.Message.Contains("width") || e.Message.Contains("radius"));
+    }
+
+    [Fact]
+    public void EdgeDip_rejects_height_less_than_radius_plus_inner_radius()
+    {
+        var result = new BoxPlanLib().ParsePlan("""
+            shapes:
+              - id: "box"
+                type: "box"
+                dimensions: [100.0, 100.0, 100.0]
+                features:
+                  - face: "front"
+                    type: "cutout"
+                    shape: "edge-dip"
+                    width: 30.0
+                    height: 5.0
+                    radius: 3.0
+                    inner-radius: 3.0
+            """);
+        Assert.False(result.Success);
+        Assert.Contains(result.Errors, e => e.Message.Contains("height") || e.Message.Contains("radius"));
+    }
+
+    [Fact]
+    public void EdgeDip_rejects_repeat()
+    {
+        var result = new BoxPlanLib().ParsePlan("""
+            shapes:
+              - id: "box"
+                type: "box"
+                dimensions: [100.0, 100.0, 100.0]
+                features:
+                  - face: "front"
+                    type: "cutout"
+                    shape: "edge-dip"
+                    width: 30.0
+                    height: 12.0
+                    repeat:
+                      spacing: [10.0, 0.0]
+            """);
+        Assert.False(result.Success);
+        Assert.Contains(result.Errors, e => e.Message.Contains("repeat"));
+    }
 }

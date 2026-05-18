@@ -1297,11 +1297,14 @@ public sealed class PlanResolver
             return null;
         }
 
-        if (!Enum.TryParse<CutoutShape>(raw.Shape, ignoreCase: true, out var shape))
+        if (!Enum.TryParse<CutoutShape>(raw.Shape.Replace("-", ""), ignoreCase: true, out var shape))
         {
             errors.Add(Err($"Unknown cutout shape '{raw.Shape}'.", $"{path}.shape", raw));
             return null;
         }
+
+        if (shape == CutoutShape.EdgeDip)
+            return ResolveEdgeDipCutout(raw, face, position, path, errors);
 
         double width;
         double height;
@@ -1351,6 +1354,87 @@ public sealed class PlanResolver
             Width = width,
             Height = height,
             Repeat = repeat,
+        };
+    }
+
+    private static CutoutFeature? ResolveEdgeDipCutout(
+        RawCutoutFeature raw,
+        FaceName face,
+        Position? position,
+        string path,
+        List<PlanError> errors)
+    {
+        if (raw.Diameter is not null)
+        {
+            errors.Add(Err("EdgeDip cutout does not support 'diameter'.", path, raw));
+            return null;
+        }
+        if (raw.Repeat is not null)
+        {
+            errors.Add(Err("EdgeDip cutout does not support 'repeat'.", path, raw));
+            return null;
+        }
+
+        if (raw.Width is not { } width || raw.Height is not { } height)
+        {
+            errors.Add(Err("EdgeDip cutout requires both 'width' and 'height'.", path, raw));
+            return null;
+        }
+        if (width <= 0)
+        {
+            errors.Add(Err("EdgeDip 'width' must be positive.", $"{path}.width", raw));
+            return null;
+        }
+        if (height <= 0)
+        {
+            errors.Add(Err("EdgeDip 'height' must be positive.", $"{path}.height", raw));
+            return null;
+        }
+
+        var radius = raw.Radius ?? 0.0;
+        var innerRadius = raw.InnerRadius ?? 0.0;
+
+        if (radius < 0)
+        {
+            errors.Add(Err("EdgeDip 'radius' must be non-negative.", $"{path}.radius", raw));
+            return null;
+        }
+        if (innerRadius < 0)
+        {
+            errors.Add(Err("EdgeDip 'inner-radius' must be non-negative.", $"{path}.inner-radius", raw));
+            return null;
+        }
+        if (width < 2 * radius)
+        {
+            errors.Add(Err($"EdgeDip 'width' ({width}) must be at least 2 * radius ({2 * radius}).", path, raw));
+            return null;
+        }
+        if (height < radius + innerRadius)
+        {
+            errors.Add(Err($"EdgeDip 'height' ({height}) must be at least radius + inner-radius ({radius + innerRadius}).", path, raw));
+            return null;
+        }
+
+        var anchor = position?.Anchor;
+        if (anchor is not null &&
+            anchor != Anchor.TopCenter &&
+            anchor != Anchor.BottomCenter &&
+            anchor != Anchor.LeftCenter &&
+            anchor != Anchor.RightCenter)
+        {
+            errors.Add(Err("EdgeDip anchor must be one of: top-center, bottom-center, left-center, right-center.", $"{path}.position.anchor", raw));
+            return null;
+        }
+
+        return new CutoutFeature
+        {
+            Face = face,
+            Position = position ?? new Position(Anchor.TopCenter, Vec2.Zero),
+            Shape = CutoutShape.EdgeDip,
+            Width = width,
+            Height = height,
+            Radius = radius,
+            InnerRadius = innerRadius,
         };
     }
 

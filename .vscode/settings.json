@@ -6,6 +6,7 @@
         "ForEach-Object": true,
         "dotnet build": true,
         ".\\BoxPlanLib.Cli\\sample-plans\\triangular-tray.yml": true,
-        "tee": true
+        "tee": true,
+        "git stash": true
     }
 }
