@@ -9,15 +9,17 @@ shapes:
   features:
     - type: "cutout"
       face: "top"
-      shape: "circle" 
-      diameter: 50.0
+      shape: "edge-dip" 
+      width: 50.0
+      height: 100.0
       position: 
         anchor: "bottom-center"
         offset: [0.0, 0.0]
     - type: "cutout"
       face: "bottom"
-      shape: "circle" 
-      diameter: 50.0
+      shape: "edge-dip" 
+      width: 50.0
+      height: 100.0
       position: 
         anchor: "bottom-center"
         offset: [0.0, 0.0]
@@ -32,15 +34,17 @@ shapes:
   features:
     - type: "cutout"
       face: "top"
-      shape: "circle" 
-      diameter: 50.0
+      shape: "edge-dip" 
+      width: 50.0
+      height: 100.0
       position: 
         anchor: "bottom-center"
         offset: [0.0, 0.0]
     - type: "cutout"
       face: "bottom"
-      shape: "circle" 
-      diameter: 50.0
+      shape: "edge-dip" 
+      width: 50.0
+      height: 100.0
       position: 
         anchor: "bottom-center"
         offset: [0.0, 0.0]
