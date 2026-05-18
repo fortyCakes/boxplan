@@ -141,6 +141,7 @@ internal static class PanelMerger
         var interiorCuts = new List<CuttablePath>();
         var engravings = new List<CuttablePath>();
         var textEngravings = new List<TextEngraving>();
+        var rasterEngravings = new List<RasterEngraving>();
 
         foreach (var member in members)
         {
@@ -189,6 +190,32 @@ internal static class PanelMerger
                             });
                         }
                         break;
+                    case RasterEngravingFeature raster:
+                        var rasterAnchorName = raster.Position?.Anchor ?? Anchor.Center;
+                        var rasterCenter = CutoutBuilder.ResolvePlacementCenter(
+                            raster.Position,
+                            CutoutShape.Rectangle,
+                            raster.Width,
+                            raster.Height,
+                            member.PanelU,
+                            member.PanelV,
+                            kerf: 0,
+                            logger);
+                        var localRasterAnchor = EngravingBuilder.AnchorPointFromCenter(rasterCenter, rasterAnchorName, raster.Width, raster.Height);
+                        var rasterAnchor = new Vec2(localRasterAnchor.X + adj.X, localRasterAnchor.Y + adj.Y);
+                        if (CutoutClipper.IsInsideOutline(rasterAnchor, path))
+                        {
+                            rasterEngravings.Add(new RasterEngraving
+                            {
+                                Href = raster.Source,
+                                X = rasterAnchor.X,
+                                Y = rasterAnchor.Y,
+                                Anchor = rasterAnchorName,
+                                Width = raster.Width,
+                                Height = raster.Height,
+                            });
+                        }
+                        break;
                 }
             }
         }
@@ -202,6 +229,7 @@ internal static class PanelMerger
             InteriorCuts = interiorCuts,
             Engravings = engravings,
             TextEngravings = textEngravings,
+            RasterEngravings = rasterEngravings,
         };
     }
 

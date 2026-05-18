@@ -45,7 +45,7 @@ These fields are accepted on every shape type.
 | `faces`    | list of face overrides              | all closed           | See [Faces](#faces).                                                                         |
 | `dividers` | list of divider sets                | none                 | Internal partitions (box only — see [Dividers](#dividers)).                                  |
 | `inserts`  | list of inserts                     | none                 | Nest other shapes inside this one. See [Inserts](#inserts).                                  |
-| `features` | list of features                    | none                 | Cutouts, engravings, grids on faces. See [Features](#features). Box and panel shapes only.   |
+| `features` | list of features                    | none                 | Cutouts, engravings (text/raster), grids on faces. See [Features](#features). Box and panel shapes only.   |
 | `fit`      | fit object                          | none                 | Auto-sized to a parent cell. See [Fit](#fit). Mutually exclusive with explicit sizing.       |
 
 ---
@@ -161,8 +161,8 @@ shapes:
         size: 12
 ```
 
-Panel shapes accept `features` (cutouts, engravings, line-engravings, engraving-
-grids). Features default to `face: front` and may omit the field entirely. The
+Panel shapes accept `features` (cutouts, engravings, raster-engravings,
+line-engravings, engraving-grids). Features default to `face: front` and may omit the field entirely. The
 only supported face name is `front`; marking it open suppresses the panel
 entirely. Panels do not support `dividers`, `inserts`, or `fit`.
 
@@ -483,6 +483,26 @@ that anchor (`left-center` starts at the point, `right-center` ends at it,
 | `font`  | Optional font family. Defaults to `sans-serif`.                                              |
 | `style` | Optional space-separated styles. Recognised values: `bold`, `italic` (combinable).            |
 
+### `type: raster-engraving`
+
+A raster image (for example PNG/JPEG/WebP) engraved onto the face.
+
+If `position` is omitted, the image is centered on the face. If `position` is
+provided, the anchor refers to the matching point on the image bounding box,
+the same way cutout anchors do.
+
+| Field    | Description                                                                                  |
+| -------- | -------------------------------------------------------------------------------------------- |
+| `source` | **Required.** Image path or URI. Relative paths are resolved from the plan file location.   |
+| `image`  | Alias of `source`.                                                                            |
+| `width`  | **Required.** Rendered image width in mm. Must be positive.                                  |
+| `height` | **Required.** Rendered image height in mm. Must be positive.                                 |
+
+CLI output behavior is controlled by settings:
+
+- `embed-raster-engravings: true` (default) embeds each image as base64 in SVG.
+- `embed-raster-engravings: false` copies source files to `raster-engraving-asset-folder` (default `assets`) and references them from SVG.
+
 ### `type: line-engraving`
 
 A shape engraved as line work (no fill).
@@ -504,6 +524,54 @@ A square grid engraved across the entire face.
 | ----------- | -------------------------------------------------------------------------------------------- |
 | `cell-size` | **Required.** Grid spacing in mm. Must be positive.                                          |
 | `center`    | `space` (default) — center the gridlines, `corner` — start in the corner, `maximize` — fit as many cells as possible. |
+
+### `type: split-cut`
+
+Adds an internal cut line (blue) on a side face (`front`, `back`, `left`, `right`) to split
+the assembled box into base/lid while still keeping each panel as one layout piece.
+
+Curve X coordinates are automatically scaled across the full width of each side face.
+No explicit split-curve width parameter is required.
+
+On tabbed side edges (the default for closed neighboring faces), split-cut endpoints are
+snapped to the nearest slot top/bottom boundary and the curve is emitted only across the
+inner span between edge strips (`t..u-t`). On smooth/open side edges, split-cut keeps the
+full-width behavior.
+When snapping is applied, the existing split curve is translated vertically as a whole
+rather than warping endpoint points independently.
+
+When `validate-separation` is enabled (default), the resolver checks the split can separate:
+
+- Exactly one validated split-cut must exist on each side face (`front`, `back`, `left`, `right`).
+- All validated split-cut features must use the same `height`, `amplitude`, and curve shape.
+
+| Field                 | Description |
+| --------------------- | ----------- |
+| `height`              | **Required.** Baseline split height in mm above the face bottom edge. |
+| `amplitude`           | Optional. Vertical scale (mm) for curve variation. Defaults to `0` (straight line). |
+| `validate-separation` | Optional. Defaults to `true`. Set to `false` to allow partial/non-matching cuts without separation checks. |
+| `curve`               | Optional. Curve definition. If omitted, a straight horizontal line is used. |
+| `curve.level-ends`    | Optional. Defaults to `true`. Rotates the source curve so its first/last points are level before normalization. |
+
+`curve.type` supports:
+
+- `straight` (or omitted)
+- `cubic-bezier` with `control-1: [x, y]`, `control-2: [x, y]`, optional `samples`
+- `polyline` with `points: [[x, y], ...]`
+- `svg-path` with `svg-path-data: "M ... C ..."`, optional `samples`
+
+Example:
+
+```yaml
+- face: "front"
+  type: "split-cut"
+  height: 50.0
+  amplitude: 10.0
+  curve:
+    type: "svg-path"
+    samples: 24
+    svg-path-data: "M 0 0 C 25 10 75 -10 100 0"
+```
 
 ### Position
 

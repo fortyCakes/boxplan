@@ -103,6 +103,36 @@ public class ParserTests
     }
 
     [Fact]
+    public void Parses_raster_engraving_feature_via_polymorphic_type()
+    {
+        var yaml = """
+            shapes:
+              - id: "d"
+                type: "box"
+                dimensions: [10.0, 10.0, 10.0]
+                features:
+                  - face: "front"
+                    type: "raster-engraving"
+                    source: "Spirit-Island-Logo.png"
+                    width: 20.0
+                    height: 12.0
+                    position:
+                      anchor: "bottom-right"
+                      offset: [-2.0, 3.0]
+            """;
+
+        var raw = ParseOk(yaml);
+
+        var feature = Assert.Single(Assert.Single(raw.Shapes).Features!);
+        var raster = Assert.IsType<RawRasterEngravingFeature>(feature);
+        Assert.Equal("Spirit-Island-Logo.png", raster.Source);
+        Assert.Equal(20.0, raster.Width);
+        Assert.Equal(12.0, raster.Height);
+        Assert.Equal("bottom-right", raster.Position!.Anchor);
+        Assert.Equal(new[] { -2.0, 3.0 }, raster.Position!.Offset);
+    }
+
+    [Fact]
     public void Parses_top_left_anchor_in_feature_position()
     {
         var yaml = """
@@ -154,6 +184,40 @@ public class ParserTests
         var cutout = Assert.IsType<RawCutoutFeature>(feature);
         Assert.Equal("bottom-right", cutout.Position!.Anchor);
         Assert.Equal(new[] { -1.0, 2.0 }, cutout.Position!.Offset);
+    }
+
+    [Fact]
+    public void Parses_split_cut_feature_with_svg_curve()
+    {
+        var yaml = """
+            shapes:
+              - id: "box"
+                type: "box"
+                dimensions: [100.0, 80.0, 60.0]
+                features:
+                  - face: "front"
+                    type: "split-cut"
+                    height: 25.0
+                    amplitude: 8.0
+                    validate-separation: true
+                    curve:
+                      type: "svg-path"
+                      level-ends: false
+                      samples: 16
+                      svg-path-data: "M 0 0 C 25 10 75 -10 100 0"
+            """;
+
+        var raw = ParseOk(yaml);
+
+        var feature = Assert.Single(Assert.Single(raw.Shapes).Features!);
+        var split = Assert.IsType<RawSplitCutFeature>(feature);
+        Assert.Equal(25.0, split.Height);
+        Assert.Equal(8.0, split.Amplitude);
+        Assert.True(split.ValidateSeparation);
+        Assert.NotNull(split.Curve);
+        Assert.Equal("svg-path", split.Curve!.Type);
+        Assert.False(split.Curve!.LevelEnds);
+        Assert.Equal(16, split.Curve!.Samples);
     }
 
     [Fact]

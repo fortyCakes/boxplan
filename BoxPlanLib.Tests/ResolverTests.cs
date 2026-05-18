@@ -326,4 +326,60 @@ public class ResolverTests
         Assert.True(error.Line is >= 6 and <= 8,
             $"expected error at cutout mapping (line ~6), got line {error.Line}");
     }
+
+    [Fact]
+    public void Split_cut_validation_requires_all_side_faces()
+    {
+        var errors = ResolveErrors("""
+            shapes:
+              - id: "box"
+                type: "box"
+                dimensions: [100.0, 80.0, 60.0]
+                features:
+                  - face: "front"
+                    type: "split-cut"
+                    height: 20.0
+            """);
+
+        Assert.Contains(errors, e => e.Message.Contains("missing on face 'back'", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(errors, e => e.Message.Contains("missing on face 'left'", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(errors, e => e.Message.Contains("missing on face 'right'", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public void Split_cut_validation_can_be_disabled_per_feature()
+    {
+        var plan = ResolveOk("""
+            shapes:
+              - id: "box"
+                type: "box"
+                dimensions: [100.0, 80.0, 60.0]
+                features:
+                  - face: "front"
+                    type: "split-cut"
+                    height: 20.0
+                    validate-separation: false
+            """);
+
+        var split = Assert.IsType<SplitCutFeature>(Assert.Single(Assert.Single(plan.Shapes).Features));
+        Assert.False(split.ValidateSeparation);
+    }
+
+    [Fact]
+    public void Split_cut_is_invalid_on_top_or_bottom_faces()
+    {
+        var errors = ResolveErrors("""
+            shapes:
+              - id: "box"
+                type: "box"
+                dimensions: [100.0, 80.0, 60.0]
+                features:
+                  - face: "top"
+                    type: "split-cut"
+                    height: 20.0
+                    validate-separation: false
+            """);
+
+        Assert.Contains(errors, e => e.Message.Contains("only valid on side faces", StringComparison.OrdinalIgnoreCase));
+    }
 }

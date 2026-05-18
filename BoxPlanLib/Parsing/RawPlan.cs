@@ -151,10 +151,51 @@ public sealed class RawLineEngravingFeature : RawFeature
     public double? Height { get; set; }
 }
 
+public sealed class RawRasterEngravingFeature : RawFeature
+{
+    public string? Source { get; set; }
+    public string? Image { get; set; }
+    public double? Width { get; set; }
+    public double? Height { get; set; }
+}
+
 public sealed class RawEngravingGridFeature : RawFeature
 {
     public double? CellSize { get; set; }
     public string? Center { get; set; }
+}
+
+public sealed class RawSplitCutFeature : RawFeature
+{
+    public double? Height { get; set; }
+    public double? Amplitude { get; set; }
+    public RawSplitCurve? Curve { get; set; }
+
+    [YamlMember(Alias = "validate-separation")]
+    public bool? ValidateSeparation { get; set; }
+}
+
+public sealed class RawSplitCurve : IRawLocated
+{
+    public string? Type { get; set; }
+
+    [YamlMember(Alias = "level-ends")]
+    public bool? LevelEnds { get; set; }
+
+    [YamlMember(Alias = "control-1")]
+    public double[]? Control1 { get; set; }
+
+    [YamlMember(Alias = "control-2")]
+    public double[]? Control2 { get; set; }
+
+    public List<double[]>? Points { get; set; }
+
+    [YamlMember(Alias = "svg-path-data")]
+    public string? SvgPathData { get; set; }
+
+    public int? Samples { get; set; }
+
+    [YamlIgnore] public RawLocation? SourceLocation { get; set; }
 }
 
 public sealed class RawPosition : IRawLocated

@@ -42,6 +42,7 @@ internal static class PanelFaceBuilder
         var interiorCuts = new List<CuttablePath>();
         var engravings = new List<CuttablePath>();
         var textEngravings = new List<TextEngraving>();
+        var rasterEngravings = new List<RasterEngraving>();
 
         // No finger-joint margins — the entire panel interior is fair game.
         var zone = new CutoutBuilder.SafeZone(UMin: 0, UMax: panelU, VMin: 0, VMax: panelV);
@@ -86,6 +87,32 @@ internal static class PanelFaceBuilder
                         });
                     }
                     break;
+                case RasterEngravingFeature raster:
+                    var rasterAnchorName = raster.Position?.Anchor ?? Anchor.Center;
+                    var rasterCenter = CutoutBuilder.ResolvePlacementCenter(
+                        raster.Position,
+                        CutoutShape.Rectangle,
+                        raster.Width,
+                        raster.Height,
+                        panelU,
+                        panelV,
+                        kerf: 0,
+                        logger);
+                    var localRasterAnchor = EngravingBuilder.AnchorPointFromCenter(rasterCenter, rasterAnchorName, raster.Width, raster.Height);
+                    var rasterAnchor = new Vec2(localRasterAnchor.X + translation.X, localRasterAnchor.Y + translation.Y);
+                    if (CutoutClipper.IsInsideOutline(rasterAnchor, path))
+                    {
+                        rasterEngravings.Add(new RasterEngraving
+                        {
+                            Href = raster.Source,
+                            X = rasterAnchor.X,
+                            Y = rasterAnchor.Y,
+                            Anchor = rasterAnchorName,
+                            Width = raster.Width,
+                            Height = raster.Height,
+                        });
+                    }
+                    break;
             }
         }
 
@@ -98,6 +125,7 @@ internal static class PanelFaceBuilder
             InteriorCuts = interiorCuts,
             Engravings = engravings,
             TextEngravings = textEngravings,
+            RasterEngravings = rasterEngravings,
         };
     }
 }

@@ -1,37 +1,221 @@
 shapes:
-# - id: "top-tray"
-#   type: "box" 
-#   dimensions: [256.0, 35.0, 316.0]
-#   faces:
-#     - name: "top"
-#       type: "open"
+- id: "top-tray"
+  type: "box" 
+  dimensions: [256.0, 35.0, 316.0]
+  faces:
+    - name: "top"
+      type: "open"
 
-# - id: "presence-tokens-1" # TODO add 5 more of these for the other 5 colors
-#   type: "box" 
-#   dimensions: [51.0, 32.0, 51.0]
-#   origin: "bottom-left-front"
-#   faces:
-#     - name: "top"
-#       type: "open"
-#   features:
-#     - face: "front"
-#       type: "engraving"
-#       text: "Yellow"
-#       size: 6.0
-#       font: "DK Snemand"
-#       style: "bold"
-#       position:
-#         anchor: "bottom-center"
-#         offset: [0.0, 6.0]    
-#   scoops:
-#     - face: bottom
-#       edge: [front, back]
-#       inset: 15
-#       rise: 15
+- id: "presence-tokens-1"
+  type: "box" 
+  dimensions: [51.0, 32.0, 51.0]
+  origin: "bottom-left-front"
+  faces:
+    - name: "top"
+      type: "open"
+  features:
+    - face: "front"
+      type: "engraving"
+      text: "Yellow"
+      size: 6.0
+      font: "DK Snemand"
+      style: "bold"
+      position:
+        anchor: "bottom-center"
+        offset: [0.0, 6.0]    
+  scoops:
+    - face: bottom
+      edge: [front, back]
+      inset: 15
+      rise: 15
+
+- id: "presence-tokens-2"
+  type: "box" 
+  dimensions: [51.0, 32.0, 51.0]
+  origin: "bottom-left-front"
+  faces:
+    - name: "top"
+      type: "open"
+  features:
+    - face: "front"
+      type: "engraving"
+      text: "Blue"
+      size: 6.0
+      font: "DK Snemand"
+      style: "bold"
+      position:
+        anchor: "bottom-center"
+        offset: [0.0, 6.0]    
+  scoops:
+    - face: bottom
+      edge: [front, back]
+      inset: 15
+      rise: 15
+
+- id: "presence-tokens-3"
+  type: "box" 
+  dimensions: [51.0, 32.0, 51.0]
+  origin: "bottom-left-front"
+  faces:
+    - name: "top"
+      type: "open"
+  features:
+    - face: "front"
+      type: "engraving"
+      text: "Purple"
+      size: 6.0
+      font: "DK Snemand"
+      style: "bold"
+      position:
+        anchor: "bottom-center"
+        offset: [0.0, 6.0]    
+  scoops:
+    - face: bottom
+      edge: [front, back]
+      inset: 15
+      rise: 15
+
+- id: "presence-tokens-4"
+  type: "box" 
+  dimensions: [51.0, 32.0, 51.0]
+  origin: "bottom-left-front"
+  faces:
+    - name: "top"
+      type: "open"
+  features:
+    - face: "front"
+      type: "engraving"
+      text: "Orange"
+      size: 6.0
+      font: "DK Snemand"
+      style: "bold"
+      position:
+        anchor: "bottom-center"
+        offset: [0.0, 6.0]    
+  scoops:
+    - face: bottom
+      edge: [front, back]
+      inset: 15
+      rise: 15
+
+- id: "presence-tokens-5"
+  type: "box" 
+  dimensions: [51.0, 32.0, 51.0]
+  origin: "bottom-left-front"
+  faces:
+    - name: "top"
+      type: "open"
+  features:
+    - face: "front"
+      type: "engraving"
+      text: "Red"
+      size: 6.0
+      font: "DK Snemand"
+      style: "bold"
+      position:
+        anchor: "bottom-center"
+        offset: [0.0, 6.0]    
+  scoops:
+    - face: bottom
+      edge: [front, back]
+      inset: 15
+      rise: 15
+
+- id: "presence-tokens-6"
+  type: "box" 
+  dimensions: [51.0, 32.0, 51.0]
+  origin: "bottom-left-front"
+  faces:
+    - name: "top"
+      type: "open"
+  features:
+    - face: "front"
+      type: "engraving"
+      text: "Green"
+      size: 6.0
+      font: "DK Snemand"
+      style: "bold"
+      position:
+        anchor: "bottom-center"
+        offset: [0.0, 6.0]    
+  scoops:
+    - face: bottom
+      edge: [front, back]
+      inset: 15
+      rise: 15
+
+- id: "presence-tokens-7"
+  type: "box" 
+  dimensions: [51.0, 32.0, 51.0]
+  origin: "bottom-left-front"
+  faces:
+    - name: "top"
+      type: "open"
+  features:
+    - face: "front"
+      type: "engraving"
+      text: "Purple 2"
+      size: 6.0
+      font: "DK Snemand"
+      style: "bold"
+      position:
+        anchor: "bottom-center"
+        offset: [0.0, 6.0]    
+  scoops:
+    - face: bottom
+      edge: [front, back]
+      inset: 15
+      rise: 15
+
+- id: "presence-tokens-8"
+  type: "box" 
+  dimensions: [51.0, 32.0, 51.0]
+  origin: "bottom-left-front"
+  faces:
+    - name: "top"
+      type: "open"
+  features:
+    - face: "front"
+      type: "engraving"
+      text: "Green 2"
+      size: 6.0
+      font: "DK Snemand"
+      style: "bold"
+      position:
+        anchor: "bottom-center"
+        offset: [0.0, 6.0]    
+  scoops:
+    - face: bottom
+      edge: [front, back]
+      inset: 15
+      rise: 15
+
+- id: "presence-tokens-corner"
+  type: "box" 
+  dimensions: [51.0, 32.0, 51.0]
+  origin: "bottom-left-front"
+  faces:
+    - name: "top"
+      type: "open"
+  features:
+    - face: "front"
+      type: "engraving"
+      text: "Yellow 2"
+      size: 6.0
+      font: "DK Snemand"
+      style: "bold"
+      position:
+        anchor: "bottom-center"
+        offset: [0.0, 6.0]    
+  scoops:
+    - face: bottom
+      edge: [front, back]
+      inset: 15
+      rise: 15
 
 - id: "element-tokens"
   type: "box" 
-  dimensions: [51.0, 32.0, 316.0]
+  dimensions: [45.0, 32.0, 310.0]
   origin: "bottom-left-front"
   faces:
     - name: "top"
@@ -44,3 +228,61 @@ shapes:
       edge: [left, right]
       inset: 15
       rise: 15
+
+- id: "fear-and-terror"
+  type: "box" 
+  dimensions: [83.0, 32.0, 100.0]
+  origin: "bottom-left-front"
+  faces:
+    - name: "top"
+      type: "open"
+  features:
+    - face: "front"
+      type: "cutout"
+      shape: "semicircle"
+      diameter: -52.0
+      position:
+        anchor: "top-center"
+        offset: [0.0, 0.0]
+    - face: "bottom"
+      type: "engraving"
+      text: "Terror & Fear"
+      size: 6.0
+      font: "DK Snemand"
+      style: "bold"
+      position:
+        anchor: "center"
+        offset: [0.0, 6.0]
+
+- id: "events"
+  type: "box" 
+  dimensions: [71.0, 32.0, 100.0]
+  origin: "bottom-left-front"
+  faces:
+    - name: "top"
+      type: "open"
+  features:
+    - face: "front"
+      type: "cutout"
+      shape: "semicircle"
+      diameter: -52.0
+      position:
+        anchor: "top-center"
+        offset: [0.0, 0.0]
+    - face: "bottom"
+      type: "engraving"
+      text: "Events"
+      size: 6.0
+      font: "DK Snemand"
+      style: "bold"
+      position:
+        anchor: "center"
+        offset: [0.0, 6.0]
+
+- id: "misc-component-tray"
+  type: "box" 
+  dimensions: [159.0, 32.0, 154.0]
+  origin: "bottom-left-front"
+  faces:
+    - name: "top"
+      type: "open"

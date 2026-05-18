@@ -174,8 +174,20 @@ static int WritePagedSvgFiles(
     string outputDirectory,
     string planName)
 {
-    var pageSvgs = lib.GeneratePagedSVGPages(pieces, settings);
     Directory.CreateDirectory(outputDirectory);
+
+    BoxPlanCuttableShape[] preparedPieces;
+    try
+    {
+        preparedPieces = PrepareRasterEngravingAssets(pieces, settings, outputDirectory);
+    }
+    catch (Exception ex) when (ex is InvalidDataException or FileNotFoundException)
+    {
+        Console.Error.WriteLine($"Failed to prepare raster engravings: {ex.Message}");
+        return 0;
+    }
+
+    var pageSvgs = lib.GeneratePagedSVGPages(preparedPieces, settings);
 
     foreach (var existingSvg in Directory.GetFiles(outputDirectory, "*.svg", SearchOption.TopDirectoryOnly))
     {
@@ -213,7 +225,180 @@ static BoxPlanCuttableShape[]? ReadPlanPieces(BoxPlanLib.BoxPlanLib lib, BoxPlan
         return null;
     }
 
-    return lib.GetCuttableShapes(parsed.Value, settings);
+    var pieces = lib.GetCuttableShapes(parsed.Value, settings);
+    return NormalizeRasterEngravingSources(pieces, inputPath);
+}
+
+static BoxPlanCuttableShape[] NormalizeRasterEngravingSources(BoxPlanCuttableShape[] pieces, string inputPath)
+{
+    var inputDirectory = Path.GetDirectoryName(Path.GetFullPath(inputPath)) ?? Directory.GetCurrentDirectory();
+    var remap = new Dictionary<string, string>(StringComparer.Ordinal);
+
+    foreach (var source in pieces
+        .SelectMany(piece => piece.RasterEngravings)
+        .Select(engraving => engraving.Href)
+        .Where(href => !string.IsNullOrWhiteSpace(href))
+        .Distinct(StringComparer.Ordinal))
+    {
+        if (LooksLikeDataUri(source))
+        {
+            remap[source] = source;
+            continue;
+        }
+
+        var absolutePath = Path.IsPathRooted(source)
+            ? Path.GetFullPath(source)
+            : Path.GetFullPath(Path.Combine(inputDirectory, source));
+
+        remap[source] = absolutePath;
+    }
+
+    return remap.Count == 0 ? pieces : CloneWithRasterHrefMap(pieces, remap);
+}
+
+static BoxPlanCuttableShape[] PrepareRasterEngravingAssets(
+    BoxPlanCuttableShape[] pieces,
+    BoxPlanSettings settings,
+    string outputDirectory)
+{
+    var rasterSources = pieces
+        .SelectMany(piece => piece.RasterEngravings)
+        .Select(engraving => engraving.Href)
+        .Where(href => !string.IsNullOrWhiteSpace(href))
+        .Distinct(StringComparer.Ordinal)
+        .ToArray();
+
+    if (rasterSources.Length == 0)
+    {
+        return pieces;
+    }
+
+    var remap = new Dictionary<string, string>(StringComparer.Ordinal);
+
+    if (settings.EmbedRasterEngravings)
+    {
+        foreach (var source in rasterSources)
+        {
+            if (LooksLikeDataUri(source))
+            {
+                remap[source] = source;
+                continue;
+            }
+
+            if (!File.Exists(source))
+            {
+                throw new FileNotFoundException($"Raster engraving source not found: {source}");
+            }
+
+            var mimeType = RasterMimeTypeFromPath(source);
+            var bytes = File.ReadAllBytes(source);
+            remap[source] = $"data:{mimeType};base64,{Convert.ToBase64String(bytes)}";
+        }
+
+        return CloneWithRasterHrefMap(pieces, remap);
+    }
+
+    var folderName = settings.RasterEngravingAssetFolder?.Trim() ?? string.Empty;
+    folderName = folderName.Trim(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+    if (string.IsNullOrWhiteSpace(folderName))
+    {
+        folderName = "assets";
+    }
+
+    var assetDirectory = Path.Combine(outputDirectory, folderName);
+    Directory.CreateDirectory(assetDirectory);
+
+    var usedFileNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+    foreach (var source in rasterSources)
+    {
+        if (LooksLikeDataUri(source))
+        {
+            remap[source] = source;
+            continue;
+        }
+
+        if (!File.Exists(source))
+        {
+            throw new FileNotFoundException($"Raster engraving source not found: {source}");
+        }
+
+        var fileName = Path.GetFileName(source);
+        if (string.IsNullOrWhiteSpace(fileName))
+        {
+            fileName = "raster-engraving.bin";
+        }
+
+        var uniqueFileName = AllocateUniqueFileName(fileName, usedFileNames);
+        var destinationPath = Path.Combine(assetDirectory, uniqueFileName);
+        File.Copy(source, destinationPath, overwrite: true);
+
+        remap[source] = $"{folderName.Replace('\\', '/')}/{uniqueFileName}";
+    }
+
+    return CloneWithRasterHrefMap(pieces, remap);
+}
+
+static BoxPlanCuttableShape[] CloneWithRasterHrefMap(
+    BoxPlanCuttableShape[] pieces,
+    IReadOnlyDictionary<string, string> hrefMap)
+{
+    return pieces.Select(piece => new BoxPlanCuttableShape
+    {
+        Id = piece.Id,
+        BoundingBoxMin = piece.BoundingBoxMin,
+        BoundingBoxMax = piece.BoundingBoxMax,
+        Outline = piece.Outline,
+        InteriorCuts = piece.InteriorCuts,
+        Engravings = piece.Engravings,
+        TextEngravings = piece.TextEngravings,
+        RasterEngravings = piece.RasterEngravings
+            .Select(engraving => new RasterEngraving
+            {
+                Href = hrefMap.TryGetValue(engraving.Href, out var mappedHref) ? mappedHref : engraving.Href,
+                X = engraving.X,
+                Y = engraving.Y,
+                Anchor = engraving.Anchor,
+                Width = engraving.Width,
+                Height = engraving.Height,
+            })
+            .ToArray(),
+    }).ToArray();
+}
+
+static string AllocateUniqueFileName(string fileName, HashSet<string> usedFileNames)
+{
+    var baseName = Path.GetFileNameWithoutExtension(fileName);
+    var extension = Path.GetExtension(fileName);
+    var candidate = fileName;
+    var counter = 2;
+
+    while (!usedFileNames.Add(candidate))
+    {
+        candidate = $"{baseName}-{counter}{extension}";
+        counter++;
+    }
+
+    return candidate;
+}
+
+static bool LooksLikeDataUri(string value) =>
+    value.StartsWith("data:", StringComparison.OrdinalIgnoreCase);
+
+static string RasterMimeTypeFromPath(string path)
+{
+    var extension = Path.GetExtension(path).ToLowerInvariant();
+    return extension switch
+    {
+        ".png" => "image/png",
+        ".jpg" => "image/jpeg",
+        ".jpeg" => "image/jpeg",
+        ".gif" => "image/gif",
+        ".webp" => "image/webp",
+        ".bmp" => "image/bmp",
+        ".tif" => "image/tiff",
+        ".tiff" => "image/tiff",
+        _ => "application/octet-stream",
+    };
 }
 
 static string BuildOutputFolderName(string inputPath)
