@@ -45,6 +45,9 @@ public sealed class SvgEngraving
     public Anchor Anchor { get; init; } = Anchor.Center;
     public double? Width { get; init; }
     public double? Height { get; init; }
+    public string? InlinedContent { get; init; }
+    public double InlinedViewBoxWidth { get; init; }
+    public double InlinedViewBoxHeight { get; init; }
 }
 
 public sealed class CuttablePath

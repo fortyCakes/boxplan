@@ -1,6 +1,7 @@
 using BoxPlanLib;
 using BoxPlanLib.Cli;
 using BoxPlanLib.Model;
+using System.Text;
 using System.Xml.Linq;
 
 var lib = new BoxPlanLib.BoxPlanLib();
@@ -230,7 +231,8 @@ static BoxPlanCuttableShape[]? ReadPlanPieces(BoxPlanLib.BoxPlanLib lib, BoxPlan
     var pieces = lib.GetCuttableShapes(parsed.Value, settings);
     pieces = NormalizeRasterEngravingSources(pieces, inputPath);
     pieces = NormalizeSvgEngravingSources(pieces, inputPath);
-    return ResolveSvgEngravingDimensions(pieces);
+    pieces = ResolveSvgEngravingDimensions(pieces);
+    return InlineSvgEngravingContent(pieces);
 }
 
 static BoxPlanCuttableShape[] NormalizeRasterEngravingSources(BoxPlanCuttableShape[] pieces, string inputPath)
@@ -403,6 +405,7 @@ static BoxPlanCuttableShape[] PrepareSvgEngravingAssets(
 {
     var svgSources = pieces
         .SelectMany(piece => piece.SvgEngravings)
+        .Where(engraving => engraving.InlinedContent is null)
         .Select(engraving => engraving.Href)
         .Where(href => !string.IsNullOrWhiteSpace(href))
         .Distinct(StringComparer.Ordinal)
@@ -467,6 +470,173 @@ static BoxPlanCuttableShape[] PrepareSvgEngravingAssets(
     return CloneWithSvgHrefMap(pieces, remap);
 }
 
+static string ExtractSvgInnerContent(XElement root, string engravingColor)
+{
+    var svgNs = XNamespace.Get("http://www.w3.org/2000/svg");
+
+    static XAttribute RecolorAttr(XAttribute a, string color) =>
+        new XAttribute(a.Name.LocalName,
+            a.Value.Trim().Equals("none", StringComparison.OrdinalIgnoreCase) ? "none" : color);
+
+    static string RewriteStyleColors(string style, string color)
+    {
+        style = System.Text.RegularExpressions.Regex.Replace(
+            style, @"(?<=\bfill\s*:\s*)(?!none\b)[^;]+", color);
+        style = System.Text.RegularExpressions.Regex.Replace(
+            style, @"(?<=\bstroke\s*:\s*)(?!none\b)[^;]+", color);
+        return style;
+    }
+
+    XElement? CleanElement(XElement elem)
+    {
+        if (elem.Name.Namespace != svgNs && elem.Name.Namespace != XNamespace.None)
+            return null;
+
+        var cleanedAttrs = elem.Attributes()
+            .Where(a => !a.IsNamespaceDeclaration && a.Name.Namespace == XNamespace.None)
+            .Select(a => a.Name.LocalName switch
+            {
+                "fill" => RecolorAttr(a, engravingColor),
+                "stroke" => RecolorAttr(a, engravingColor),
+                "style" => new XAttribute("style", RewriteStyleColors(a.Value, engravingColor)),
+                _ => new XAttribute(a.Name.LocalName, a.Value),
+            });
+
+        var cleanedChildren = elem.Nodes()
+            .Select<XNode, XNode?>(n => n is XElement child ? CleanElement(child) : n is XText t ? t : null)
+            .Where(n => n is not null)
+            .Cast<XNode>();
+
+        return new XElement(elem.Name.LocalName, cleanedAttrs, cleanedChildren);
+    }
+
+    var sb = new StringBuilder();
+    foreach (var node in root.Nodes())
+    {
+        if (node is XElement elem)
+        {
+            var cleaned = CleanElement(elem);
+            if (cleaned is not null)
+                sb.Append(cleaned.ToString(SaveOptions.DisableFormatting));
+        }
+    }
+    return sb.ToString();
+}
+
+static BoxPlanCuttableShape[] InlineSvgEngravingContent(BoxPlanCuttableShape[] pieces)
+{
+    var sources = pieces
+        .SelectMany(p => p.SvgEngravings)
+        .Select(e => e.Href)
+        .Where(h => !string.IsNullOrWhiteSpace(h) && !LooksLikeDataUri(h))
+        .Distinct(StringComparer.Ordinal)
+        .ToArray();
+
+    if (sources.Length == 0)
+        return pieces;
+
+    var inlineMap = new Dictionary<string, (string Content, double VbW, double VbH)>(StringComparer.Ordinal);
+
+    foreach (var source in sources)
+    {
+        if (!File.Exists(source))
+            continue;
+
+        try
+        {
+            var doc = XDocument.Load(source);
+            var root = doc.Root;
+            if (root is null)
+                continue;
+
+            double vbW = 0, vbH = 0;
+            var viewBox = root.Attribute("viewBox")?.Value;
+            if (viewBox is not null)
+            {
+                var parts = viewBox.Trim().Split(new[] { ' ', ',' }, StringSplitOptions.RemoveEmptyEntries);
+                if (parts.Length == 4
+                    && double.TryParse(parts[2], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var w)
+                    && double.TryParse(parts[3], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var h)
+                    && w > 0 && h > 0)
+                {
+                    vbW = w; vbH = h;
+                }
+            }
+
+            if (vbW == 0 || vbH == 0)
+            {
+                var wAttr = root.Attribute("width")?.Value;
+                var hAttr = root.Attribute("height")?.Value;
+                if (wAttr is not null && hAttr is not null)
+                {
+                    var wm = System.Text.RegularExpressions.Regex.Match(wAttr, @"^[\d.]+");
+                    var hm = System.Text.RegularExpressions.Regex.Match(hAttr, @"^[\d.]+");
+                    if (wm.Success && hm.Success
+                        && double.TryParse(wm.Value, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var w2)
+                        && double.TryParse(hm.Value, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var h2)
+                        && w2 > 0 && h2 > 0)
+                    {
+                        vbW = w2; vbH = h2;
+                    }
+                }
+            }
+
+            if (vbW == 0 || vbH == 0)
+                continue;
+
+            var innerXml = ExtractSvgInnerContent(root, "purple");
+            if (string.IsNullOrEmpty(innerXml))
+                continue;
+
+            inlineMap[source] = (innerXml, vbW, vbH);
+        }
+        catch
+        {
+            // SVG could not be parsed — will fall back to <image>
+        }
+    }
+
+    if (inlineMap.Count == 0)
+        return pieces;
+
+    return pieces.Select(piece =>
+    {
+        if (!piece.SvgEngravings.Any(e => inlineMap.ContainsKey(e.Href)))
+            return piece;
+
+        return new BoxPlanCuttableShape
+        {
+            Id = piece.Id,
+            BoundingBoxMin = piece.BoundingBoxMin,
+            BoundingBoxMax = piece.BoundingBoxMax,
+            Outline = piece.Outline,
+            InteriorCuts = piece.InteriorCuts,
+            Engravings = piece.Engravings,
+            TextEngravings = piece.TextEngravings,
+            RasterEngravings = piece.RasterEngravings,
+            SvgEngravings = piece.SvgEngravings
+                .Select(e =>
+                {
+                    if (!inlineMap.TryGetValue(e.Href, out var inline))
+                        return e;
+                    return new SvgEngraving
+                    {
+                        Href = e.Href,
+                        X = e.X,
+                        Y = e.Y,
+                        Anchor = e.Anchor,
+                        Width = e.Width,
+                        Height = e.Height,
+                        InlinedContent = inline.Content,
+                        InlinedViewBoxWidth = inline.VbW,
+                        InlinedViewBoxHeight = inline.VbH,
+                    };
+                })
+                .ToArray(),
+        };
+    }).ToArray();
+}
+
 static BoxPlanCuttableShape[] CloneWithSvgHrefMap(
     BoxPlanCuttableShape[] pieces,
     IReadOnlyDictionary<string, string> hrefMap)
@@ -490,6 +660,9 @@ static BoxPlanCuttableShape[] CloneWithSvgHrefMap(
                 Anchor = engraving.Anchor,
                 Width = engraving.Width,
                 Height = engraving.Height,
+                InlinedContent = engraving.InlinedContent,
+                InlinedViewBoxWidth = engraving.InlinedViewBoxWidth,
+                InlinedViewBoxHeight = engraving.InlinedViewBoxHeight,
             })
             .ToArray(),
     }).ToArray();
@@ -542,6 +715,9 @@ static BoxPlanCuttableShape[] ResolveSvgEngravingDimensions(BoxPlanCuttableShape
                 Anchor = e.Anchor,
                 Width = width,
                 Height = height,
+                InlinedContent = e.InlinedContent,
+                InlinedViewBoxWidth = e.InlinedViewBoxWidth,
+                InlinedViewBoxHeight = e.InlinedViewBoxHeight,
             };
         }).ToArray();
 

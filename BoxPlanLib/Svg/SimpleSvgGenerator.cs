@@ -572,12 +572,30 @@ internal sealed class SvgGenerator
         sb.Append("<g transform=\"translate(")
           .Append(F(x)).Append(' ').Append(F(y))
           .Append(") scale(1 -1)\">");
-        sb.Append("<image x=\"").Append(F(offsetX))
-          .Append("\" y=\"").Append(F(offsetY))
-          .Append("\" width=\"").Append(F(width))
-          .Append("\" height=\"").Append(F(height))
-          .Append("\" preserveAspectRatio=\"none\" href=\"").Append(Escape(engraving.Href))
-          .Append("\" filter=\"url(#svg-eng)\"/>");
+
+        if (engraving.InlinedContent is { } content
+            && engraving.InlinedViewBoxWidth > 0
+            && engraving.InlinedViewBoxHeight > 0)
+        {
+            var scaleX = width / engraving.InlinedViewBoxWidth;
+            var scaleY = height / engraving.InlinedViewBoxHeight;
+            sb.Append("<g filter=\"url(#svg-eng)\" transform=\"translate(")
+              .Append(F(offsetX)).Append(' ').Append(F(offsetY))
+              .Append(") scale(").Append(F(scaleX)).Append(' ').Append(F(scaleY))
+              .Append(")\">");
+            sb.Append(content);
+            sb.Append("</g>");
+        }
+        else
+        {
+            sb.Append("<image x=\"").Append(F(offsetX))
+              .Append("\" y=\"").Append(F(offsetY))
+              .Append("\" width=\"").Append(F(width))
+              .Append("\" height=\"").Append(F(height))
+              .Append("\" preserveAspectRatio=\"none\" href=\"").Append(Escape(engraving.Href))
+              .Append("\" filter=\"url(#svg-eng)\"/>");
+        }
+
         sb.Append("</g>");
     }
 

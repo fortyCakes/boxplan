@@ -2,7 +2,7 @@ shapes:
 # Shorter drawers for small components.
 - id: "short-drawers-compartment"
   type: "box" 
-  dimensions: [106.0, 161.0, 59.0]
+  dimensions: [106.0, 161.0, 79.0]
   faces:
     - name: "front"
       type: "open"
@@ -340,3 +340,4 @@ shapes:
       position:
         anchor: "center"
         offset: [0.0, -3.0]
+
