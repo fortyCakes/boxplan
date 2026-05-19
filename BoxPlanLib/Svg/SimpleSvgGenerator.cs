@@ -496,31 +496,26 @@ internal sealed class SvgGenerator
         var fontWeight = engraving.Bold ? "bold" : "normal";
         var fontStyle = engraving.Italic ? "italic" : "normal";
                 var textAnchor = engraving.Anchor switch
-                {
-                    Anchor.TopLeft => "start",
-                    Anchor.LeftCenter => "start",
-                    Anchor.BottomLeft => "start",
-                    Anchor.TopRight => "end",
-                    Anchor.RightCenter => "end",
-                    Anchor.BottomRight => "end",
-                    _ => "middle",
-                };
-                var alignmentBaseline = engraving.Anchor switch
-                {
-                    Anchor.TopLeft => "text-before-edge",
-                    Anchor.TopCenter => "text-before-edge",
-                    Anchor.TopRight => "text-before-edge",
-                    Anchor.BottomLeft => "text-after-edge",
-                    Anchor.BottomCenter => "text-after-edge",
-                    Anchor.BottomRight => "text-after-edge",
-                    _ => "middle",
-                };
+        {
+            Anchor.TopLeft or Anchor.LeftCenter or Anchor.BottomLeft => "start",
+            Anchor.TopRight or Anchor.RightCenter or Anchor.BottomRight => "end",
+            _ => "middle",
+        };
+        // dominant-baseline is the correct attribute for <text> elements (alignment-baseline
+        // applies to inline tspan children). Laser software rejects alignment-baseline on text
+        // elements and falls back to alphabetic, which shifts top-anchored text up by its height.
+        var dominantBaseline = engraving.Anchor switch
+        {
+            Anchor.TopLeft or Anchor.TopCenter or Anchor.TopRight => "hanging",
+            Anchor.BottomLeft or Anchor.BottomCenter or Anchor.BottomRight => "alphabetic",
+            _ => "middle",
+        };
         sb.Append("<g transform=\"translate(")
           .Append(F(x)).Append(' ').Append(F(y))
           .Append(") scale(1 -1)\">");
         sb.Append("<text x=\"0\" y=\"0\" fill=\"").Append(TextEngravingColor)
-                    .Append("\" text-anchor=\"").Append(textAnchor)
-                    .Append("\" alignment-baseline=\"").Append(alignmentBaseline).Append("\"")
+          .Append("\" text-anchor=\"").Append(textAnchor)
+          .Append("\" dominant-baseline=\"").Append(dominantBaseline).Append("\"")
           .Append(" font-size=\"").Append(F(engraving.Size)).Append("\"")
           .Append(" font-family=\"").Append(Escape(engraving.Font)).Append("\"")
           .Append(" font-weight=\"").Append(fontWeight).Append("\"")
@@ -533,15 +528,17 @@ internal sealed class SvgGenerator
         {
                 var x = engraving.X - origin.X;
                 var y = engraving.Y - origin.Y;
-                var (offsetX, offsetY) = AnchorOffset(engraving.Anchor, engraving.Width, engraving.Height);
+                var width = engraving.Width.GetValueOrDefault();
+                var height = engraving.Height.GetValueOrDefault();
+                var (offsetX, offsetY) = AnchorOffset(engraving.Anchor, width, height);
 
                 sb.Append("<g transform=\"translate(")
                     .Append(F(x)).Append(' ').Append(F(y))
                     .Append(") scale(1 -1)\">");
                 sb.Append("<image x=\"").Append(F(offsetX))
                     .Append("\" y=\"").Append(F(offsetY))
-                    .Append("\" width=\"").Append(F(engraving.Width))
-                    .Append("\" height=\"").Append(F(engraving.Height))
+                    .Append("\" width=\"").Append(F(width))
+                    .Append("\" height=\"").Append(F(height))
                     .Append("\" preserveAspectRatio=\"none\" href=\"").Append(Escape(engraving.Href))
                     .Append("\"/>");
                 sb.Append("</g>");

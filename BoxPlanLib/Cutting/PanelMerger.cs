@@ -196,13 +196,13 @@ internal static class PanelMerger
                         var rasterCenter = CutoutBuilder.ResolvePlacementCenter(
                             raster.Position,
                             CutoutShape.Rectangle,
-                            raster.Width,
-                            raster.Height,
+                            raster.Width ?? 0.0,
+                            raster.Height ?? 0.0,
                             member.PanelU,
                             member.PanelV,
                             kerf: 0,
                             logger);
-                        var localRasterAnchor = EngravingBuilder.AnchorPointFromCenter(rasterCenter, rasterAnchorName, raster.Width, raster.Height);
+                        var localRasterAnchor = EngravingBuilder.AnchorPointFromCenter(rasterCenter, rasterAnchorName, raster.Width ?? 0.0, raster.Height ?? 0.0);
                         var rasterAnchor = new Vec2(localRasterAnchor.X + adj.X, localRasterAnchor.Y + adj.Y);
                         if (CutoutClipper.IsInsideOutline(rasterAnchor, path))
                         {

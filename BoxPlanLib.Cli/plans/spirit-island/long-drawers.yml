@@ -46,20 +46,22 @@ shapes:
   features:
     - face: "front"
       type: "cutout"
-      shape: "semicircle"
-      diameter: -25.0
+      shape: "edge-dip"
+      width: 25.0
+      height: 10.0
+      radius: 5.0
+      inner-radius: 5.0
       position:
         anchor: "top-center"
         offset: [0.0, 0.0]
     - face: "front"
-      type: "engraving"
-      text: "Energy"
-      size: 6.0
-      font: "DK Snemand"
-      style: "bold"
+      type: "svg-engraving"
+      source: "images/Energy.svg"
+      height: 10.0
+      width: 10.0
       position:
-        anchor: "bottom-center"
-        offset: [0.0, 6.0]
+        anchor: "center"
+        offset: [0.0, -3.5]
 
 - id: "long-drawer-2"
   type: "box"
@@ -76,20 +78,22 @@ shapes:
   features:
     - face: "front"
       type: "cutout"
-      shape: "semicircle"
-      diameter: -25.0
+      shape: "edge-dip"
+      width: 25.0
+      height: 10.0
+      radius: 5.0
+      inner-radius: 5.0
       position:
         anchor: "top-center"
         offset: [0.0, 0.0]
     - face: "front"
-      type: "engraving"
-      text: "Energy"
-      size: 6.0
-      font: "DK Snemand"
-      style: "bold"
+      type: "svg-engraving"
+      source: "images/Energy.svg"
+      height: 10.0
+      width: 10.0
       position:
-        anchor: "bottom-center"
-        offset: [0.0, 6.0]
+        anchor: "center"
+        offset: [0.0, -3.5]
 
 - id: "long-drawer-3"
   type: "box"
@@ -106,20 +110,21 @@ shapes:
   features:
     - face: "front"
       type: "cutout"
-      shape: "semicircle"
-      diameter: -25.0
+      shape: "edge-dip"
+      width: 25.0
+      height: 10.0
+      radius: 5.0
+      inner-radius: 5.0
       position:
         anchor: "top-center"
         offset: [0.0, 0.0]
     - face: "front"
-      type: "engraving"
-      text: "Fear"
-      size: 6.0
-      font: "DK Snemand"
-      style: "bold"
+      type: "svg-engraving"
+      source: "images/Fear.svg"
+      height: 10.0
       position:
-        anchor: "bottom-center"
-        offset: [0.0, 6.0]
+        anchor: "center"
+        offset: [0.0, -3.5]
 
 - id: "long-drawer-4"
   type: "box"
@@ -136,20 +141,22 @@ shapes:
   features:
     - face: "front"
       type: "cutout"
-      shape: "semicircle"
-      diameter: -25.0
+      shape: "edge-dip"
+      width: 25.0
+      height: 10.0
+      radius: 5.0
+      inner-radius: 5.0
       position:
         anchor: "top-center"
         offset: [0.0, 0.0]
     - face: "front"
-      type: "engraving"
-      text: "Dahan"
-      size: 6.0
-      font: "DK Snemand"
-      style: "bold"
+      type: "svg-engraving"
+      source: "images/Dahan.svg"
+      height: 10.0
+      width: 10.0
       position:
-        anchor: "bottom-center"
-        offset: [0.0, 6.0]
+        anchor: "center"
+        offset: [0.0, -3.5]
 
 - id: "long-drawer-5"
   type: "box"
@@ -166,20 +173,22 @@ shapes:
   features:
     - face: "front"
       type: "cutout"
-      shape: "semicircle"
-      diameter: -25.0
+      shape: "edge-dip"
+      width: 25.0
+      height: 10.0
+      radius: 5.0
+      inner-radius: 5.0
       position:
         anchor: "top-center"
         offset: [0.0, 0.0]
     - face: "front"
-      type: "engraving"
-      text: "Dahan"
-      size: 6.0
-      font: "DK Snemand"
-      style: "bold"
+      type: "svg-engraving"
+      source: "images/Dahan.svg"
+      height: 10.0
+      width: 10.0
       position:
-        anchor: "bottom-center"
-        offset: [0.0, 6.0]
+        anchor: "center"
+        offset: [0.0, -3.5]
 
 - id: "long-drawer-6"
   type: "box"
@@ -196,14 +205,17 @@ shapes:
   features:
     - face: "front"
       type: "cutout"
-      shape: "semicircle"
-      diameter: -25.0
+      shape: "edge-dip"
+      width: 25.0
+      height: 10.0
+      radius: 5.0
+      inner-radius: 5.0
       position:
         anchor: "top-center"
         offset: [0.0, 0.0]
     - face: "front"
       type: "engraving"
-      text: "Elements"
+      text: "?!?!"
       size: 6.0
       font: "DK Snemand"
       style: "bold"
@@ -226,20 +238,22 @@ shapes:
   features:
     - face: "front"
       type: "cutout"
-      shape: "semicircle"
-      diameter: -25.0
+      shape: "edge-dip"
+      width: 25.0
+      height: 10.0
+      radius: 5.0
+      inner-radius: 5.0
       position:
         anchor: "top-center"
         offset: [0.0, 0.0]
     - face: "front"
-      type: "engraving"
-      text: "Scenario"
-      size: 6.0
-      font: "DK Snemand"
-      style: "bold"
+      type: "svg-engraving"
+      source: "images/Scenario.svg"
+      height: 10.0
+      width: 10.0
       position:
-        anchor: "bottom-center"
-        offset: [0.0, 6.0]
+        anchor: "center"
+        offset: [0.0, -3.5]
 
 - id: "long-drawer-8"
   type: "box"
@@ -256,20 +270,35 @@ shapes:
   features:
     - face: "front"
       type: "cutout"
-      shape: "semicircle"
-      diameter: -25.0
+      shape: "edge-dip"
+      width: 25.0
+      height: 10.0
+      radius: 5.0
+      inner-radius: 5.0
       position:
         anchor: "top-center"
         offset: [0.0, 0.0]
     - face: "front"
-      type: "engraving"
-      text: "Adversary"
-      size: 6.0
-      font: "DK Snemand"
-      style: "bold"
+      type: "svg-engraving"
+      source: "images/AdversaryFlag.svg"
+      height: 10.0
       position:
-        anchor: "bottom-center"
-        offset: [0.0, 6.0]
+        anchor: "center"
+        offset: [0.0, -3.5]
+    - face: "front"
+      type: "svg-engraving"
+      source: "images/Explorer.svg"
+      height: 7.0
+      position:
+        anchor: "center"
+        offset: [-4.0, -3.5]
+    - face: "front"
+      type: "svg-engraving"
+      source: "images/Town.svg"
+      height: 7.0
+      position:
+        anchor: "center"
+        offset: [+2.2, -3.5]
 
 - id: "long-drawer-9"
   type: "box"
@@ -286,8 +315,11 @@ shapes:
   features:
     - face: "front"
       type: "cutout"
-      shape: "semicircle"
-      diameter: -25.0
+      shape: "edge-dip"
+      width: 25.0
+      height: 10.0
+      radius: 5.0
+      inner-radius: 5.0
       position:
         anchor: "top-center"
         offset: [0.0, 0.0]
@@ -316,8 +348,11 @@ shapes:
   features:
     - face: "front"
       type: "cutout"
-      shape: "semicircle"
-      diameter: -25.0
+      shape: "edge-dip"
+      width: 25.0
+      height: 10.0
+      radius: 5.0
+      inner-radius: 5.0
       position:
         anchor: "top-center"
         offset: [0.0, 0.0]

@@ -994,13 +994,13 @@ public sealed class CuttingPipeline
                 var center = CutoutBuilder.ResolvePlacementCenter(
                     raster.Position,
                     CutoutShape.Rectangle,
-                    raster.Width,
-                    raster.Height,
+                    raster.Width ?? 0.0,
+                    raster.Height ?? 0.0,
                     panelU,
                     panelV,
                     kerf: 0,
                     logger);
-                var localAnchor = EngravingBuilder.AnchorPointFromCenter(center, anchor, raster.Width, raster.Height);
+                var localAnchor = EngravingBuilder.AnchorPointFromCenter(center, anchor, raster.Width ?? 0.0, raster.Height ?? 0.0);
                 var anchorPoint = new Vec2(localAnchor.X + translation.X, localAnchor.Y + translation.Y);
                 if (CutoutClipper.IsInsideOutline(anchorPoint, path))
                 {

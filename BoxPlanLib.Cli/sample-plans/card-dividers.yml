@@ -11,18 +11,25 @@ shapes:
     - type: "engraving"
       position:
         anchor: "top-left"
-        offset: [3.0, -1.0]
+        offset: [12, -2.0]
       font: "DK Snemand"
-      style: "bold"
       text: "Branch & Claw"
-      size: 5
+      size: 3
     - type: "cutout"
-      shape: "rectangle"
+      shape: "edge-dip"
       width: 25.4
       height: 50.8
+      radius: 5.0
+      inner-radius: 5.0
       position:
-        anchor: "top-right"
-        offset: [-6.0, 0.0]
+        anchor: "top-center"
+        offset: [15.0, 0.0]
+    - type: "raster-engraving"
+      source: "images/48px-Expansion.png"
+      height: 8.0
+      position:
+        anchor: "top-left"
+        offset: [1.0, -2.0]
 - id: "divider-branch-and-claw-notch-1"
   type: "panel"
   location: [68.0, 0.0, 86.0]

@@ -33,8 +33,8 @@ public sealed class RasterEngraving
     public required double X { get; init; }
     public required double Y { get; init; }
     public Anchor Anchor { get; init; } = Anchor.Center;
-    public required double Width { get; init; }
-    public required double Height { get; init; }
+    public double? Width { get; init; }
+    public double? Height { get; init; }
 }
 
 public sealed class SvgEngraving

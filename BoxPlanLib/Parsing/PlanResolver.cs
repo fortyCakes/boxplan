@@ -1570,15 +1570,21 @@ public sealed class PlanResolver
             return null;
         }
 
-        if (raw.Width is not { } width || width <= 0)
+        if (raw.Width is null && raw.Height is null)
         {
-            errors.Add(Err("Raster engraving requires a positive 'width'.", $"{path}.width", raw));
+            errors.Add(Err("Raster engraving requires at least one of 'width' or 'height'.", path, raw));
             return null;
         }
 
-        if (raw.Height is not { } height || height <= 0)
+        if (raw.Width is { } w && w <= 0)
         {
-            errors.Add(Err("Raster engraving requires a positive 'height'.", $"{path}.height", raw));
+            errors.Add(Err("Raster engraving 'width' must be positive.", $"{path}.width", raw));
+            return null;
+        }
+
+        if (raw.Height is { } h && h <= 0)
+        {
+            errors.Add(Err("Raster engraving 'height' must be positive.", $"{path}.height", raw));
             return null;
         }
 
@@ -1587,8 +1593,8 @@ public sealed class PlanResolver
             Face = face,
             Position = position,
             Source = source,
-            Width = width,
-            Height = height,
+            Width = raw.Width,
+            Height = raw.Height,
         };
     }
 

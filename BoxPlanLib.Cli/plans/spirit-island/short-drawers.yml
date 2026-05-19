@@ -56,7 +56,7 @@ shapes:
         offset: [0.0, 0.0]
     - face: "front"
       type: "svg-engraving"
-      source: "../plans/spirit-island/images/Beasts.svg"
+      source: "images/Beasts.svg"
       height: 10.0
       position:
         anchor: "center"
@@ -87,7 +87,7 @@ shapes:
         offset: [0.0, 0.0]
     - face: "front"
       type: "svg-engraving"
-      source: "../plans/spirit-island/images/Wilds.svg"
+      source: "images/Wilds.svg"
       height: 10.0
       position:
         anchor: "center"
@@ -118,7 +118,7 @@ shapes:
         offset: [0.0, 0.0]
     - face: "front"
       type: "svg-engraving"
-      source: "../plans/spirit-island/images/Disease.svg"
+      source: "images/Disease.svg"
       height: 10.0
       position:
         anchor: "center"
@@ -149,7 +149,7 @@ shapes:
         offset: [0.0, 0.0]
     - face: "front"
       type: "svg-engraving"
-      source: "../plans/spirit-island/images/Strife.svg"
+      source: "images/Strife.svg"
       height: 10.0
       position:
         anchor: "center"
@@ -180,7 +180,7 @@ shapes:
         offset: [0.0, 0.0]
     - face: "front"
       type: "svg-engraving"
-      source: "../plans/spirit-island/images/Blight.svg"
+      source: "images/Blight.svg"
       height: 10.0
       position:
         anchor: "center"
@@ -211,7 +211,7 @@ shapes:
         offset: [0.0, 0.0]
     - face: "front"
       type: "svg-engraving"
-      source: "../plans/spirit-island/images/Badlands.svg"
+      source: "images/Badlands.svg"
       height: 10.0
       position:
         anchor: "center"
@@ -242,7 +242,7 @@ shapes:
         offset: [0.0, 0.0]
     - face: "front"
       type: "svg-engraving"
-      source: "../plans/spirit-island/images/Quake.svg"
+      source: "images/Quake.svg"
       height: 10.0
       position:
         anchor: "center"
@@ -273,7 +273,7 @@ shapes:
         offset: [0.0, 0.0]
     - face: "front"
       type: "svg-engraving"
-      source: "../plans/spirit-island/images/Incarna.svg"
+      source: "images/Incarna.svg"
       height: 10.0
       position:
         anchor: "center"
@@ -304,7 +304,7 @@ shapes:
         offset: [0.0, 0.0]
     - face: "front"
       type: "svg-engraving"
-      source: "../plans/spirit-island/images/Deeps.svg"
+      source: "images/Deeps.svg"
       height: 10.0
       position:
         anchor: "center"
@@ -335,7 +335,7 @@ shapes:
         offset: [0.0, 0.0]
     - face: "front"
       type: "svg-engraving"
-      source: "../plans/spirit-island/images/Vitality.svg"
+      source: "images/Vitality.svg"
       height: 10.0
       position:
         anchor: "center"

@@ -491,12 +491,14 @@ If `position` is omitted, the image is centered on the face. If `position` is
 provided, the anchor refers to the matching point on the image bounding box,
 the same way cutout anchors do.
 
-| Field    | Description                                                                                  |
-| -------- | -------------------------------------------------------------------------------------------- |
-| `source` | **Required.** Image path or URI. Relative paths are resolved from the plan file location.   |
-| `image`  | Alias of `source`.                                                                            |
-| `width`  | **Required.** Rendered image width in mm. Must be positive.                                  |
-| `height` | **Required.** Rendered image height in mm. Must be positive.                                 |
+| Field    | Description                                                                                                                                |
+| -------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| `source` | **Required.** Image path or URI. Relative paths are resolved from the plan file location.                                                 |
+| `image`  | Alias of `source`.                                                                                                                         |
+| `width`  | Rendered image width in mm. Must be positive. If omitted, inferred from the image's pixel dimensions to match the given `height`.          |
+| `height` | Rendered image height in mm. Must be positive. If omitted, inferred from the image's pixel dimensions to match the given `width`.          |
+
+At least one of `width` or `height` is required. When only one is given, the other is computed from the image's native pixel aspect ratio (PNG and JPEG supported). If both are omitted the plan is invalid.
 
 CLI output behavior is controlled by settings:
 

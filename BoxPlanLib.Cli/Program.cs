@@ -231,6 +231,7 @@ static BoxPlanCuttableShape[]? ReadPlanPieces(BoxPlanLib.BoxPlanLib lib, BoxPlan
     var pieces = lib.GetCuttableShapes(parsed.Value, settings);
     pieces = NormalizeRasterEngravingSources(pieces, inputPath);
     pieces = NormalizeSvgEngravingSources(pieces, inputPath);
+    pieces = ResolveRasterEngravingDimensions(pieces);
     pieces = ResolveSvgEngravingDimensions(pieces);
     return InlineSvgEngravingContent(pieces);
 }
@@ -666,6 +667,117 @@ static BoxPlanCuttableShape[] CloneWithSvgHrefMap(
             })
             .ToArray(),
     }).ToArray();
+}
+
+static BoxPlanCuttableShape[] ResolveRasterEngravingDimensions(BoxPlanCuttableShape[] pieces)
+{
+    var aspectByPath = new Dictionary<string, double?>(StringComparer.Ordinal);
+
+    bool NeedsResolution(RasterEngraving e) => e.Width is null || e.Height is null;
+
+    if (!pieces.Any(p => p.RasterEngravings.Any(NeedsResolution)))
+        return pieces;
+
+    return pieces.Select(piece =>
+    {
+        if (!piece.RasterEngravings.Any(NeedsResolution))
+            return piece;
+
+        var resolved = piece.RasterEngravings.Select(e =>
+        {
+            if (!NeedsResolution(e))
+                return e;
+
+            if (!aspectByPath.TryGetValue(e.Href, out var aspect))
+            {
+                aspect = TryGetRasterAspectRatio(e.Href);
+                aspectByPath[e.Href] = aspect;
+            }
+
+            var width = e.Width;
+            var height = e.Height;
+
+            if (aspect is { } ar && ar > 0)
+            {
+                if (width is null && height is not null)
+                    width = height.Value * ar;
+                else if (height is null && width is not null)
+                    height = width.Value / ar;
+            }
+
+            if (width == e.Width && height == e.Height)
+                return e;
+
+            return new RasterEngraving
+            {
+                Href = e.Href,
+                X = e.X,
+                Y = e.Y,
+                Anchor = e.Anchor,
+                Width = width,
+                Height = height,
+            };
+        }).ToArray();
+
+        return new BoxPlanCuttableShape
+        {
+            Id = piece.Id,
+            BoundingBoxMin = piece.BoundingBoxMin,
+            BoundingBoxMax = piece.BoundingBoxMax,
+            Outline = piece.Outline,
+            InteriorCuts = piece.InteriorCuts,
+            Engravings = piece.Engravings,
+            TextEngravings = piece.TextEngravings,
+            RasterEngravings = resolved,
+            SvgEngravings = piece.SvgEngravings,
+        };
+    }).ToArray();
+}
+
+static double? TryGetRasterAspectRatio(string path)
+{
+    if (!File.Exists(path))
+        return null;
+
+    try
+    {
+        var bytes = File.ReadAllBytes(path);
+        // PNG: signature 8 bytes + IHDR header 8 bytes = width at offset 16, height at offset 20
+        if (bytes.Length >= 24
+            && bytes[0] == 0x89 && bytes[1] == 0x50 && bytes[2] == 0x4E && bytes[3] == 0x47)
+        {
+            var w = (bytes[16] << 24) | (bytes[17] << 16) | (bytes[18] << 8) | bytes[19];
+            var h = (bytes[20] << 24) | (bytes[21] << 16) | (bytes[22] << 8) | bytes[23];
+            if (w > 0 && h > 0)
+                return (double)w / h;
+        }
+        // JPEG: scan for SOF markers (FFC0–FFCF, excluding FFC4/FFC8)
+        if (bytes.Length >= 4 && bytes[0] == 0xFF && bytes[1] == 0xD8)
+        {
+            var i = 2;
+            while (i + 8 < bytes.Length)
+            {
+                if (bytes[i] != 0xFF)
+                    break;
+                var marker = bytes[i + 1];
+                var segLen = (bytes[i + 2] << 8) | bytes[i + 3];
+                if (marker >= 0xC0 && marker <= 0xCF && marker != 0xC4 && marker != 0xC8)
+                {
+                    var h = (bytes[i + 5] << 8) | bytes[i + 6];
+                    var w = (bytes[i + 7] << 8) | bytes[i + 8];
+                    if (w > 0 && h > 0)
+                        return (double)w / h;
+                }
+                i += 2 + segLen;
+            }
+        }
+    }
+    catch
+    {
+        // Unreadable image — can't infer aspect ratio
+    }
+
+    return null;
 }
 
 static BoxPlanCuttableShape[] ResolveSvgEngravingDimensions(BoxPlanCuttableShape[] pieces)

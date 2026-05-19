@@ -5,7 +5,9 @@
       "Bash(dotnet build *)",
       "Bash(dotnet new *)",
       "Bash(dotnet test *)",
-      "Bash(xargs grep -l *)"
+      "Bash(xargs grep -l *)",
+      "Bash(Get-ChildItem -Path *)",
+      "Bash(Select-Object -ExpandProperty FullName)"
     ]
   }
 }

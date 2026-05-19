@@ -93,13 +93,13 @@ internal static class PanelFaceBuilder
                     var rasterCenter = CutoutBuilder.ResolvePlacementCenter(
                         raster.Position,
                         CutoutShape.Rectangle,
-                        raster.Width,
-                        raster.Height,
+                        raster.Width ?? 0.0,
+                        raster.Height ?? 0.0,
                         panelU,
                         panelV,
                         kerf: 0,
                         logger);
-                    var localRasterAnchor = EngravingBuilder.AnchorPointFromCenter(rasterCenter, rasterAnchorName, raster.Width, raster.Height);
+                    var localRasterAnchor = EngravingBuilder.AnchorPointFromCenter(rasterCenter, rasterAnchorName, raster.Width ?? 0.0, raster.Height ?? 0.0);
                     var rasterAnchor = new Vec2(localRasterAnchor.X + translation.X, localRasterAnchor.Y + translation.Y);
                     if (CutoutClipper.IsInsideOutline(rasterAnchor, path))
                     {

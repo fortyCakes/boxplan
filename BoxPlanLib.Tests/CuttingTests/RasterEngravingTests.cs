@@ -116,4 +116,89 @@ public class RasterEngravingTests
         Assert.False(result.Success);
         Assert.Contains(result.Errors, e => e.Message.Contains("source"));
     }
+
+    [Fact]
+    public void Raster_engraving_without_any_dimension_is_invalid()
+    {
+        var lib = new BoxPlanLib();
+        var result = lib.ParsePlan("""
+            shapes:
+              - id: "box"
+                type: "box"
+                dimensions: [100.0, 100.0, 100.0]
+                features:
+                  - face: "front"
+                    type: "raster-engraving"
+                    source: "Spirit-Island-Logo.png"
+            """);
+
+        Assert.False(result.Success);
+        Assert.Contains(result.Errors, e => e.Message.Contains("width") || e.Message.Contains("height"));
+    }
+
+    [Fact]
+    public void Raster_engraving_with_only_width_parses_successfully()
+    {
+        var plan = ParseOk("""
+            shapes:
+              - id: "box"
+                type: "box"
+                dimensions: [100.0, 100.0, 100.0]
+                features:
+                  - face: "front"
+                    type: "raster-engraving"
+                    source: "Spirit-Island-Logo.png"
+                    width: 20.0
+            """);
+
+        var pieces = new BoxPlanLib().GetCuttableShapes(plan, Settings());
+        var front = pieces.Single(p => p.Id == "box.front");
+        var engraving = Assert.Single(front.RasterEngravings);
+
+        Assert.Equal(20.0, engraving.Width);
+        Assert.Null(engraving.Height);
+    }
+
+    [Fact]
+    public void Raster_engraving_with_only_height_parses_successfully()
+    {
+        var plan = ParseOk("""
+            shapes:
+              - id: "box"
+                type: "box"
+                dimensions: [100.0, 100.0, 100.0]
+                features:
+                  - face: "front"
+                    type: "raster-engraving"
+                    source: "Spirit-Island-Logo.png"
+                    height: 10.0
+            """);
+
+        var pieces = new BoxPlanLib().GetCuttableShapes(plan, Settings());
+        var front = pieces.Single(p => p.Id == "box.front");
+        var engraving = Assert.Single(front.RasterEngravings);
+
+        Assert.Null(engraving.Width);
+        Assert.Equal(10.0, engraving.Height);
+    }
+
+    [Fact]
+    public void Raster_engraving_single_dimension_with_non_center_anchor_is_valid()
+    {
+        // Omitting one dimension is valid regardless of anchor — no constraint required.
+        ParseOk("""
+            shapes:
+              - id: "box"
+                type: "box"
+                dimensions: [100.0, 100.0, 100.0]
+                features:
+                  - face: "front"
+                    type: "raster-engraving"
+                    source: "Spirit-Island-Logo.png"
+                    width: 20.0
+                    position:
+                      anchor: "top-left"
+                      offset: [10.0, -10.0]
+            """);
+    }
 }
