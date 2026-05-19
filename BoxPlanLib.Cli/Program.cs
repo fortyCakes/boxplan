@@ -1,6 +1,7 @@
 using BoxPlanLib;
 using BoxPlanLib.Cli;
 using BoxPlanLib.Model;
+using System.Xml.Linq;
 
 var lib = new BoxPlanLib.BoxPlanLib();
 
@@ -180,6 +181,7 @@ static int WritePagedSvgFiles(
     try
     {
         preparedPieces = PrepareRasterEngravingAssets(pieces, settings, outputDirectory);
+        preparedPieces = PrepareSvgEngravingAssets(preparedPieces, settings, outputDirectory);
     }
     catch (Exception ex) when (ex is InvalidDataException or FileNotFoundException)
     {
@@ -226,7 +228,9 @@ static BoxPlanCuttableShape[]? ReadPlanPieces(BoxPlanLib.BoxPlanLib lib, BoxPlan
     }
 
     var pieces = lib.GetCuttableShapes(parsed.Value, settings);
-    return NormalizeRasterEngravingSources(pieces, inputPath);
+    pieces = NormalizeRasterEngravingSources(pieces, inputPath);
+    pieces = NormalizeSvgEngravingSources(pieces, inputPath);
+    return ResolveSvgEngravingDimensions(pieces);
 }
 
 static BoxPlanCuttableShape[] NormalizeRasterEngravingSources(BoxPlanCuttableShape[] pieces, string inputPath)
@@ -363,6 +367,246 @@ static BoxPlanCuttableShape[] CloneWithRasterHrefMap(
             })
             .ToArray(),
     }).ToArray();
+}
+
+static BoxPlanCuttableShape[] NormalizeSvgEngravingSources(BoxPlanCuttableShape[] pieces, string inputPath)
+{
+    var inputDirectory = Path.GetDirectoryName(Path.GetFullPath(inputPath)) ?? Directory.GetCurrentDirectory();
+    var remap = new Dictionary<string, string>(StringComparer.Ordinal);
+
+    foreach (var source in pieces
+        .SelectMany(piece => piece.SvgEngravings)
+        .Select(engraving => engraving.Href)
+        .Where(href => !string.IsNullOrWhiteSpace(href))
+        .Distinct(StringComparer.Ordinal))
+    {
+        if (LooksLikeDataUri(source))
+        {
+            remap[source] = source;
+            continue;
+        }
+
+        var absolutePath = Path.IsPathRooted(source)
+            ? Path.GetFullPath(source)
+            : Path.GetFullPath(Path.Combine(inputDirectory, source));
+
+        remap[source] = absolutePath;
+    }
+
+    return remap.Count == 0 ? pieces : CloneWithSvgHrefMap(pieces, remap);
+}
+
+static BoxPlanCuttableShape[] PrepareSvgEngravingAssets(
+    BoxPlanCuttableShape[] pieces,
+    BoxPlanSettings settings,
+    string outputDirectory)
+{
+    var svgSources = pieces
+        .SelectMany(piece => piece.SvgEngravings)
+        .Select(engraving => engraving.Href)
+        .Where(href => !string.IsNullOrWhiteSpace(href))
+        .Distinct(StringComparer.Ordinal)
+        .ToArray();
+
+    if (svgSources.Length == 0)
+        return pieces;
+
+    var remap = new Dictionary<string, string>(StringComparer.Ordinal);
+
+    if (settings.EmbedRasterEngravings)
+    {
+        foreach (var source in svgSources)
+        {
+            if (LooksLikeDataUri(source))
+            {
+                remap[source] = source;
+                continue;
+            }
+
+            if (!File.Exists(source))
+                throw new FileNotFoundException($"SVG engraving source not found: {source}");
+
+            var bytes = File.ReadAllBytes(source);
+            remap[source] = $"data:image/svg+xml;base64,{Convert.ToBase64String(bytes)}";
+        }
+
+        return CloneWithSvgHrefMap(pieces, remap);
+    }
+
+    var folderName = settings.RasterEngravingAssetFolder?.Trim() ?? string.Empty;
+    folderName = folderName.Trim(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+    if (string.IsNullOrWhiteSpace(folderName))
+        folderName = "assets";
+
+    var assetDirectory = Path.Combine(outputDirectory, folderName);
+    Directory.CreateDirectory(assetDirectory);
+
+    var usedFileNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+    foreach (var source in svgSources)
+    {
+        if (LooksLikeDataUri(source))
+        {
+            remap[source] = source;
+            continue;
+        }
+
+        if (!File.Exists(source))
+            throw new FileNotFoundException($"SVG engraving source not found: {source}");
+
+        var fileName = Path.GetFileName(source);
+        if (string.IsNullOrWhiteSpace(fileName))
+            fileName = "svg-engraving.svg";
+
+        var uniqueFileName = AllocateUniqueFileName(fileName, usedFileNames);
+        var destinationPath = Path.Combine(assetDirectory, uniqueFileName);
+        File.Copy(source, destinationPath, overwrite: true);
+
+        remap[source] = $"{folderName.Replace('\\', '/')}/{uniqueFileName}";
+    }
+
+    return CloneWithSvgHrefMap(pieces, remap);
+}
+
+static BoxPlanCuttableShape[] CloneWithSvgHrefMap(
+    BoxPlanCuttableShape[] pieces,
+    IReadOnlyDictionary<string, string> hrefMap)
+{
+    return pieces.Select(piece => new BoxPlanCuttableShape
+    {
+        Id = piece.Id,
+        BoundingBoxMin = piece.BoundingBoxMin,
+        BoundingBoxMax = piece.BoundingBoxMax,
+        Outline = piece.Outline,
+        InteriorCuts = piece.InteriorCuts,
+        Engravings = piece.Engravings,
+        TextEngravings = piece.TextEngravings,
+        RasterEngravings = piece.RasterEngravings,
+        SvgEngravings = piece.SvgEngravings
+            .Select(engraving => new SvgEngraving
+            {
+                Href = hrefMap.TryGetValue(engraving.Href, out var mappedHref) ? mappedHref : engraving.Href,
+                X = engraving.X,
+                Y = engraving.Y,
+                Anchor = engraving.Anchor,
+                Width = engraving.Width,
+                Height = engraving.Height,
+            })
+            .ToArray(),
+    }).ToArray();
+}
+
+static BoxPlanCuttableShape[] ResolveSvgEngravingDimensions(BoxPlanCuttableShape[] pieces)
+{
+    var aspectByPath = new Dictionary<string, double?>(StringComparer.Ordinal);
+
+    bool NeedsResolution(SvgEngraving e) => e.Width is null || e.Height is null;
+
+    if (!pieces.Any(p => p.SvgEngravings.Any(NeedsResolution)))
+        return pieces;
+
+    return pieces.Select(piece =>
+    {
+        if (!piece.SvgEngravings.Any(NeedsResolution))
+            return piece;
+
+        var resolved = piece.SvgEngravings.Select(e =>
+        {
+            if (!NeedsResolution(e))
+                return e;
+
+            if (!aspectByPath.TryGetValue(e.Href, out var aspect))
+            {
+                aspect = TryGetSvgAspectRatio(e.Href);
+                aspectByPath[e.Href] = aspect;
+            }
+
+            var width = e.Width;
+            var height = e.Height;
+
+            if (aspect is { } ar && ar > 0)
+            {
+                if (width is null && height is not null)
+                    width = height.Value * ar;
+                else if (height is null && width is not null)
+                    height = width.Value / ar;
+            }
+
+            if (width == e.Width && height == e.Height)
+                return e;
+
+            return new SvgEngraving
+            {
+                Href = e.Href,
+                X = e.X,
+                Y = e.Y,
+                Anchor = e.Anchor,
+                Width = width,
+                Height = height,
+            };
+        }).ToArray();
+
+        return new BoxPlanCuttableShape
+        {
+            Id = piece.Id,
+            BoundingBoxMin = piece.BoundingBoxMin,
+            BoundingBoxMax = piece.BoundingBoxMax,
+            Outline = piece.Outline,
+            InteriorCuts = piece.InteriorCuts,
+            Engravings = piece.Engravings,
+            TextEngravings = piece.TextEngravings,
+            RasterEngravings = piece.RasterEngravings,
+            SvgEngravings = resolved,
+        };
+    }).ToArray();
+}
+
+static double? TryGetSvgAspectRatio(string path)
+{
+    if (!File.Exists(path))
+        return null;
+
+    try
+    {
+        var doc = XDocument.Load(path);
+        var root = doc.Root;
+        if (root is null)
+            return null;
+
+        var viewBox = root.Attribute("viewBox")?.Value;
+        if (viewBox is not null)
+        {
+            var parts = viewBox.Trim().Split(new[] { ' ', ',' }, StringSplitOptions.RemoveEmptyEntries);
+            if (parts.Length == 4
+                && double.TryParse(parts[2], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var vbW)
+                && double.TryParse(parts[3], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var vbH)
+                && vbW > 0 && vbH > 0)
+            {
+                return vbW / vbH;
+            }
+        }
+
+        // Fallback: numeric width/height attributes (strip trailing units like px, mm, pt, %)
+        var wAttr = root.Attribute("width")?.Value;
+        var hAttr = root.Attribute("height")?.Value;
+        if (wAttr is not null && hAttr is not null)
+        {
+            var wNum = System.Text.RegularExpressions.Regex.Match(wAttr, @"^[\d.]+");
+            var hNum = System.Text.RegularExpressions.Regex.Match(hAttr, @"^[\d.]+");
+            if (wNum.Success && hNum.Success
+                && double.TryParse(wNum.Value, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var attrW)
+                && double.TryParse(hNum.Value, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var attrH)
+                && attrW > 0 && attrH > 0)
+            {
+                return attrW / attrH;
+            }
+        }
+    }
+    catch
+    {
+        // Malformed SVG — can't infer aspect ratio
+    }
+
+    return null;
 }
 
 static string AllocateUniqueFileName(string fileName, HashSet<string> usedFileNames)

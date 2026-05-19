@@ -1,0 +1,82 @@
+# Boxes for invader pieces in Spirit Island.
+shapes:
+- id: "invader-box-1"
+  type: "box" 
+  dimensions: [75.0, 60.0, 79.0]
+  faces:
+    - name: "top"
+      type: "open"
+  features:
+  - face: "front"
+    type: "svg-engraving"
+    source: "../plans/spirit-island/images/Explorer.svg"
+    width: 18.0
+    position:
+      anchor: "center"
+- id: "invader-box-2"
+  type: "box" 
+  dimensions: [75.0, 60.0, 79.0]
+  faces:
+    - name: "top"
+      type: "open"
+  features:
+  - face: "front"
+    type: "svg-engraving"
+    source: "../plans/spirit-island/images/Explorer.svg"
+    width: 18.0
+    position:
+      anchor: "center"
+- id: "invader-box-3"
+  type: "box" 
+  dimensions: [75.0, 60.0, 79.0]
+  faces:
+    - name: "top"
+      type: "open"
+  features:
+  - face: "front"
+    type: "svg-engraving"
+    source: "../plans/spirit-island/images/Town.svg"
+    width: 24.0
+    position:
+      anchor: "center"
+- id: "invader-box-4"
+  type: "box" 
+  dimensions: [75.0, 60.0, 79.0]
+  faces:
+    - name: "top"
+      type: "open"
+  features:
+  - face: "front"
+    type: "svg-engraving"
+    source: "../plans/spirit-island/images/Town.svg"
+    width: 24.0
+    position:
+      anchor: "center"
+
+- id: "invader-box-5"
+  type: "box" 
+  dimensions: [75.0, 60.0, 79.0]
+  faces:
+    - name: "top"
+      type: "open"
+  features:
+  - face: "front"
+    type: "svg-engraving"
+    source: "../plans/spirit-island/images/City.svg"
+    width: 24.0
+    position:
+      anchor: "center"
+- id: "invader-box-6"
+  type: "box" 
+  dimensions: [75.0, 60.0, 79.0]
+  faces:
+    - name: "top"
+      type: "open"
+  features:
+  - face: "front"
+    type: "svg-engraving"
+    source: "../plans/spirit-island/images/City.svg"
+    width: 24.0
+    position:
+      anchor: "center"
+

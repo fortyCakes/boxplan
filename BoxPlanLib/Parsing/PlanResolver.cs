@@ -1281,6 +1281,10 @@ public sealed class PlanResolver
                     var rasterEngravingFeature = ResolveRasterEngraving(rasterEngraving, face.Value, position, fpath, errors);
                     if (rasterEngravingFeature is not null) result.Add(rasterEngravingFeature);
                     break;
+                case RawSvgEngravingFeature svgEngraving:
+                    var svgEngravingFeature = ResolveSvgEngraving(svgEngraving, face.Value, position, fpath, errors);
+                    if (svgEngravingFeature is not null) result.Add(svgEngravingFeature);
+                    break;
                 case RawEngravingGridFeature grid:
                     var gridFeature = ResolveEngravingGrid(grid, face.Value, fpath, errors);
                     if (gridFeature is not null) result.Add(gridFeature);
@@ -1585,6 +1589,54 @@ public sealed class PlanResolver
             Source = source,
             Width = width,
             Height = height,
+        };
+    }
+
+    private static SvgEngravingFeature? ResolveSvgEngraving(
+        RawSvgEngravingFeature raw,
+        FaceName face,
+        Position? position,
+        string path,
+        List<PlanError> errors)
+    {
+        if (string.IsNullOrWhiteSpace(raw.Source))
+        {
+            errors.Add(Err("SVG engraving requires 'source'.", $"{path}.source", raw));
+            return null;
+        }
+
+        if (raw.Width is null && raw.Height is null)
+        {
+            errors.Add(Err("SVG engraving requires at least one of 'width' or 'height'.", path, raw));
+            return null;
+        }
+
+        if (raw.Width is { } w && w <= 0)
+        {
+            errors.Add(Err("SVG engraving 'width' must be positive.", $"{path}.width", raw));
+            return null;
+        }
+
+        if (raw.Height is { } h && h <= 0)
+        {
+            errors.Add(Err("SVG engraving 'height' must be positive.", $"{path}.height", raw));
+            return null;
+        }
+
+        var resolvedAnchor = position?.Anchor ?? Anchor.Center;
+        if ((raw.Width is null || raw.Height is null) && resolvedAnchor != Anchor.Center)
+        {
+            errors.Add(Err("SVG engraving with inferred dimensions (only one of width/height) requires anchor 'center'.", path, raw));
+            return null;
+        }
+
+        return new SvgEngravingFeature
+        {
+            Face = face,
+            Position = position,
+            Source = raw.Source,
+            Width = raw.Width,
+            Height = raw.Height,
         };
     }
 

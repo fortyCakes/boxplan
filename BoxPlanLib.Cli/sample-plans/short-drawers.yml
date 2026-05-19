@@ -46,20 +46,21 @@ shapes:
   features:
     - face: "front"
       type: "cutout"
-      shape: "semicircle"
-      diameter: -25.0
+      shape: "edge-dip"
+      width: 25.0
+      height: 10.0
+      radius: 5.0
+      inner-radius: 5.0
       position:
         anchor: "top-center"
         offset: [0.0, 0.0]
     - face: "front"
-      type: "engraving"
-      text: "Beasts"
-      size: 6.0
-      font: "DK Snemand"
-      style: "bold"
+      type: "svg-engraving"
+      source: "../plans/spirit-island/images/Beasts.svg"
+      height: 10.0
       position:
-        anchor: "bottom-center"
-        offset: [0.0, 6.0]
+        anchor: "center"
+        offset: [0.0, -3.0]
 
 - id: "short-drawer-2"
   type: "box"
@@ -76,20 +77,21 @@ shapes:
   features:
     - face: "front"
       type: "cutout"
-      shape: "semicircle"
-      diameter: -25.0
+      shape: "edge-dip"
+      width: 25.0
+      height: 10.0
+      radius: 5.0
+      inner-radius: 5.0
       position:
         anchor: "top-center"
         offset: [0.0, 0.0]
     - face: "front"
-      type: "engraving"
-      text: "Wilds"
-      size: 6.0
-      font: "DK Snemand"
-      style: "bold"
+      type: "svg-engraving"
+      source: "../plans/spirit-island/images/Wilds.svg"
+      height: 10.0
       position:
-        anchor: "bottom-center"
-        offset: [0.0, 6.0]
+        anchor: "center"
+        offset: [0.0, -3.0]
 
 - id: "short-drawer-3"
   type: "box"
@@ -106,20 +108,21 @@ shapes:
   features:
     - face: "front"
       type: "cutout"
-      shape: "semicircle"
-      diameter: -25.0
+      shape: "edge-dip"
+      width: 25.0
+      height: 10.0
+      radius: 5.0
+      inner-radius: 5.0
       position:
         anchor: "top-center"
         offset: [0.0, 0.0]
     - face: "front"
-      type: "engraving"
-      text: "Disease"
-      size: 6.0
-      font: "DK Snemand"
-      style: "bold"
+      type: "svg-engraving"
+      source: "../plans/spirit-island/images/Disease.svg"
+      height: 10.0
       position:
-        anchor: "bottom-center"
-        offset: [0.0, 6.0]
+        anchor: "center"
+        offset: [0.0, -3.0]
 
 - id: "short-drawer-4"
   type: "box"
@@ -136,20 +139,21 @@ shapes:
   features:
     - face: "front"
       type: "cutout"
-      shape: "semicircle"
-      diameter: -25.0
+      shape: "edge-dip"
+      width: 25.0
+      height: 10.0
+      radius: 5.0
+      inner-radius: 5.0
       position:
         anchor: "top-center"
         offset: [0.0, 0.0]
     - face: "front"
-      type: "engraving"
-      text: "Strife"
-      size: 6.0
-      font: "DK Snemand"
-      style: "bold"
+      type: "svg-engraving"
+      source: "../plans/spirit-island/images/Strife.svg"
+      height: 10.0
       position:
-        anchor: "bottom-center"
-        offset: [0.0, 6.0]
+        anchor: "center"
+        offset: [0.0, -3.0]
 
 - id: "short-drawer-5"
   type: "box"
@@ -166,20 +170,21 @@ shapes:
   features:
     - face: "front"
       type: "cutout"
-      shape: "semicircle"
-      diameter: -25.0
+      shape: "edge-dip"
+      width: 25.0
+      height: 10.0
+      radius: 5.0
+      inner-radius: 5.0
       position:
         anchor: "top-center"
         offset: [0.0, 0.0]
     - face: "front"
-      type: "engraving"
-      text: "Blight"
-      size: 6.0
-      font: "DK Snemand"
-      style: "bold"
+      type: "svg-engraving"
+      source: "../plans/spirit-island/images/Blight.svg"
+      height: 10.0
       position:
-        anchor: "bottom-center"
-        offset: [0.0, 6.0]
+        anchor: "center"
+        offset: [0.0, -3.0]
 
 - id: "short-drawer-6"
   type: "box"
@@ -196,20 +201,21 @@ shapes:
   features:
     - face: "front"
       type: "cutout"
-      shape: "semicircle"
-      diameter: -25.0
+      shape: "edge-dip"
+      width: 25.0
+      height: 10.0
+      radius: 5.0
+      inner-radius: 5.0
       position:
         anchor: "top-center"
         offset: [0.0, 0.0]
     - face: "front"
-      type: "engraving"
-      text: "Badlands"
-      size: 6.0
-      font: "DK Snemand"
-      style: "bold"
+      type: "svg-engraving"
+      source: "../plans/spirit-island/images/Badlands.svg"
+      height: 10.0
       position:
-        anchor: "bottom-center"
-        offset: [0.0, 6.0]
+        anchor: "center"
+        offset: [0.0, -3.0]
 
 - id: "short-drawer-7"
   type: "box"
@@ -226,20 +232,21 @@ shapes:
   features:
     - face: "front"
       type: "cutout"
-      shape: "semicircle"
-      diameter: -25.0
+      shape: "edge-dip"
+      width: 25.0
+      height: 10.0
+      radius: 5.0
+      inner-radius: 5.0
       position:
         anchor: "top-center"
         offset: [0.0, 0.0]
     - face: "front"
-      type: "engraving"
-      text: "Quake"
-      size: 6.0
-      font: "DK Snemand"
-      style: "bold"
+      type: "svg-engraving"
+      source: "../plans/spirit-island/images/Quake.svg"
+      height: 10.0
       position:
-        anchor: "bottom-center"
-        offset: [0.0, 6.0]
+        anchor: "center"
+        offset: [0.0, -3.0]
 
 - id: "short-drawer-8"
   type: "box"
@@ -256,20 +263,21 @@ shapes:
   features:
     - face: "front"
       type: "cutout"
-      shape: "semicircle"
-      diameter: -25.0
+      shape: "edge-dip"
+      width: 25.0
+      height: 10.0
+      radius: 5.0
+      inner-radius: 5.0
       position:
         anchor: "top-center"
         offset: [0.0, 0.0]
     - face: "front"
-      type: "engraving"
-      text: "Incarnae"
-      size: 6.0
-      font: "DK Snemand"
-      style: "bold"
+      type: "svg-engraving"
+      source: "../plans/spirit-island/images/Incarna.svg"
+      height: 10.0
       position:
-        anchor: "bottom-center"
-        offset: [0.0, 6.0]
+        anchor: "center"
+        offset: [0.0, -3.0]
 
 - id: "short-drawer-9"
   type: "box"
@@ -286,20 +294,21 @@ shapes:
   features:
     - face: "front"
       type: "cutout"
-      shape: "semicircle"
-      diameter: -25.0
+      shape: "edge-dip"
+      width: 25.0
+      height: 10.0
+      radius: 5.0
+      inner-radius: 5.0
       position:
         anchor: "top-center"
         offset: [0.0, 0.0]
     - face: "front"
-      type: "engraving"
-      text: "Deeps"
-      size: 6.0
-      font: "DK Snemand"
-      style: "bold"
+      type: "svg-engraving"
+      source: "../plans/spirit-island/images/Deeps.svg"
+      height: 10.0
       position:
-        anchor: "bottom-center"
-        offset: [0.0, 6.0]
+        anchor: "center"
+        offset: [0.0, -3.0]
 
 - id: "short-drawer-10"
   type: "box"
@@ -316,17 +325,18 @@ shapes:
   features:
     - face: "front"
       type: "cutout"
-      shape: "semicircle"
-      diameter: -25.0
+      shape: "edge-dip"
+      width: 25.0
+      height: 10.0
+      radius: 5.0
+      inner-radius: 5.0
       position:
         anchor: "top-center"
         offset: [0.0, 0.0]
     - face: "front"
-      type: "engraving"
-      text: "Vitality"
-      size: 6.0
-      font: "DK Snemand"
-      style: "bold"
+      type: "svg-engraving"
+      source: "../plans/spirit-island/images/Vitality.svg"
+      height: 10.0
       position:
-        anchor: "bottom-center"
-        offset: [0.0, 6.0]
+        anchor: "center"
+        offset: [0.0, -3.0]

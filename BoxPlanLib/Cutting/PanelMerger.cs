@@ -142,6 +142,7 @@ internal static class PanelMerger
         var engravings = new List<CuttablePath>();
         var textEngravings = new List<TextEngraving>();
         var rasterEngravings = new List<RasterEngraving>();
+        var svgEngravings = new List<SvgEngraving>();
 
         foreach (var member in members)
         {
@@ -216,6 +217,32 @@ internal static class PanelMerger
                             });
                         }
                         break;
+                    case SvgEngravingFeature svg:
+                        var svgAnchorName = svg.Position?.Anchor ?? Anchor.Center;
+                        var svgCenter = CutoutBuilder.ResolvePlacementCenter(
+                            svg.Position,
+                            CutoutShape.Rectangle,
+                            svg.Width ?? 0.0,
+                            svg.Height ?? 0.0,
+                            member.PanelU,
+                            member.PanelV,
+                            kerf: 0,
+                            logger);
+                        var localSvgAnchor = EngravingBuilder.AnchorPointFromCenter(svgCenter, svgAnchorName, svg.Width ?? 0.0, svg.Height ?? 0.0);
+                        var svgAnchor = new Vec2(localSvgAnchor.X + adj.X, localSvgAnchor.Y + adj.Y);
+                        if (CutoutClipper.IsInsideOutline(svgAnchor, path))
+                        {
+                            svgEngravings.Add(new SvgEngraving
+                            {
+                                Href = svg.Source,
+                                X = svgAnchor.X,
+                                Y = svgAnchor.Y,
+                                Anchor = svgAnchorName,
+                                Width = svg.Width,
+                                Height = svg.Height,
+                            });
+                        }
+                        break;
                 }
             }
         }
@@ -230,6 +257,7 @@ internal static class PanelMerger
             Engravings = engravings,
             TextEngravings = textEngravings,
             RasterEngravings = rasterEngravings,
+            SvgEngravings = svgEngravings,
         };
     }
 

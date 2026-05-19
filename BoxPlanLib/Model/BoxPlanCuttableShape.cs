@@ -12,6 +12,7 @@ public sealed class BoxPlanCuttableShape
     public required IReadOnlyList<CuttablePath> Engravings { get; init; }
     public required IReadOnlyList<TextEngraving> TextEngravings { get; init; }
     public IReadOnlyList<RasterEngraving> RasterEngravings { get; init; } = Array.Empty<RasterEngraving>();
+    public IReadOnlyList<SvgEngraving> SvgEngravings { get; init; } = Array.Empty<SvgEngraving>();
 }
 
 public sealed class TextEngraving
@@ -34,6 +35,16 @@ public sealed class RasterEngraving
     public Anchor Anchor { get; init; } = Anchor.Center;
     public required double Width { get; init; }
     public required double Height { get; init; }
+}
+
+public sealed class SvgEngraving
+{
+    public required string Href { get; init; }
+    public required double X { get; init; }
+    public required double Y { get; init; }
+    public Anchor Anchor { get; init; } = Anchor.Center;
+    public double? Width { get; init; }
+    public double? Height { get; init; }
 }
 
 public sealed class CuttablePath

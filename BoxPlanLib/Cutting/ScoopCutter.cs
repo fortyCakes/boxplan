@@ -623,6 +623,7 @@ internal static class ScoopCutter
             Engravings = Array.Empty<CuttablePath>(),
             TextEngravings = Array.Empty<TextEngraving>(),
             RasterEngravings = Array.Empty<RasterEngraving>(),
+            SvgEngravings = Array.Empty<SvgEngraving>(),
         };
     }
 

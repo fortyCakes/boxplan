@@ -42,6 +42,7 @@ internal sealed class SvgGenerator
         sb.Append("width=\"").Append(F(totalW)).Append("mm\" ");
         sb.Append("height=\"").Append(F(totalH)).Append("mm\" ");
         sb.Append("viewBox=\"0 0 ").Append(F(totalW)).Append(' ').Append(F(totalH)).Append("\">");
+        EmitSvgEngravingDefsIfNeeded(sb, shapes);
         sb.Append("<g transform=\"translate(0 ").Append(F(totalH)).Append(") scale(1 -1)\">");
 
         double xCursor = 0;
@@ -55,6 +56,7 @@ internal sealed class SvgGenerator
             foreach (var p in s.Engravings) EmitPath(sb, p, s.BoundingBoxMin, LineEngravingColor);
             foreach (var t in s.TextEngravings) EmitTextEngraving(sb, t, s.BoundingBoxMin);
             foreach (var r in s.RasterEngravings) EmitRasterEngraving(sb, r, s.BoundingBoxMin);
+            foreach (var v in s.SvgEngravings) EmitSvgEngraving(sb, v, s.BoundingBoxMin);
             if (settings.Labels) EmitLabel(sb, s);
             sb.Append("</g>");
             xCursor += widths[i] + settings.Spacing;
@@ -82,6 +84,7 @@ internal sealed class SvgGenerator
         sb.Append("width=\"").Append(F(totalWidth)).Append("mm\" ");
         sb.Append("height=\"").Append(F(totalHeight)).Append("mm\" ");
         sb.Append("viewBox=\"0 0 ").Append(F(totalWidth)).Append(' ').Append(F(totalHeight)).Append("\">");
+        EmitSvgEngravingDefsIfNeeded(sb, shapes);
         sb.Append("<g transform=\"translate(0 ").Append(F(totalHeight)).Append(") scale(1 -1)\">");
 
         for (int pageIndex = 0; pageIndex < placements.PageCount; pageIndex++)
@@ -102,6 +105,7 @@ internal sealed class SvgGenerator
                 foreach (var path in placement.Shape.Engravings) EmitPath(sb, path, placement.Shape.BoundingBoxMin, LineEngravingColor);
                 foreach (var t in placement.Shape.TextEngravings) EmitTextEngraving(sb, t, placement.Shape.BoundingBoxMin);
                 foreach (var r in placement.Shape.RasterEngravings) EmitRasterEngraving(sb, r, placement.Shape.BoundingBoxMin);
+                foreach (var v in placement.Shape.SvgEngravings) EmitSvgEngraving(sb, v, placement.Shape.BoundingBoxMin);
                 if (settings.Labels) EmitLabel(sb, placement.Shape);
                 sb.Append("</g>");
             }
@@ -140,6 +144,10 @@ internal sealed class SvgGenerator
         sb.Append("width=\"").Append(F(settings.SheetWidth)).Append("mm\" ");
         sb.Append("height=\"").Append(F(settings.SheetHeight)).Append("mm\" ");
         sb.Append("viewBox=\"0 0 ").Append(F(settings.SheetWidth)).Append(' ').Append(F(settings.SheetHeight)).Append("\">");
+        if (placements.Items.Any(p => p.PageIndex == pageIndex && p.Shape.SvgEngravings.Count > 0))
+        {
+            EmitSvgEngravingDefs(sb);
+        }
         sb.Append("<g transform=\"translate(0 ").Append(F(settings.SheetHeight)).Append(") scale(1 -1)\">");
 
         foreach (var placement in placements.Items.Where(p => p.PageIndex == pageIndex))
@@ -153,6 +161,7 @@ internal sealed class SvgGenerator
             foreach (var path in placement.Shape.Engravings) EmitPath(sb, path, placement.Shape.BoundingBoxMin, LineEngravingColor);
             foreach (var t in placement.Shape.TextEngravings) EmitTextEngraving(sb, t, placement.Shape.BoundingBoxMin);
             foreach (var r in placement.Shape.RasterEngravings) EmitRasterEngraving(sb, r, placement.Shape.BoundingBoxMin);
+            foreach (var v in placement.Shape.SvgEngravings) EmitSvgEngraving(sb, v, placement.Shape.BoundingBoxMin);
             if (settings.Labels) EmitLabel(sb, placement.Shape);
             sb.Append("</g>");
         }
@@ -537,6 +546,40 @@ internal sealed class SvgGenerator
                     .Append("\"/>");
                 sb.Append("</g>");
         }
+
+    private static void EmitSvgEngravingDefsIfNeeded(StringBuilder sb, BoxPlanCuttableShape[] shapes)
+    {
+        if (shapes.Any(s => s.SvgEngravings.Count > 0))
+            EmitSvgEngravingDefs(sb);
+    }
+
+    private static void EmitSvgEngravingDefs(StringBuilder sb)
+    {
+        sb.Append("<defs><filter id=\"svg-eng\">")
+          .Append("<feFlood flood-color=\"").Append(TextEngravingColor).Append("\" result=\"c\"/>")
+          .Append("<feComposite in=\"c\" in2=\"SourceGraphic\" operator=\"in\"/>")
+          .Append("</filter></defs>");
+    }
+
+    private static void EmitSvgEngraving(StringBuilder sb, SvgEngraving engraving, Vec2 origin)
+    {
+        var x = engraving.X - origin.X;
+        var y = engraving.Y - origin.Y;
+        var width = engraving.Width.GetValueOrDefault();
+        var height = engraving.Height.GetValueOrDefault();
+        var (offsetX, offsetY) = AnchorOffset(engraving.Anchor, width, height);
+
+        sb.Append("<g transform=\"translate(")
+          .Append(F(x)).Append(' ').Append(F(y))
+          .Append(") scale(1 -1)\">");
+        sb.Append("<image x=\"").Append(F(offsetX))
+          .Append("\" y=\"").Append(F(offsetY))
+          .Append("\" width=\"").Append(F(width))
+          .Append("\" height=\"").Append(F(height))
+          .Append("\" preserveAspectRatio=\"none\" href=\"").Append(Escape(engraving.Href))
+          .Append("\" filter=\"url(#svg-eng)\"/>");
+        sb.Append("</g>");
+    }
 
         private static (double X, double Y) AnchorOffset(Anchor anchor, double width, double height)
         {

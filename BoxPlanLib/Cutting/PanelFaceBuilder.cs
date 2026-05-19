@@ -43,6 +43,7 @@ internal static class PanelFaceBuilder
         var engravings = new List<CuttablePath>();
         var textEngravings = new List<TextEngraving>();
         var rasterEngravings = new List<RasterEngraving>();
+        var svgEngravings = new List<SvgEngraving>();
 
         // No finger-joint margins — the entire panel interior is fair game.
         var zone = new CutoutBuilder.SafeZone(UMin: 0, UMax: panelU, VMin: 0, VMax: panelV);
@@ -113,6 +114,32 @@ internal static class PanelFaceBuilder
                         });
                     }
                     break;
+                case SvgEngravingFeature svg:
+                    var svgAnchorName = svg.Position?.Anchor ?? Anchor.Center;
+                    var svgCenter = CutoutBuilder.ResolvePlacementCenter(
+                        svg.Position,
+                        CutoutShape.Rectangle,
+                        svg.Width ?? 0.0,
+                        svg.Height ?? 0.0,
+                        panelU,
+                        panelV,
+                        kerf: 0,
+                        logger);
+                    var localSvgAnchor = EngravingBuilder.AnchorPointFromCenter(svgCenter, svgAnchorName, svg.Width ?? 0.0, svg.Height ?? 0.0);
+                    var svgAnchor = new Vec2(localSvgAnchor.X + translation.X, localSvgAnchor.Y + translation.Y);
+                    if (CutoutClipper.IsInsideOutline(svgAnchor, path))
+                    {
+                        svgEngravings.Add(new SvgEngraving
+                        {
+                            Href = svg.Source,
+                            X = svgAnchor.X,
+                            Y = svgAnchor.Y,
+                            Anchor = svgAnchorName,
+                            Width = svg.Width,
+                            Height = svg.Height,
+                        });
+                    }
+                    break;
             }
         }
 
@@ -126,6 +153,7 @@ internal static class PanelFaceBuilder
             Engravings = engravings,
             TextEngravings = textEngravings,
             RasterEngravings = rasterEngravings,
+            SvgEngravings = svgEngravings,
         };
     }
 }

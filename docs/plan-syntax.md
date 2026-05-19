@@ -503,6 +503,24 @@ CLI output behavior is controlled by settings:
 - `embed-raster-engravings: true` (default) embeds each image as base64 in SVG.
 - `embed-raster-engravings: false` copies source files to `raster-engraving-asset-folder` (default `assets`) and references them from SVG.
 
+### `type: svg-engraving`
+
+An SVG vector file engraved onto the face. Rendered as purple in the output (the same layer as text engravings). The SVG filter `feFlood`+`feComposite` is used to tint the embedded image purple.
+
+If `position` is omitted, the image is centered on the face. If `position` is
+provided, the anchor refers to the matching point on the image bounding box,
+the same way cutout anchors do.
+
+| Field    | Description                                                                                 |
+| -------- | ------------------------------------------------------------------------------------------- |
+| `source` | **Required.** SVG file path. Relative paths are resolved from the plan file location.       |
+| `width`  | Rendered image width in mm. Must be positive. At least one of `width` or `height` is required. |
+| `height` | Rendered image height in mm. Must be positive. At least one of `width` or `height` is required. |
+
+If only one of `width` or `height` is specified, the other is inferred from the SVG file's `viewBox` aspect ratio. Aspect-ratio inference requires `position.anchor: center` (the default); providing a non-center anchor with a missing dimension is an error.
+
+The `embed-raster-engravings` setting also controls SVG engraving assets: `true` (default) embeds as base64, `false` copies to the asset folder.
+
 ### `type: line-engraving`
 
 A shape engraved as line work (no fill).

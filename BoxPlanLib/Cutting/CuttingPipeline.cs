@@ -271,6 +271,7 @@ public sealed class CuttingPipeline
             Engravings = Array.Empty<CuttablePath>(),
             TextEngravings = Array.Empty<TextEngraving>(),
             RasterEngravings = Array.Empty<RasterEngraving>(),
+            SvgEngravings = Array.Empty<SvgEngraving>(),
         };
     }
 
@@ -933,6 +934,7 @@ public sealed class CuttingPipeline
         var engravings = new List<CuttablePath>();
         var textEngravings = new List<TextEngraving>();
         var rasterEngravings = new List<RasterEngraving>();
+        var svgEngravings = new List<SvgEngraving>();
         foreach (var feature in features)
         {
             if (feature is SplitCutFeature splitCut)
@@ -1013,6 +1015,33 @@ public sealed class CuttingPipeline
                     });
                 }
             }
+            else if (feature is SvgEngravingFeature svg)
+            {
+                var anchor = svg.Position?.Anchor ?? Anchor.Center;
+                var center = CutoutBuilder.ResolvePlacementCenter(
+                    svg.Position,
+                    CutoutShape.Rectangle,
+                    svg.Width ?? 0.0,
+                    svg.Height ?? 0.0,
+                    panelU,
+                    panelV,
+                    kerf: 0,
+                    logger);
+                var localAnchor = EngravingBuilder.AnchorPointFromCenter(center, anchor, svg.Width ?? 0.0, svg.Height ?? 0.0);
+                var anchorPoint = new Vec2(localAnchor.X + translation.X, localAnchor.Y + translation.Y);
+                if (CutoutClipper.IsInsideOutline(anchorPoint, path))
+                {
+                    svgEngravings.Add(new SvgEngraving
+                    {
+                        Href = svg.Source,
+                        X = anchorPoint.X,
+                        Y = anchorPoint.Y,
+                        Anchor = anchor,
+                        Width = svg.Width,
+                        Height = svg.Height,
+                    });
+                }
+            }
         }
         var clippedDividerSlots = scoopFaceSlotExclusions.TryGetValue(face, out var exclusions)
             ? FilterSlotsByExclusions(dividerSlots, exclusions)
@@ -1049,6 +1078,7 @@ public sealed class CuttingPipeline
             Engravings = engravings,
             TextEngravings = textEngravings,
             RasterEngravings = rasterEngravings,
+            SvgEngravings = svgEngravings,
         };
     }
 
