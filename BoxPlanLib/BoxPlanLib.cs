@@ -65,7 +65,7 @@ public class BoxPlanLib
     /// When provided, engraving assets are copied or embedded relative to this directory
     /// before SVG generation. Must already exist.
     /// </param>
-    public (int PageCount, double DensityScore) MeasureLayout(
+    public (int PageCount, double UtilityScore) MeasureLayout(
         BoxPlanCuttableShape[] shapes, BoxPlanSettings settings)
         => _svgGenerator.MeasureLayout(shapes, settings);
 

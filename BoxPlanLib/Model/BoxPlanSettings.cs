@@ -25,6 +25,8 @@ public class BoxPlanSettings
     // Multiplier applied to arc length when sizing a curved face panel.
     // Values < 1.0 compensate for the material shortening caused by flex cuts.
     public double FlexLengthCompensationFactor { get; set; }
+    public double ScrapValue { get; set; }
+    public double MinScrapSize { get; set; }
 
     public BoxPlanSettings Default => new BoxPlanSettings
     {
@@ -46,5 +48,7 @@ public class BoxPlanSettings
         FlexLineSpacing = 3.0,
         FlexLineLengthFraction = 0.75,
         FlexLengthCompensationFactor = 1.0,
+        ScrapValue = 0.5,
+        MinScrapSize = 50.0,
     };
 }

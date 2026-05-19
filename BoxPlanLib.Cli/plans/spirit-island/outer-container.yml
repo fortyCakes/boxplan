@@ -38,7 +38,7 @@ shapes:
 
 - id: "outer-container"
   type: "box" 
-  dimensions: [328.0, 248.0, 304.0]
+  dimensions: [328.0, 248.0, 302.0]
   features:
   - face: "top"
     type: "raster-engraving"

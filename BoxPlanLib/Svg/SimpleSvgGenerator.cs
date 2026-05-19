@@ -137,7 +137,7 @@ internal sealed class SvgGenerator
         return pages;
     }
 
-    internal (int PageCount, double DensityScore) MeasureLayout(
+    internal (int PageCount, double UtilityScore) MeasureLayout(
         BoxPlanCuttableShape[] shapes, BoxPlanSettings settings)
     {
         if (shapes.Length == 0) return (0, 0.0);
@@ -146,7 +146,6 @@ internal sealed class SvgGenerator
 
         var pageWidths = new double[layout.PageCount];
         var pageHeights = new double[layout.PageCount];
-        var pagePieceAreas = new double[layout.PageCount];
 
         foreach (var placement in layout.Items)
         {
@@ -157,19 +156,25 @@ internal sealed class SvgGenerator
             var top = placement.Y + h;
             if (right > pageWidths[placement.PageIndex]) pageWidths[placement.PageIndex] = right;
             if (top > pageHeights[placement.PageIndex]) pageHeights[placement.PageIndex] = top;
-
-            pagePieceAreas[placement.PageIndex] += w * h;
         }
 
-        var densityScore = 0.0;
-        for (var p = 0; p < layout.PageCount; p++)
+        var sheetArea = settings.SheetWidth * settings.SheetHeight;
+        var utilityScore = (double)layout.PageCount;
+        if (sheetArea > 1e-6)
         {
-            var pieceArea = pagePieceAreas[p];
-            if (pieceArea > 1e-6)
-                densityScore += (pageWidths[p] * pageHeights[p]) / pieceArea;
+            for (var p = 0; p < layout.PageCount; p++)
+            {
+                var trailingX = Math.Max(0.0, settings.SheetWidth - pageWidths[p]);
+                var trailingY = Math.Max(0.0, settings.SheetHeight - pageHeights[p]);
+                if (Math.Max(trailingX, trailingY) < settings.MinScrapSize)
+                    continue;
+                var usedExtent = pageWidths[p] * pageHeights[p];
+                var scrapFraction = Math.Max(0.0, 1.0 - usedExtent / sheetArea);
+                utilityScore -= settings.ScrapValue * scrapFraction;
+            }
         }
 
-        return (layout.PageCount, densityScore);
+        return (layout.PageCount, utilityScore);
     }
 
     private static string BuildSinglePageSvg(LayoutResult placements, int pageIndex, BoxPlanSettings settings, int shapeCount)
