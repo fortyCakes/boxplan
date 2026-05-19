@@ -1,3 +1,4 @@
+using System.Text.Json.Serialization;
 using BoxPlanLib.Model;
 
 namespace BoxPlanLib;
@@ -60,6 +61,9 @@ public sealed class CuttablePath
     public required bool Closed { get; init; }
 }
 
+[JsonPolymorphic(TypeDiscriminatorPropertyName = "$type")]
+[JsonDerivedType(typeof(LineSegment), "line")]
+[JsonDerivedType(typeof(ArcSegment), "arc")]
 public abstract record PathSegment;
 public sealed record LineSegment(Vec2 To) : PathSegment;
 public sealed record ArcSegment(Vec2 To, double Radius, bool Clockwise, bool LargeArc) : PathSegment;

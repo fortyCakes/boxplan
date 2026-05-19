@@ -1,4 +1,4 @@
-﻿using BoxPlanLib.Cutting;
+using BoxPlanLib.Cutting;
 using BoxPlanLib.Model;
 using BoxPlanLib.Parsing;
 using BoxPlanLib.Svg;
@@ -28,16 +28,31 @@ public class BoxPlanLib
         return _fitResolver.Resolve(resolved.Value, settings?.MaterialThickness ?? 0);
     }
 
-    // Downstream stages — re-enable once their underlying types exist.
-    //
-    public BoxPlanCuttableShape[] GetCuttableShapes(BoxPlan plan, BoxPlanSettings settings)
+    /// <param name="sourcePath">
+    /// Absolute path to the source YAML file. When provided, engraving hrefs are resolved
+    /// relative to this file's directory, and image dimensions and vectorization are applied.
+    /// </param>
+    public BoxPlanCuttableShape[] GetCuttableShapes(
+        BoxPlan plan, BoxPlanSettings settings, string? sourcePath = null)
     {
         var resolved = _fitResolver.Resolve(plan, settings.MaterialThickness);
         if (!resolved.Success || resolved.Value is null)
         {
             throw new InvalidOperationException(string.Join("; ", resolved.Errors.Select(e => e.ToString())));
         }
-        return _cuttingPipeline.Run(plan, settings);
+
+        var shapes = _cuttingPipeline.Run(plan, settings);
+
+        if (sourcePath is not null)
+        {
+            shapes = EngravingPipeline.NormalizeEngravingSources(shapes, sourcePath);
+            shapes = EngravingPipeline.ResolveEngravingDimensions(shapes);
+            if (settings.VectorizeRasterEngravings)
+                shapes = EngravingPipeline.VectorizeRasterEngravings(shapes);
+            shapes = EngravingPipeline.InlineSvgEngravings(shapes);
+        }
+
+        return shapes;
     }
 
     public string GenerateSimpleSVG(BoxPlanCuttableShape[] shapes, BoxPlanSettings settings)
@@ -46,14 +61,23 @@ public class BoxPlanLib
     public string GeneratePagedSVG(BoxPlanCuttableShape[] cuttableShapes, BoxPlanSettings materialSettings)
         => _svgGenerator.GeneratePagedSvg(cuttableShapes, materialSettings);
 
-    public IReadOnlyList<string> GeneratePagedSVGPages(BoxPlanCuttableShape[] cuttableShapes, BoxPlanSettings materialSettings)
-        => _svgGenerator.GeneratePagedSvgPages(cuttableShapes, materialSettings);
+    /// <param name="outputDirectory">
+    /// When provided, engraving assets are copied or embedded relative to this directory
+    /// before SVG generation. Must already exist.
+    /// </param>
+    public (int PageCount, double DensityScore) MeasureLayout(
+        BoxPlanCuttableShape[] shapes, BoxPlanSettings settings)
+        => _svgGenerator.MeasureLayout(shapes, settings);
 
-    //
-    // public string GenerateFullPagedSvg(string plan, BoxPlanMaterialSettings materialSettings)
-    // {
-    //     var shapes = ParsePlan(plan);
-    //     var cuttableShapes = GetCuttableShapes(shapes, materialSettings);
-    //     return GeneratePagedSVG(cuttableShapes, materialSettings);
-    // }
+    public IReadOnlyList<string> GeneratePagedSVGPages(
+        BoxPlanCuttableShape[] cuttableShapes,
+        BoxPlanSettings materialSettings,
+        string? outputDirectory = null)
+    {
+        var shapes = cuttableShapes;
+        if (outputDirectory is not null)
+            shapes = EngravingPipeline.PrepareEngravingAssets(shapes, materialSettings, outputDirectory);
+
+        return _svgGenerator.GeneratePagedSvgPages(shapes, materialSettings);
+    }
 }

@@ -137,6 +137,41 @@ internal sealed class SvgGenerator
         return pages;
     }
 
+    internal (int PageCount, double DensityScore) MeasureLayout(
+        BoxPlanCuttableShape[] shapes, BoxPlanSettings settings)
+    {
+        if (shapes.Length == 0) return (0, 0.0);
+        ValidatePagedSettings(settings);
+        var layout = LayoutPages(shapes, settings);
+
+        var pageWidths = new double[layout.PageCount];
+        var pageHeights = new double[layout.PageCount];
+        var pagePieceAreas = new double[layout.PageCount];
+
+        foreach (var placement in layout.Items)
+        {
+            var w = placement.Rotation is 90 or 270 ? Height(placement.Shape) : Width(placement.Shape);
+            var h = placement.Rotation is 90 or 270 ? Width(placement.Shape) : Height(placement.Shape);
+
+            var right = placement.X + w;
+            var top = placement.Y + h;
+            if (right > pageWidths[placement.PageIndex]) pageWidths[placement.PageIndex] = right;
+            if (top > pageHeights[placement.PageIndex]) pageHeights[placement.PageIndex] = top;
+
+            pagePieceAreas[placement.PageIndex] += w * h;
+        }
+
+        var densityScore = 0.0;
+        for (var p = 0; p < layout.PageCount; p++)
+        {
+            var pieceArea = pagePieceAreas[p];
+            if (pieceArea > 1e-6)
+                densityScore += (pageWidths[p] * pageHeights[p]) / pieceArea;
+        }
+
+        return (layout.PageCount, densityScore);
+    }
+
     private static string BuildSinglePageSvg(LayoutResult placements, int pageIndex, BoxPlanSettings settings, int shapeCount)
     {
         var sb = new StringBuilder(256 + shapeCount * 192);

@@ -9,7 +9,7 @@ shapes:
   features:
   - face: "front"
     type: "svg-engraving"
-    source: "../plans/spirit-island/images/Explorer.svg"
+    source: "images/Explorer.svg"
     width: 18.0
     position:
       anchor: "center"
@@ -22,7 +22,7 @@ shapes:
   features:
   - face: "front"
     type: "svg-engraving"
-    source: "../plans/spirit-island/images/Explorer.svg"
+    source: "images/Explorer.svg"
     width: 18.0
     position:
       anchor: "center"
@@ -35,7 +35,7 @@ shapes:
   features:
   - face: "front"
     type: "svg-engraving"
-    source: "../plans/spirit-island/images/Town.svg"
+    source: "images/Town.svg"
     width: 24.0
     position:
       anchor: "center"
@@ -48,7 +48,7 @@ shapes:
   features:
   - face: "front"
     type: "svg-engraving"
-    source: "../plans/spirit-island/images/Town.svg"
+    source: "images/Town.svg"
     width: 24.0
     position:
       anchor: "center"
@@ -62,7 +62,7 @@ shapes:
   features:
   - face: "front"
     type: "svg-engraving"
-    source: "../plans/spirit-island/images/City.svg"
+    source: "images/City.svg"
     width: 24.0
     position:
       anchor: "center"
@@ -75,7 +75,7 @@ shapes:
   features:
   - face: "front"
     type: "svg-engraving"
-    source: "../plans/spirit-island/images/City.svg"
+    source: "images/City.svg"
     width: 24.0
     position:
       anchor: "center"
