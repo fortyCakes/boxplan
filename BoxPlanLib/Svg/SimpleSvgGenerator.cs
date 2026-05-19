@@ -524,29 +524,46 @@ internal sealed class SvgGenerator
         sb.Append("</g>");
     }
 
-        private static void EmitRasterEngraving(StringBuilder sb, RasterEngraving engraving, Vec2 origin)
-        {
-                var x = engraving.X - origin.X;
-                var y = engraving.Y - origin.Y;
-                var width = engraving.Width.GetValueOrDefault();
-                var height = engraving.Height.GetValueOrDefault();
-                var (offsetX, offsetY) = AnchorOffset(engraving.Anchor, width, height);
+    private static void EmitRasterEngraving(StringBuilder sb, RasterEngraving engraving, Vec2 origin)
+    {
+        var x = engraving.X - origin.X;
+        var y = engraving.Y - origin.Y;
+        var width = engraving.Width.GetValueOrDefault();
+        var height = engraving.Height.GetValueOrDefault();
+        var (offsetX, offsetY) = AnchorOffset(engraving.Anchor, width, height);
 
-                sb.Append("<g transform=\"translate(")
-                    .Append(F(x)).Append(' ').Append(F(y))
-                    .Append(") scale(1 -1)\">");
-                sb.Append("<image x=\"").Append(F(offsetX))
-                    .Append("\" y=\"").Append(F(offsetY))
-                    .Append("\" width=\"").Append(F(width))
-                    .Append("\" height=\"").Append(F(height))
-                    .Append("\" preserveAspectRatio=\"none\" href=\"").Append(Escape(engraving.Href))
-                    .Append("\"/>");
-                sb.Append("</g>");
+        sb.Append("<g transform=\"translate(")
+          .Append(F(x)).Append(' ').Append(F(y))
+          .Append(") scale(1 -1)\">");
+
+        if (engraving.InlinedPaths is { } paths && engraving.PixelWidth > 0 && engraving.PixelHeight > 0)
+        {
+            var scaleX = width / engraving.PixelWidth;
+            var scaleY = height / engraving.PixelHeight;
+            sb.Append("<g fill=\"").Append(TextEngravingColor).Append("\" filter=\"url(#svg-eng)\" transform=\"translate(")
+              .Append(F(offsetX)).Append(' ').Append(F(offsetY))
+              .Append(") scale(").Append(F(scaleX)).Append(' ').Append(F(scaleY))
+              .Append(")\">");
+            sb.Append(paths);
+            sb.Append("</g>");
         }
+        else
+        {
+            sb.Append("<image x=\"").Append(F(offsetX))
+              .Append("\" y=\"").Append(F(offsetY))
+              .Append("\" width=\"").Append(F(width))
+              .Append("\" height=\"").Append(F(height))
+              .Append("\" preserveAspectRatio=\"none\" href=\"").Append(Escape(engraving.Href))
+              .Append("\"/>");
+        }
+
+        sb.Append("</g>");
+    }
 
     private static void EmitSvgEngravingDefsIfNeeded(StringBuilder sb, BoxPlanCuttableShape[] shapes)
     {
-        if (shapes.Any(s => s.SvgEngravings.Count > 0))
+        if (shapes.Any(s => s.SvgEngravings.Count > 0
+                         || s.RasterEngravings.Any(e => e.InlinedPaths is not null)))
             EmitSvgEngravingDefs(sb);
     }
 

@@ -119,7 +119,7 @@ public class EngravingTests
 
         var svg = lib.GenerateSimpleSVG(pieces, Settings());
         Assert.Contains("text-anchor=\"start\"", svg);
-        Assert.Contains("alignment-baseline=\"middle\"", svg);
+        Assert.Contains("dominant-baseline=\"middle\"", svg);
     }
 
     [Fact]
@@ -151,7 +151,7 @@ public class EngravingTests
 
         var svg = lib.GenerateSimpleSVG(pieces, Settings());
         Assert.Contains("text-anchor=\"start\"", svg);
-        Assert.Contains("alignment-baseline=\"text-before-edge\"", svg);
+        Assert.Contains("dominant-baseline=\"hanging\"", svg);
     }
 
     [Fact]
@@ -183,7 +183,7 @@ public class EngravingTests
 
         var svg = lib.GenerateSimpleSVG(pieces, Settings());
         Assert.Contains("text-anchor=\"end\"", svg);
-        Assert.Contains("alignment-baseline=\"text-after-edge\"", svg);
+        Assert.Contains("dominant-baseline=\"alphabetic\"", svg);
     }
 
     [Fact]
@@ -250,7 +250,7 @@ public class EngravingTests
         Assert.Contains("font-family=\"sans-serif\"", svg);
         Assert.Contains("font-size=\"6.000\"", svg);
     Assert.Contains("text-anchor=\"middle\"", svg);
-    Assert.Contains("alignment-baseline=\"middle\"", svg);
+    Assert.Contains("dominant-baseline=\"middle\"", svg);
     }
 
     [Fact]

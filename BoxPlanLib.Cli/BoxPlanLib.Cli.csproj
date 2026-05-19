@@ -9,6 +9,10 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="SixLabors.ImageSharp" Version="3.1.*" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\BoxPlanLib\BoxPlanLib.csproj" />
   </ItemGroup>
 

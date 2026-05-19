@@ -519,7 +519,7 @@ the same way cutout anchors do.
 | `width`  | Rendered image width in mm. Must be positive. At least one of `width` or `height` is required. |
 | `height` | Rendered image height in mm. Must be positive. At least one of `width` or `height` is required. |
 
-If only one of `width` or `height` is specified, the other is inferred from the SVG file's `viewBox` aspect ratio. Aspect-ratio inference requires `position.anchor: center` (the default); providing a non-center anchor with a missing dimension is an error.
+If only one of `width` or `height` is specified, the other is inferred from the SVG file's `viewBox` aspect ratio.
 
 The `embed-raster-engravings` setting also controls SVG engraving assets: `true` (default) embeds as base64, `false` copies to the asset folder.
 

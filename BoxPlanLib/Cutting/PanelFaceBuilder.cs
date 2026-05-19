@@ -87,6 +87,10 @@ internal static class PanelFaceBuilder
                             Italic = text.Italic,
                         });
                     }
+                    else
+                    {
+                        logger?.Warn($"[engraving-drop] Text engraving \"{text.Text}\" dropped — anchor ({anchorPoint.X:F2}, {anchorPoint.Y:F2}) is outside the panel outline.");
+                    }
                     break;
                 case RasterEngravingFeature raster:
                     var rasterAnchorName = raster.Position?.Anchor ?? Anchor.Center;
@@ -113,6 +117,10 @@ internal static class PanelFaceBuilder
                             Height = raster.Height,
                         });
                     }
+                    else
+                    {
+                        logger?.Warn($"[engraving-drop] Raster engraving \"{raster.Source}\" dropped — anchor ({rasterAnchor.X:F2}, {rasterAnchor.Y:F2}) is outside the panel outline.");
+                    }
                     break;
                 case SvgEngravingFeature svg:
                     var svgAnchorName = svg.Position?.Anchor ?? Anchor.Center;
@@ -138,6 +146,10 @@ internal static class PanelFaceBuilder
                             Width = svg.Width,
                             Height = svg.Height,
                         });
+                    }
+                    else
+                    {
+                        logger?.Warn($"[engraving-drop] SVG engraving \"{svg.Source}\" dropped — anchor ({svgAnchor.X:F2}, {svgAnchor.Y:F2}) is outside the panel outline.");
                     }
                     break;
             }

@@ -1629,13 +1629,6 @@ public sealed class PlanResolver
             return null;
         }
 
-        var resolvedAnchor = position?.Anchor ?? Anchor.Center;
-        if ((raw.Width is null || raw.Height is null) && resolvedAnchor != Anchor.Center)
-        {
-            errors.Add(Err("SVG engraving with inferred dimensions (only one of width/height) requires anchor 'center'.", path, raw));
-            return null;
-        }
-
         return new SvgEngravingFeature
         {
             Face = face,

@@ -1,6 +1,9 @@
 using BoxPlanLib;
 using BoxPlanLib.Cli;
 using BoxPlanLib.Model;
+using BoxPlanLib.Svg;
+using SixLabors.ImageSharp;
+using SixLabors.ImageSharp.PixelFormats;
 using System.Text;
 using System.Xml.Linq;
 
@@ -233,6 +236,8 @@ static BoxPlanCuttableShape[]? ReadPlanPieces(BoxPlanLib.BoxPlanLib lib, BoxPlan
     pieces = NormalizeSvgEngravingSources(pieces, inputPath);
     pieces = ResolveRasterEngravingDimensions(pieces);
     pieces = ResolveSvgEngravingDimensions(pieces);
+    if (settings.VectorizeRasterEngravings)
+        pieces = VectorizeRasterEngravingContent(pieces);
     return InlineSvgEngravingContent(pieces);
 }
 
@@ -270,6 +275,7 @@ static BoxPlanCuttableShape[] PrepareRasterEngravingAssets(
 {
     var rasterSources = pieces
         .SelectMany(piece => piece.RasterEngravings)
+        .Where(engraving => engraving.InlinedPaths is null)
         .Select(engraving => engraving.Href)
         .Where(href => !string.IsNullOrWhiteSpace(href))
         .Distinct(StringComparer.Ordinal)
@@ -367,8 +373,12 @@ static BoxPlanCuttableShape[] CloneWithRasterHrefMap(
                 Anchor = engraving.Anchor,
                 Width = engraving.Width,
                 Height = engraving.Height,
+                InlinedPaths = engraving.InlinedPaths,
+                PixelWidth = engraving.PixelWidth,
+                PixelHeight = engraving.PixelHeight,
             })
             .ToArray(),
+        SvgEngravings = piece.SvgEngravings,
     }).ToArray();
 }
 
@@ -522,6 +532,99 @@ static string ExtractSvgInnerContent(XElement root, string engravingColor)
         }
     }
     return sb.ToString();
+}
+
+static BoxPlanCuttableShape[] VectorizeRasterEngravingContent(BoxPlanCuttableShape[] pieces)
+{
+    var sources = pieces
+        .SelectMany(p => p.RasterEngravings)
+        .Where(e => e.InlinedPaths is null && !string.IsNullOrWhiteSpace(e.Href) && !LooksLikeDataUri(e.Href))
+        .Select(e => e.Href)
+        .Distinct(StringComparer.Ordinal)
+        .ToArray();
+
+    if (sources.Length == 0)
+        return pieces;
+
+    var vectorizer = new MarchingSquaresVectorizer();
+    var inlineMap = new Dictionary<string, (string Paths, int W, int H)>(StringComparer.Ordinal);
+
+    foreach (var source in sources)
+    {
+        if (!File.Exists(source))
+            continue;
+
+        try
+        {
+            using var image = Image.Load<Rgba32>(source);
+            var w = image.Width;
+            var h = image.Height;
+            var dark = new bool[h, w];
+
+            image.ProcessPixelRows(accessor =>
+            {
+                for (var y = 0; y < h; y++)
+                {
+                    var row = accessor.GetRowSpan(y);
+                    for (var x = 0; x < w; x++)
+                    {
+                        var p = row[x];
+                        // Transparent pixels are light; opaque dark pixels are filled.
+                        var luminance = 0.299 * p.R + 0.587 * p.G + 0.114 * p.B;
+                        dark[y, x] = p.A >= 128 && luminance < 128.0;
+                    }
+                }
+            });
+
+            var paths = vectorizer.Vectorize(dark, w, h);
+            if (!string.IsNullOrEmpty(paths))
+                inlineMap[source] = (paths, w, h);
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Warning: could not vectorize raster engraving '{source}': {ex.Message}");
+        }
+    }
+
+    if (inlineMap.Count == 0)
+        return pieces;
+
+    return pieces.Select(piece =>
+    {
+        if (!piece.RasterEngravings.Any(e => e.InlinedPaths is null && inlineMap.ContainsKey(e.Href)))
+            return piece;
+
+        return new BoxPlanCuttableShape
+        {
+            Id = piece.Id,
+            BoundingBoxMin = piece.BoundingBoxMin,
+            BoundingBoxMax = piece.BoundingBoxMax,
+            Outline = piece.Outline,
+            InteriorCuts = piece.InteriorCuts,
+            Engravings = piece.Engravings,
+            TextEngravings = piece.TextEngravings,
+            SvgEngravings = piece.SvgEngravings,
+            RasterEngravings = piece.RasterEngravings
+                .Select(e =>
+                {
+                    if (e.InlinedPaths is not null || !inlineMap.TryGetValue(e.Href, out var inline))
+                        return e;
+                    return new RasterEngraving
+                    {
+                        Href = e.Href,
+                        X = e.X,
+                        Y = e.Y,
+                        Anchor = e.Anchor,
+                        Width = e.Width,
+                        Height = e.Height,
+                        InlinedPaths = inline.Paths,
+                        PixelWidth = inline.W,
+                        PixelHeight = inline.H,
+                    };
+                })
+                .ToArray(),
+        };
+    }).ToArray();
 }
 
 static BoxPlanCuttableShape[] InlineSvgEngravingContent(BoxPlanCuttableShape[] pieces)

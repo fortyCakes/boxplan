@@ -16,6 +16,7 @@ public class BoxPlanSettings
     public int LayoutSearchIterations { get; set; }
     public int LayoutRandomSeed { get; set; }
     public bool EmbedRasterEngravings { get; set; }
+    public bool VectorizeRasterEngravings { get; set; }
     public string RasterEngravingAssetFolder { get; set; } = "assets";
 
     // Flex cut pattern settings (used for curved prism faces)

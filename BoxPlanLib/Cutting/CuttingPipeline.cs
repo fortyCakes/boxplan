@@ -987,6 +987,10 @@ public sealed class CuttingPipeline
                         Italic = engraving.Italic,
                     });
                 }
+                else
+                {
+                    logger?.Warn($"[engraving-drop] Text engraving \"{engraving.Text}\" dropped — anchor ({anchorPoint.X:F2}, {anchorPoint.Y:F2}) is outside the panel outline.");
+                }
             }
             else if (feature is RasterEngravingFeature raster)
             {
@@ -1014,6 +1018,10 @@ public sealed class CuttingPipeline
                         Height = raster.Height,
                     });
                 }
+                else
+                {
+                    logger?.Warn($"[engraving-drop] Raster engraving \"{raster.Source}\" dropped — anchor ({anchorPoint.X:F2}, {anchorPoint.Y:F2}) is outside the panel outline.");
+                }
             }
             else if (feature is SvgEngravingFeature svg)
             {
@@ -1040,6 +1048,10 @@ public sealed class CuttingPipeline
                         Width = svg.Width,
                         Height = svg.Height,
                     });
+                }
+                else
+                {
+                    logger?.Warn($"[engraving-drop] SVG engraving \"{svg.Source}\" dropped — anchor ({anchorPoint.X:F2}, {anchorPoint.Y:F2}) is outside the panel outline.");
                 }
             }
         }

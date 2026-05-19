@@ -9,15 +9,21 @@ shapes:
   features:
     - type: "cutout"
       face: "left"
-      shape: "circle" 
-      diameter: 200.0
+      shape: "edge-dip" 
+      width: 200.0
+      height: 100.0
+      radius: 10.0
+      inner-radius: 10.0
       position: 
         anchor: "top-center"
         offset: [0.0, 0.0]
     - type: "cutout"
       face: "right"
-      shape: "circle" 
-      diameter: 200.0
+      shape: "edge-dip" 
+      width: 200.0
+      height: 100.0
+      radius: 10.0
+      inner-radius: 10.0
       position: 
         anchor: "top-center"
         offset: [0.0, 0.0]

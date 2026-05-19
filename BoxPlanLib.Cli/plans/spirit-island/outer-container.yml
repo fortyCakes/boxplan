@@ -42,7 +42,7 @@ shapes:
   features:
   - face: "top"
     type: "raster-engraving"
-    source: "images/Spirit-Island-Logo.png"
+    source: "images/Spirit-Island-Logo-transparent.png"
     width: 240.0
     height: 83.2
     position:

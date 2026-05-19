@@ -15,14 +15,12 @@ shapes:
       type: "open"
   features:
     - face: "front"
-      type: "engraving"
-      text: "Yellow"
-      size: 6.0
-      font: "DK Snemand"
-      style: "bold"
+      type: "svg-engraving"
+      source: "images/Presence.svg"
+      height: 8.0
       position:
-        anchor: "bottom-center"
-        offset: [0.0, 6.0]    
+        anchor: "top-center"
+        offset: [0.0, -3.0]
   scoops:
     - face: bottom
       edge: [front, back]
@@ -38,14 +36,12 @@ shapes:
       type: "open"
   features:
     - face: "front"
-      type: "engraving"
-      text: "Blue"
-      size: 6.0
-      font: "DK Snemand"
-      style: "bold"
+      type: "svg-engraving"
+      source: "images/Presence.svg"
+      height: 8.0
       position:
-        anchor: "bottom-center"
-        offset: [0.0, 6.0]    
+        anchor: "top-center"
+        offset: [0.0, -3.0]
   scoops:
     - face: bottom
       edge: [front, back]
@@ -61,14 +57,12 @@ shapes:
       type: "open"
   features:
     - face: "front"
-      type: "engraving"
-      text: "Purple"
-      size: 6.0
-      font: "DK Snemand"
-      style: "bold"
+      type: "svg-engraving"
+      source: "images/Presence.svg"
+      height: 8.0
       position:
-        anchor: "bottom-center"
-        offset: [0.0, 6.0]    
+        anchor: "top-center"
+        offset: [0.0, -3.0]
   scoops:
     - face: bottom
       edge: [front, back]
@@ -84,14 +78,12 @@ shapes:
       type: "open"
   features:
     - face: "front"
-      type: "engraving"
-      text: "Orange"
-      size: 6.0
-      font: "DK Snemand"
-      style: "bold"
+      type: "svg-engraving"
+      source: "images/Presence.svg"
+      height: 8.0
       position:
-        anchor: "bottom-center"
-        offset: [0.0, 6.0]    
+        anchor: "top-center"
+        offset: [0.0, -3.0]  
   scoops:
     - face: bottom
       edge: [front, back]
@@ -107,14 +99,12 @@ shapes:
       type: "open"
   features:
     - face: "front"
-      type: "engraving"
-      text: "Red"
-      size: 6.0
-      font: "DK Snemand"
-      style: "bold"
+      type: "svg-engraving"
+      source: "images/Presence.svg"
+      height: 8.0
       position:
-        anchor: "bottom-center"
-        offset: [0.0, 6.0]    
+        anchor: "top-center"
+        offset: [0.0, -3.0]
   scoops:
     - face: bottom
       edge: [front, back]
@@ -130,14 +120,12 @@ shapes:
       type: "open"
   features:
     - face: "front"
-      type: "engraving"
-      text: "Green"
-      size: 6.0
-      font: "DK Snemand"
-      style: "bold"
+      type: "svg-engraving"
+      source: "images/Presence.svg"
+      height: 8.0
       position:
-        anchor: "bottom-center"
-        offset: [0.0, 6.0]    
+        anchor: "top-center"
+        offset: [0.0, -3.0] 
   scoops:
     - face: bottom
       edge: [front, back]
@@ -153,14 +141,12 @@ shapes:
       type: "open"
   features:
     - face: "front"
-      type: "engraving"
-      text: "Purple 2"
-      size: 6.0
-      font: "DK Snemand"
-      style: "bold"
+      type: "svg-engraving"
+      source: "images/Presence.svg"
+      height: 8.0
       position:
-        anchor: "bottom-center"
-        offset: [0.0, 6.0]    
+        anchor: "top-center"
+        offset: [0.0, -3.0]  
   scoops:
     - face: bottom
       edge: [front, back]
@@ -176,14 +162,12 @@ shapes:
       type: "open"
   features:
     - face: "front"
-      type: "engraving"
-      text: "Green 2"
-      size: 6.0
-      font: "DK Snemand"
-      style: "bold"
+      type: "svg-engraving"
+      source: "images/Presence.svg"
+      height: 8.0
       position:
-        anchor: "bottom-center"
-        offset: [0.0, 6.0]    
+        anchor: "top-center"
+        offset: [0.0, -3.0]  
   scoops:
     - face: bottom
       edge: [front, back]
@@ -199,14 +183,12 @@ shapes:
       type: "open"
   features:
     - face: "front"
-      type: "engraving"
-      text: "Yellow 2"
-      size: 6.0
-      font: "DK Snemand"
-      style: "bold"
+      type: "svg-engraving"
+      source: "images/Presence.svg"
+      height: 8.0
       position:
-        anchor: "bottom-center"
-        offset: [0.0, 6.0]    
+        anchor: "top-center"
+        offset: [0.0, -3.0]  
   scoops:
     - face: bottom
       edge: [front, back]
@@ -239,20 +221,21 @@ shapes:
   features:
     - face: "front"
       type: "cutout"
-      shape: "semicircle"
-      diameter: -52.0
+      shape: "edge-dip"
+      height: 25.0
+      width: 30.0
+      radius: 5.0
+      inner-radius: 5.0
       position:
         anchor: "top-center"
         offset: [0.0, 0.0]
     - face: "bottom"
-      type: "engraving"
-      text: "Terror & Fear"
-      size: 6.0
-      font: "DK Snemand"
-      style: "bold"
+      type: "svg-engraving"
+      source: "images/Fear.svg"
+      height: 50.0
       position:
         anchor: "center"
-        offset: [0.0, 6.0]
+        offset: [0.0, 0.0]
 
 - id: "events"
   type: "box" 
@@ -264,15 +247,18 @@ shapes:
   features:
     - face: "front"
       type: "cutout"
-      shape: "semicircle"
-      diameter: -52.0
+      shape: "edge-dip"
+      height: 25.0
+      width: 30.0
+      radius: 5.0
+      inner-radius: 5.0
       position:
         anchor: "top-center"
         offset: [0.0, 0.0]
     - face: "bottom"
       type: "engraving"
       text: "Events"
-      size: 6.0
+      size: 12.0
       font: "DK Snemand"
       style: "bold"
       position:

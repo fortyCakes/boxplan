@@ -175,6 +175,7 @@ internal static class CliSettings
         LayoutSearchIterations = 2,
         LayoutRandomSeed = Random.Shared.Next(),
         EmbedRasterEngravings = true,
+        VectorizeRasterEngravings = true,
         RasterEngravingAssetFolder = "assets",
         FlexLineSpacing = 0.8,
         FlexLineLengthFraction = 0.3,

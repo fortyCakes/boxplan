@@ -11,7 +11,7 @@ shapes:
     - type: "engraving"
       position:
         anchor: "top-left"
-        offset: [12, -2.0]
+        offset: [12, -2.3]
       font: "DK Snemand"
       text: "Branch & Claw"
       size: 3
@@ -29,7 +29,7 @@ shapes:
       height: 8.0
       position:
         anchor: "top-left"
-        offset: [1.0, -2.0]
+        offset: [2.0, -2.0]
 - id: "divider-branch-and-claw-notch-1"
   type: "panel"
   location: [68.0, 0.0, 86.0]
@@ -59,18 +59,25 @@ shapes:
     - type: "engraving"
       position:
         anchor: "top-left"
-        offset: [3.0, -1.0]
+        offset: [12, -2.3]
       font: "DK Snemand"
-      style: "bold"
-      text: "Jaggged Earth" # For some reason the font collapses two g's into one, so I have to add an extra g to make it look right.
-      size: 5
+      text: "Jaggged Earth"
+      size: 3
     - type: "cutout"
-      shape: "rectangle"
+      shape: "edge-dip"
       width: 25.4
       height: 50.8
+      radius: 5.0
+      inner-radius: 5.0
       position:
-        anchor: "top-right"
-        offset: [-6.0, 0.0]
+        anchor: "top-center"
+        offset: [15.0, 0.0]
+    - type: "raster-engraving"
+      source: "images/48px-Jagged_Earth_complexity_3.png"
+      height: 8.0
+      position:
+        anchor: "top-left"
+        offset: [2.0, -2.0]
 - id: "divider-jagged-earth-notch-1"
   type: "panel"
   location: [68.0, 4.0, 86.0]
@@ -100,18 +107,25 @@ shapes:
     - type: "engraving"
       position:
         anchor: "top-left"
-        offset: [0.0, -1.0]
+        offset: [12, -2.3]
       font: "DK Snemand"
-      style: "bold"
       text: "Nature Incarnate"
-      size: 5
+      size: 3
     - type: "cutout"
-      shape: "rectangle"
+      shape: "edge-dip"
       width: 25.4
       height: 50.8
+      radius: 5.0
+      inner-radius: 5.0
       position:
-        anchor: "top-right"
-        offset: [-6.0, 0.0]
+        anchor: "top-center"
+        offset: [15.0, 0.0]
+    - type: "raster-engraving"
+      source: "images/48px-Nature_incarnate_expansion_symbol.png"
+      height: 8.0
+      position:
+        anchor: "top-left"
+        offset: [2.0, -2.0]
 - id: "divider-nature-incarnate-notch-1"
   type: "panel"
   location: [68.0, 8.0, 86.0]
@@ -142,18 +156,32 @@ shapes:
     - type: "engraving"
       position:
         anchor: "top-left"
-        offset: [3.0, -1.0]
+        offset: [12, -5.3]
       font: "DK Snemand"
-      style: "bold"
+      text: "of Spirit Island"
+      size: 3
+    - type: "engraving"
+      position:
+        anchor: "top-left"
+        offset: [12, -2.3]
+      font: "DK Snemand"
       text: "Horizons"
-      size: 5
+      size: 3
     - type: "cutout"
-      shape: "rectangle"
+      shape: "edge-dip"
       width: 25.4
       height: 50.8
+      radius: 5.0
+      inner-radius: 5.0
       position:
-        anchor: "top-right"
-        offset: [-6.0, 0.0]
+        anchor: "top-center"
+        offset: [15.0, 0.0]
+    - type: "raster-engraving"
+      source: "images/48px-Horizons_expansion_symbol.png"
+      height: 8.0
+      position:
+        anchor: "top-left"
+        offset: [2.0, -2.0]
 - id: "divider-horizons-notch-1"
   type: "panel"
   location: [68.0, 12.0, 86.0]
@@ -183,18 +211,25 @@ shapes:
     - type: "engraving"
       position:
         anchor: "top-left"
-        offset: [3.0, -1.0]
+        offset: [12, -2.3]
       font: "DK Snemand"
-      style: "bold"
       text: "Promos"
-      size: 5
+      size: 3
     - type: "cutout"
-      shape: "rectangle"
+      shape: "edge-dip"
       width: 25.4
       height: 50.8
+      radius: 5.0
+      inner-radius: 5.0
       position:
-        anchor: "top-right"
-        offset: [-6.0, 0.0]
+        anchor: "top-center"
+        offset: [15.0, 0.0]
+    - type: "raster-engraving"
+      source: "images/150px-Promo_Pack_1_box.png"
+      height: 8.0
+      position:
+        anchor: "top-left"
+        offset: [2.0, -2.0]
 - id: "divider-promos-notch-1"
   type: "panel"
   location: [68.0, 16.0, 86.0]
@@ -224,18 +259,26 @@ shapes:
     - type: "engraving"
       position:
         anchor: "top-left"
-        offset: [3.0, -1.0]
+        offset: [12, -2.3]
       font: "DK Snemand"
-      style: "bold"
       text: "Aspects"
-      size: 5
+      size: 3
     - type: "cutout"
-      shape: "rectangle"
+      shape: "edge-dip"
       width: 25.4
       height: 50.8
+      radius: 5.0
+      inner-radius: 5.0
       position:
-        anchor: "top-right"
-        offset: [-6.0, 0.0]
+        anchor: "top-center"
+        offset: [15.0, 0.0]
+    - type: "svg-engraving"
+      source: "images/Spirits.svg"
+      height: 8.0
+      width: 8.0
+      position:
+        anchor: "top-left"
+        offset: [2.0, -2.0]
 - id: "divider-aspects-notch-1"
   type: "panel"
   location: [68.0, 20.0, 86.0]
@@ -265,18 +308,25 @@ shapes:
     - type: "engraving"
       position:
         anchor: "top-left"
-        offset: [3.0, -1.0]
+        offset: [12, -2.3]
       font: "DK Snemand"
-      style: "bold"
       text: "Minor Powers"
-      size: 5
+      size: 3
     - type: "cutout"
-      shape: "rectangle"
+      shape: "edge-dip"
       width: 25.4
       height: 50.8
+      radius: 5.0
+      inner-radius: 5.0
       position:
-        anchor: "top-right"
-        offset: [-6.0, 0.0]
+        anchor: "top-center"
+        offset: [15.0, 0.0]
+    - type: "svg-engraving"
+      source: "images/MinorPowerSymbol.svg"
+      height: 8.0
+      position:
+        anchor: "top-left"
+        offset: [2.0, -2.0]
 - id: "divider-minor-powers-notch-1"
   type: "panel"
   location: [68.0, 24.0, 86.0]
@@ -306,18 +356,25 @@ shapes:
     - type: "engraving"
       position:
         anchor: "top-left"
-        offset: [3.0, -1.0]
+        offset: [12, -2.3]
       font: "DK Snemand"
-      style: "bold"
       text: "Major Powers"
-      size: 5
+      size: 3
     - type: "cutout"
-      shape: "rectangle"
+      shape: "edge-dip"
       width: 25.4
       height: 50.8
+      radius: 5.0
+      inner-radius: 5.0
       position:
-        anchor: "top-right"
-        offset: [-6.0, 0.0]
+        anchor: "top-center"
+        offset: [15.0, 0.0]
+    - type: "raster-engraving"
+      source: "images/MajorPowerSymbol.png"
+      height: 8.0
+      position:
+        anchor: "top-left"
+        offset: [2.0, -2.0]
 - id: "divider-major-powers-notch-1"
   type: "panel"
   location: [68.0, 28.0, 86.0]
@@ -347,18 +404,25 @@ shapes:
     - type: "engraving"
       position:
         anchor: "top-left"
-        offset: [3.0, -1.0]
+        offset: [12, -2.3]
       font: "DK Snemand"
-      style: "bold"
       text: "Reference Cards"
-      size: 5
+      size: 3
     - type: "cutout"
-      shape: "rectangle"
+      shape: "edge-dip"
       width: 25.4
       height: 50.8
+      radius: 5.0
+      inner-radius: 5.0
       position:
-        anchor: "top-right"
-        offset: [-6.0, 0.0]
+        anchor: "top-center"
+        offset: [15.0, 0.0]
+    - type: "raster-engraving"
+      source: "images/90px-Reclaimall.png"
+      height: 8.0
+      position:
+        anchor: "top-left"
+        offset: [2.0, -2.0]
 - id: "divider-reference-cards-notch-1"
   type: "panel"
   location: [68.0, 32.0, 86.0]
@@ -386,12 +450,14 @@ shapes:
     height: 98.0
   features:
     - type: "cutout"
-      shape: "rectangle"
+      shape: "edge-dip"
       width: 25.4
       height: 50.8
+      radius: 5.0
+      inner-radius: 5.0
       position:
-        anchor: "top-right"
-        offset: [-6.0, 0.0]
+        anchor: "top-center"
+        offset: [15.0, 0.0]
 - id: "divider-blank-notch-1"
   type: "panel"
   location: [68.0, 36.0, 86.0]
@@ -403,39 +469,6 @@ shapes:
 - id: "divider-blank-notch-2"
   type: "panel"
   location: [-3.0, 36.0, 86.0]
-  origin: "bottom-left-front"
-  profile:
-    type: "rectangle"
-    width: 3.0
-    height: 12.0
-
-- id: "divider-blank-2"
-  type: "panel"
-  location: [0.0, 40.0, 0.0]
-  origin: "bottom-left-front"
-  profile:
-    type: "rectangle"
-    width: 68.0
-    height: 98.0
-  features:
-    - type: "cutout"
-      shape: "rectangle"
-      width: 25.4
-      height: 50.8
-      position:
-        anchor: "top-right"
-        offset: [-6.0, 0.0]
-- id: "divider-blank-2-notch-1"
-  type: "panel"
-  location: [68.0, 40.0, 86.0]
-  origin: "bottom-left-front"
-  profile:
-    type: "rectangle"
-    width: 3.0
-    height: 12.0
-- id: "divider-blank-2-notch-2"
-  type: "panel"
-  location: [-3.0, 40.0, 86.0]
   origin: "bottom-left-front"
   profile:
     type: "rectangle"

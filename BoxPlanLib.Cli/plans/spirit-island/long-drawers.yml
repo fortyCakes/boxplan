@@ -287,18 +287,11 @@ shapes:
         offset: [0.0, -3.5]
     - face: "front"
       type: "svg-engraving"
-      source: "images/Explorer.svg"
+      source: "images/Escalation.svg"
       height: 7.0
       position:
         anchor: "center"
-        offset: [-4.0, -3.5]
-    - face: "front"
-      type: "svg-engraving"
-      source: "images/Town.svg"
-      height: 7.0
-      position:
-        anchor: "center"
-        offset: [+2.2, -3.5]
+        offset: [0.0, -3.5]
 
 - id: "long-drawer-9"
   type: "box"

@@ -35,6 +35,9 @@ public sealed class RasterEngraving
     public Anchor Anchor { get; init; } = Anchor.Center;
     public double? Width { get; init; }
     public double? Height { get; init; }
+    public string? InlinedPaths { get; init; }
+    public int PixelWidth { get; init; }
+    public int PixelHeight { get; init; }
 }
 
 public sealed class SvgEngraving

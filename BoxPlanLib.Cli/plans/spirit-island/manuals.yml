@@ -10,21 +10,25 @@ shapes:
     - type: "cutout"
       face: "top"
       shape: "edge-dip" 
-      width: 50.0
+      width: 200.0
       height: 100.0
+      radius: 10.0
+      inner-radius: 10.0
       position: 
         anchor: "bottom-center"
         offset: [0.0, 0.0]
     - type: "cutout"
       face: "bottom"
       shape: "edge-dip" 
-      width: 50.0
+      width: 200.0
       height: 100.0
+      radius: 10.0
+      inner-radius: 10.0
       position: 
         anchor: "bottom-center"
         offset: [0.0, 0.0]
 
-# This goes over the rest of the organiser, and is used to hold the game boards.
+# This goes over the rest of the organiser, and is used to hold the foldable boards.
 - id: "board-compartment"
   type: "box" 
   dimensions: [290.0, 30.0, 316.0]
@@ -35,16 +39,20 @@ shapes:
     - type: "cutout"
       face: "top"
       shape: "edge-dip" 
-      width: 50.0
+      width: 200.0
       height: 100.0
+      radius: 10.0
+      inner-radius: 10.0
       position: 
         anchor: "bottom-center"
         offset: [0.0, 0.0]
     - type: "cutout"
       face: "bottom"
       shape: "edge-dip" 
-      width: 50.0
+      width: 200.0
       height: 100.0
+      radius: 10.0
+      inner-radius: 10.0
       position: 
         anchor: "bottom-center"
         offset: [0.0, 0.0]
