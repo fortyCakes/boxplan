@@ -3,12 +3,6 @@
 Plan files are YAML documents describing one or more 3D shapes that the BoxPlan
 pipeline will turn into laser-cuttable parts. All measurements are in millimetres.
 
-> **Maintainers:** this file documents the user-facing YAML schema. The
-> authoritative source is [BoxPlanLib/Parsing/RawPlan.cs](../BoxPlanLib/Parsing/RawPlan.cs)
-> and [BoxPlanLib/Parsing/PlanParser.cs](../BoxPlanLib/Parsing/PlanParser.cs).
-> **Update this document whenever you add, rename, or remove a field, shape
-> type, feature type, or enum value.**
-
 Field names use `hyphenated-case` (the YAML deserializer applies
 `HyphenatedNamingConvention`). String enum values are case-insensitive.
 
@@ -60,7 +54,7 @@ A rectangular cuboid.
 
 | Field        | Type                | Description                                                                             |
 | ------------ | ------------------- | --------------------------------------------------------------------------------------- |
-| `dimensions` | `[x, y, z]` numbers | Width, depth, height. All values must be positive.                                      |
+| `dimensions` | `[x, y, z]` numbers | Width, height, depth. All values must be positive.                                      |
 
 Either `dimensions` or `fit` must be specified, but not both.
 

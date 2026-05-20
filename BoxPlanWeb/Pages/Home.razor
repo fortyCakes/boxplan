@@ -1,138 +1,252 @@
 @page "/"
+@using Markdig
 @inject IJSRuntime JS
+@inject HttpClient Http
 
 <PageTitle>BoxPlan</PageTitle>
 
-<div class="bp-workspace @(hasGenerated ? "bp-workspace--split" : "")">
-    <div class="bp-input-panel">
-        <div class="bp-input-scroll">
-            <section class="bp-section">
-                <h2 class="bp-section-title">Plan</h2>
-                <textarea class="form-control bp-yaml-input"
+<div class="bp-wizard">
+    <nav class="bp-wizard-steps">
+        <div class="bp-wizard-step @StepClass(WizardStep.Plan)">
+            <span class="bp-wizard-step-num">1</span>
+            <span class="bp-wizard-step-label">Plan</span>
+        </div>
+        <div class="bp-wizard-connector"></div>
+        <div class="bp-wizard-step @StepClass(WizardStep.Settings)">
+            <span class="bp-wizard-step-num">2</span>
+            <span class="bp-wizard-step-label">Settings</span>
+        </div>
+        <div class="bp-wizard-connector"></div>
+        <div class="bp-wizard-step @StepClass(WizardStep.Output)">
+            <span class="bp-wizard-step-num">3</span>
+            <span class="bp-wizard-step-label">Output</span>
+        </div>
+    </nav>
+
+    <div class="bp-wizard-content">
+        @if (currentStep == WizardStep.Plan)
+        {
+            <div class="bp-step-plan">
+                <div class="bp-step-plan-toolbar">
+                    <button class="btn btn-sm btn-link p-0 text-muted bp-syntax-btn"
+                            @onclick="OpenSyntaxPanel" title="Plan file syntax reference">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" fill="currentColor" viewBox="0 0 16 16">
+                            <path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14zm0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16z"/>
+                            <path d="m8.93 6.588-2.29.287-.082.38.45.083c.294.07.352.176.288.469l-.738 3.468c-.194.897.105 1.319.808 1.319.545 0 1.178-.252 1.465-.598l.088-.416c-.2.176-.492.246-.686.246-.275 0-.375-.193-.304-.533L8.93 6.588zM9 4.5a1 1 0 1 1-2 0 1 1 0 0 1 2 0z"/>
+                        </svg>
+                        Syntax reference
+                    </button>
+                </div>
+                <textarea class="form-control bp-yaml-input bp-yaml-input--fill"
                           @bind="yamlInput"
                           @bind:event="oninput"
                           placeholder="Paste your plan YAML here..."></textarea>
-                <label class="btn btn-outline-secondary btn-sm mt-2">
-                    Load file
-                    <InputFile OnChange="LoadFile" accept=".yml,.yaml" class="d-none" />
-                </label>
-            </section>
-
-            <section class="bp-section">
-                <h2 class="bp-section-title">Settings</h2>
-                <div class="row g-2">
-                    <div class="col-6">
-                        <label class="form-label">Sheet width (mm)</label>
-                        <input type="number" class="form-control" @bind="sheetWidth" min="1" step="1" />
-                    </div>
-                    <div class="col-6">
-                        <label class="form-label">Sheet height (mm)</label>
-                        <input type="number" class="form-control" @bind="sheetHeight" min="1" step="1" />
-                    </div>
-                    <div class="col-6">
-                        <label class="form-label">Thickness (mm)</label>
-                        <input type="number" class="form-control" @bind="thickness" min="0.1" step="0.1" />
-                    </div>
-                    <div class="col-6">
-                        <label class="form-label">Kerf (mm)</label>
-                        <input type="number" class="form-control" @bind="kerf" min="0" step="0.01" />
-                    </div>
+                <div class="mt-2">
+                    <label class="btn btn-outline-secondary btn-sm">
+                        Load file
+                        <InputFile OnChange="LoadFile" accept=".yml,.yaml" class="d-none" />
+                    </label>
                 </div>
+            </div>
+        }
+        else if (currentStep == WizardStep.Settings)
+        {
+            <div class="bp-step-settings">
+                <div class="bp-section">
+                    <div class="row g-2">
+                        <div class="col-6">
+                            <label class="form-label">Sheet width (mm)</label>
+                            <input type="number" class="form-control" @bind="sheetWidth" min="1" step="1" />
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label">Sheet height (mm)</label>
+                            <input type="number" class="form-control" @bind="sheetHeight" min="1" step="1" />
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label">Thickness (mm)</label>
+                            <input type="number" class="form-control" @bind="thickness" min="0.1" step="0.1" />
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label">Kerf (mm)</label>
+                            <input type="number" class="form-control" @bind="kerf" min="0" step="0.01" />
+                        </div>
+                    </div>
 
-                <button class="btn btn-sm btn-link ps-0 mt-2" @onclick="ToggleAdvanced">
-                    @(showAdvanced ? "Hide" : "Show") advanced settings
-                </button>
+                    <button class="btn btn-sm btn-link ps-0 mt-2" @onclick="ToggleAdvanced">
+                        @(showAdvanced ? "Hide" : "Show") advanced settings
+                    </button>
 
-                @if (showAdvanced)
-                {
-                    <div class="row g-2 mt-1">
-                        <div class="col-6">
-                            <label class="form-label">Finger joint size (mm)</label>
-                            <input type="number" class="form-control" @bind="fingerJointSize" min="1" step="0.5" />
+                    @if (showAdvanced)
+                    {
+                        <div class="row g-2 mt-1">
+                            <div class="col-6">
+                                <label class="form-label">Finger joint size (mm)</label>
+                                <input type="number" class="form-control" @bind="fingerJointSize" min="1" step="0.5" />
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label">Spacing (mm)</label>
+                                <input type="number" class="form-control" @bind="spacing" min="0" step="1" />
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label">Margin (mm)</label>
+                                <input type="number" class="form-control" @bind="margin" min="0" step="1" />
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label">Layout iterations</label>
+                                <input type="number" class="form-control" @bind="layoutIterations" min="1" step="1" />
+                            </div>
+                            <div class="col-12">
+                                <div class="form-check mt-1">
+                                    <input class="form-check-input" type="checkbox" id="advLayout" @bind="useAdvancedLayout" />
+                                    <label class="form-check-label" for="advLayout">Advanced layout optimizer</label>
+                                </div>
+                            </div>
                         </div>
-                        <div class="col-6">
-                            <label class="form-label">Spacing (mm)</label>
-                            <input type="number" class="form-control" @bind="spacing" min="0" step="1" />
+                    }
+                </div>
+            </div>
+        }
+        else
+        {
+            @if (svgPages.Count > 0)
+            {
+                <div class="bp-step-output-split">
+                    <div class="bp-log">
+                        @foreach (var line in logLines)
+                        {
+                            <div class="bp-log-line @line.CssClass">@line.Text</div>
+                        }
+                    </div>
+                    <div class="bp-svg-area">
+                        <div class="bp-output-header">
+                            <h2 class="bp-section-title mb-0">
+                                Output &mdash; @svgPages.Count page@(svgPages.Count == 1 ? "" : "s")
+                            </h2>
                         </div>
-                        <div class="col-6">
-                            <label class="form-label">Margin (mm)</label>
-                            <input type="number" class="form-control" @bind="margin" min="0" step="1" />
+                        <div class="bp-tab-bar">
+                            @for (int i = 0; i < svgPages.Count; i++)
+                            {
+                                var idx = i;
+                                <button class="bp-tab @(selectedPageIndex == idx ? "bp-tab-active" : "")"
+                                        @onclick="() => selectedPageIndex = idx">
+                                    Page @(idx + 1)
+                                </button>
+                            }
                         </div>
-                        <div class="col-6">
-                            <label class="form-label">Layout iterations</label>
-                            <input type="number" class="form-control" @bind="layoutIterations" min="1" step="1" />
-                        </div>
-                        <div class="col-12">
-                            <div class="form-check mt-1">
-                                <input class="form-check-input" type="checkbox" id="advLayout" @bind="useAdvancedLayout" />
-                                <label class="form-check-label" for="advLayout">Advanced layout optimizer</label>
+                        <div class="bp-svg-page">
+                            <div class="bp-svg-page-header">
+                                <button class="btn btn-outline-primary btn-sm"
+                                        @onclick="() => DownloadPage(selectedPageIndex)">
+                                    Download SVG
+                                </button>
+                            </div>
+                            <div class="bp-svg-preview">
+                                @((MarkupString)svgPages[selectedPageIndex])
                             </div>
                         </div>
                     </div>
-                }
-            </section>
-        </div>
-
-        <div class="bp-input-actions">
-            <button class="btn btn-primary w-100" @onclick="Generate" disabled="@isGenerating">
-                @(isGenerating ? "Generating…" : "Generate SVG")
-            </button>
-            @if (errorMessage is not null)
-            {
-                <div class="alert alert-danger mt-2 mb-0 bp-error">@errorMessage</div>
-            }
-        </div>
-
-        <div class="bp-log">
-            @if (logLines.Count == 0)
-            {
-                <span class="bp-log-empty">Log output will appear here.</span>
+                </div>
             }
             else
             {
-                @foreach (var line in logLines)
-                {
-                    <div class="bp-log-line @line.CssClass">@line.Text</div>
-                }
-            }
-        </div>
-    </div>
-
-    <div class="bp-output-panel" @ref="outputPanel">
-        @if (svgPages.Count > 0)
-        {
-            <div class="bp-output-header">
-                <h2 class="bp-section-title mb-0">
-                    Output &mdash; @svgPages.Count page@(svgPages.Count == 1 ? "" : "s")
-                </h2>
-            </div>
-            @for (int i = 0; i < svgPages.Count; i++)
-            {
-                var idx = i;
-                <div class="bp-svg-page">
-                    <div class="bp-svg-page-header">
-                        <span>Page @(i + 1)</span>
-                        <button class="btn btn-outline-primary btn-sm"
-                                @onclick="() => DownloadPage(idx)">
-                            Download SVG
-                        </button>
-                    </div>
-                    <div class="bp-svg-preview">
-                        @((MarkupString)svgPages[idx])
+                <div class="bp-step-output-log">
+                    @if (errorMessage is not null)
+                    {
+                        <div class="alert alert-danger mb-2 bp-error">@errorMessage</div>
+                    }
+                    @if (isGenerating)
+                    {
+                        <div class="mb-2 text-muted" style="font-size:0.875rem">
+                            <span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
+                            Generating&hellip;
+                        </div>
+                    }
+                    <div class="bp-log bp-log--grow">
+                        @if (logLines.Count == 0)
+                        {
+                            <span class="bp-log-empty">Log output will appear here.</span>
+                        }
+                        else
+                        {
+                            @foreach (var line in logLines)
+                            {
+                                <div class="bp-log-line @line.CssClass">@line.Text</div>
+                            }
+                        }
                     </div>
                 </div>
             }
         }
-        else if (!isGenerating)
+    </div>
+
+    <div class="bp-wizard-nav">
+        @if (currentStep == WizardStep.Plan)
         {
-            <div class="bp-empty-state">
-                <p>Enter a plan and click <strong>Generate SVG</strong> to see the output here.</p>
-            </div>
+            <div></div>
+            <button class="btn btn-primary" @onclick="GoToSettings"
+                    disabled="@string.IsNullOrWhiteSpace(yamlInput)">
+                Settings &rarr;
+            </button>
+        }
+        else if (currentStep == WizardStep.Settings)
+        {
+            <button class="btn btn-outline-secondary" @onclick="GoToPlan">&larr; Plan</button>
+            <button class="btn btn-primary" @onclick="GoToOutput">Generate &rarr;</button>
+        }
+        else
+        {
+            <button class="btn btn-outline-secondary" @onclick="GoToSettings"
+                    disabled="@isGenerating">&larr; Settings</button>
+            <button class="btn btn-outline-secondary" @onclick="Reset"
+                    disabled="@isGenerating">Reset</button>
+        }
+    </div>
+</div>
+
+<div class="bp-syntax-backdrop @(showSyntaxPanel ? "bp-syntax-backdrop--visible" : "")"
+     @onclick="CloseSyntaxPanel"></div>
+<div class="bp-syntax-panel @(showSyntaxPanel ? "bp-syntax-panel--open" : "")">
+    <div class="bp-syntax-panel-header">
+        <span class="bp-syntax-panel-title">Plan file syntax</span>
+        <button class="btn-close" @onclick="CloseSyntaxPanel" aria-label="Close"></button>
+    </div>
+    <div class="bp-syntax-panel-body">
+        @if (syntaxHtml is null)
+        {
+            <p class="text-muted">Loading&hellip;</p>
+        }
+        else
+        {
+            @((MarkupString)syntaxHtml)
         }
     </div>
 </div>
 
 @code {
+    private enum WizardStep { Plan, Settings, Output }
+    private WizardStep currentStep = WizardStep.Plan;
+
+    private string StepClass(WizardStep step) =>
+        currentStep == step ? "bp-wizard-step--active" :
+        currentStep > step ? "bp-wizard-step--done" : "";
+
+    private void GoToPlan() => currentStep = WizardStep.Plan;
+    private void GoToSettings() => currentStep = WizardStep.Settings;
+    private async Task GoToOutput()
+    {
+        currentStep = WizardStep.Output;
+        StateHasChanged();
+        await Generate();
+    }
+    private void Reset()
+    {
+        currentStep = WizardStep.Plan;
+        errorMessage = null;
+        svgPages = new();
+        logLines = new();
+        selectedPageIndex = 0;
+    }
+
     private string yamlInput =
         "shapes:\n" +
         "- id: \"sample-box\"\n" +
@@ -156,12 +270,29 @@
 
     private string? errorMessage;
     private bool isGenerating;
-    private bool hasGenerated;
     private List<string> svgPages = new();
+    private int selectedPageIndex = 0;
     private List<LogLine> logLines = new();
 
-    private ElementReference outputPanel;
     private readonly BoxPlanLib.BoxPlanLib _lib = new();
+
+    private bool showSyntaxPanel = false;
+    private string? syntaxHtml;
+
+    private async Task OpenSyntaxPanel()
+    {
+        showSyntaxPanel = true;
+        if (syntaxHtml is null)
+        {
+            var md = await Http.GetStringAsync("plan-syntax.md");
+            var pipeline = new Markdig.MarkdownPipelineBuilder()
+                .UseAdvancedExtensions()
+                .Build();
+            syntaxHtml = Markdig.Markdown.ToHtml(md, pipeline);
+        }
+    }
+
+    private void CloseSyntaxPanel() => showSyntaxPanel = false;
 
     private record LogLine(string Text, string CssClass);
 
@@ -193,9 +324,9 @@
     {
         errorMessage = null;
         svgPages = new();
+        selectedPageIndex = 0;
         logLines = new();
         isGenerating = true;
-        hasGenerated = true;
         StateHasChanged();
 
         var writer = new LineCallbackWriter(AppendLog);
