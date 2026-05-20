@@ -1,0 +1,22 @@
+# A 3-step staircase built from three stacked boxes.
+# The boxes share faces and the cutting pipeline fuses them into a single solid,
+# culling any internal contact faces.
+#
+# Each step is 30 mm wide, 20 mm tall, and 80 mm deep.
+# Steps ascend left to right (widest at the bottom-left).
+
+shapes:
+  - id: "lower"
+    type: "box"
+    dimensions: [90.0, 80.0, 20.0]
+    location: [0.0, 0.0, 0.0]
+
+  - id: "middle"
+    type: "box"
+    dimensions: [60.0, 80.0, 20.0]
+    location: [0.0, 0.0, 20.0]
+
+  - id: "upper"
+    type: "box"
+    dimensions: [30.0, 80.0, 20.0]
+    location: [0.0, 0.0, 40.0]

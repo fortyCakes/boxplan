@@ -1,0 +1,8 @@
+shapes:
+  - id: "hex-tray"
+    type: "hexagon"
+    width: 150.0
+    depth: 33.0
+    faces:
+      - name: "front"
+        type: "open"

@@ -1,0 +1,13 @@
+# A shallow open tray subdivided into a 4-column × 3-row grid of compartments.
+
+shapes:
+  - id: "tray"
+    type: "box"
+    dimensions: [240.0, 180.0, 50.0]
+    faces:
+      - name: "top"
+        type: "open"
+    dividers:
+      - split:
+          x: 4
+          y: 3

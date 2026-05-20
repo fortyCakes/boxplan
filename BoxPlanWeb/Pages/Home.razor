@@ -37,10 +37,19 @@
                         Syntax reference
                     </button>
                 </div>
-                <textarea class="form-control bp-yaml-input bp-yaml-input--fill"
-                          @bind="yamlInput"
-                          @bind:event="oninput"
-                          placeholder="Paste your plan YAML here..."></textarea>
+                <div class="bp-step-plan-main">
+                    <div class="bp-example-list">
+                        @foreach (var ex in Examples)
+                        {
+                            var example = ex;
+                            <button class="bp-example-btn" @onclick="() => LoadExample(example)">@example.Name</button>
+                        }
+                    </div>
+                    <textarea class="form-control bp-yaml-input bp-yaml-input--fill"
+                              @bind="yamlInput"
+                              @bind:event="oninput"
+                              placeholder="Paste your plan YAML here..."></textarea>
+                </div>
                 <div class="mt-2">
                     <label class="btn btn-outline-secondary btn-sm">
                         Load file
@@ -247,16 +256,30 @@
         selectedPageIndex = 0;
     }
 
-    private string yamlInput =
-        "shapes:\n" +
-        "- id: \"sample-box\"\n" +
-        "  type: \"box\"\n" +
-        "  dimensions: [100.0, 100.0, 50.0]\n" +
-        "  location: [0.0, 0.0, 0.0]\n" +
-        "  origin: \"bottom-left-front\"\n" +
-        "  faces:\n" +
-        "    - name: \"top\"\n" +
-        "      type: \"closed\"\n";
+    private record ExamplePlan(string Name, string File);
+
+    private static readonly ExamplePlan[] Examples =
+    [
+        new("Simple box",          "simple-box.yml"),
+        new("Hex tray",            "hex-tray.yml"),
+        new("Frustum tray",        "frustum-tray.yml"),
+        new("3×2 drawers",         "drawer-frame-3x2.yml"),
+        new("Staircase (boxes)",   "staircase-boxes.yml"),
+        new("Staircase (prism)",   "staircase-prism.yml"),
+        new("Multi-divided tray",  "multi-divided-tray.yml"),
+    ];
+
+    private async Task LoadExample(ExamplePlan example)
+    {
+        yamlInput = await Http.GetStringAsync($"examples/{example.File}");
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadExample(Examples[0]);
+    }
+
+    private string yamlInput = "";
     private double sheetWidth = 400;
     private double sheetHeight = 400;
     private double thickness = 3.0;

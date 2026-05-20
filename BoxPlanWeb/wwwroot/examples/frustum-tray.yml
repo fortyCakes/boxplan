@@ -1,0 +1,9 @@
+shapes:
+  - id: "frustum-tray"
+    type: "hexagon"
+    width: 150.0
+    depth: 30.0
+    back-size: 0.7
+    faces:
+      - name: "front"
+        type: "open"

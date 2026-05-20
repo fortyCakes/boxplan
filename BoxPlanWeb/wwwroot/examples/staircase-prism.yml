@@ -1,0 +1,18 @@
+# A 3-step staircase defined as a single prism with a stepped polygon profile.
+# Produces identical geometry to staircase-boxes.yml:
+#   each step is 30 mm wide, 20 mm tall, and the prism is 80 mm deep.
+# The polygon is specified in the X-Z plane and extruded along Y (depth).
+
+shapes:
+  - id: "staircase"
+    type: "prism"
+    depth: 80.0
+    points:
+      - [0,  0]   # bottom-left
+      - [90, 0]   # bottom-right
+      - [90, 20]  # top of right (lowest) step
+      - [60, 20]  # inner corner between step 1 and step 2
+      - [60, 40]  # top of middle step
+      - [30, 40]  # inner corner between step 2 and step 3
+      - [30, 60]  # top of left (highest) step
+      - [0,  60]  # top-left corner
