@@ -4,3 +4,7 @@
 **/artifacts/
 **/packages/
 /sample-output/
+/infra/terraform.tfvars
+/infra/.terraform/
+/infra/*.tfstate
+/infra/*.tfstate.backup

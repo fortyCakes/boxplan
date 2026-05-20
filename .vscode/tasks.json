@@ -2,6 +2,18 @@
     "version": "2.0.0",
     "tasks": [
         {
+            "label": "build BoxPlanWeb",
+            "type": "process",
+            "command": "dotnet",
+            "args": ["build", "${workspaceFolder}/BoxPlanWeb/BoxPlanWeb.csproj"],
+            "group": "build",
+            "presentation": {
+                "reveal": "silent",
+                "panel": "shared"
+            },
+            "problemMatcher": "$msCompile"
+        },
+        {
             "label": "build BoxPlanLib.Cli",
             "type": "process",
             "command": "dotnet",

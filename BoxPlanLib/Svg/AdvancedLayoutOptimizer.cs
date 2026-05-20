@@ -2,7 +2,9 @@ using System.Diagnostics;
 using BoxPlanLib.Cutting;
 using BoxPlanLib.Model;
 using Clipper2Lib;
+#if !NO_ORTOOLS
 using Google.OrTools.Sat;
+#endif
 
 namespace BoxPlanLib.Svg;
 
@@ -10,7 +12,7 @@ internal sealed record AdvancedLayoutPlacement(BoxPlanCuttableShape Shape, int P
 
 internal sealed record AdvancedLayoutResult(IReadOnlyList<AdvancedLayoutPlacement> Items, int PageCount);
 
-internal sealed class AdvancedLayoutOptimizer
+internal sealed partial class AdvancedLayoutOptimizer
 {
     private const double Epsilon = 1e-6;
     private const int ClipperPrecision = 6;
@@ -293,6 +295,9 @@ internal sealed class AdvancedLayoutOptimizer
         return orderings;
     }
 
+#if NO_ORTOOLS
+    private int[]? TryBuildOrToolsOrdering(IReadOnlyList<LayoutPiece> pieces) => null;
+#else
     private int[]? TryBuildOrToolsOrdering(IReadOnlyList<LayoutPiece> pieces)
     {
         // The OR-Tools sequence model explores adjacency compatibility and can
@@ -405,6 +410,7 @@ internal sealed class AdvancedLayoutOptimizer
             return null;
         }
     }
+#endif
 
     private static int CompatibilityScore(LayoutPiece a, LayoutPiece b)
     {

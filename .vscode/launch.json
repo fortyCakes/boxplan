@@ -5,6 +5,14 @@
     "version": "0.2.0",
     "configurations": [
         {
+            "name": "BoxPlanWeb (localhost)",
+            "type": "blazorwasm",
+            "request": "launch",
+            "cwd": "${workspaceFolder}/BoxPlanWeb",
+            "url": "http://localhost:5283",
+            "preLaunchTask": "build BoxPlanWeb"
+        },
+        {
             "name": "BoxPlanLib.Cli (no params)",
             "type": "coreclr",
             "request": "launch",

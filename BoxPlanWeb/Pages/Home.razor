@@ -1,0 +1,292 @@
+@page "/"
+@inject IJSRuntime JS
+
+<PageTitle>BoxPlan</PageTitle>
+
+<div class="bp-workspace @(hasGenerated ? "bp-workspace--split" : "")">
+    <div class="bp-input-panel">
+        <div class="bp-input-scroll">
+            <section class="bp-section">
+                <h2 class="bp-section-title">Plan</h2>
+                <textarea class="form-control bp-yaml-input"
+                          @bind="yamlInput"
+                          @bind:event="oninput"
+                          placeholder="Paste your plan YAML here..."></textarea>
+                <label class="btn btn-outline-secondary btn-sm mt-2">
+                    Load file
+                    <InputFile OnChange="LoadFile" accept=".yml,.yaml" class="d-none" />
+                </label>
+            </section>
+
+            <section class="bp-section">
+                <h2 class="bp-section-title">Settings</h2>
+                <div class="row g-2">
+                    <div class="col-6">
+                        <label class="form-label">Sheet width (mm)</label>
+                        <input type="number" class="form-control" @bind="sheetWidth" min="1" step="1" />
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label">Sheet height (mm)</label>
+                        <input type="number" class="form-control" @bind="sheetHeight" min="1" step="1" />
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label">Thickness (mm)</label>
+                        <input type="number" class="form-control" @bind="thickness" min="0.1" step="0.1" />
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label">Kerf (mm)</label>
+                        <input type="number" class="form-control" @bind="kerf" min="0" step="0.01" />
+                    </div>
+                </div>
+
+                <button class="btn btn-sm btn-link ps-0 mt-2" @onclick="ToggleAdvanced">
+                    @(showAdvanced ? "Hide" : "Show") advanced settings
+                </button>
+
+                @if (showAdvanced)
+                {
+                    <div class="row g-2 mt-1">
+                        <div class="col-6">
+                            <label class="form-label">Finger joint size (mm)</label>
+                            <input type="number" class="form-control" @bind="fingerJointSize" min="1" step="0.5" />
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label">Spacing (mm)</label>
+                            <input type="number" class="form-control" @bind="spacing" min="0" step="1" />
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label">Margin (mm)</label>
+                            <input type="number" class="form-control" @bind="margin" min="0" step="1" />
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label">Layout iterations</label>
+                            <input type="number" class="form-control" @bind="layoutIterations" min="1" step="1" />
+                        </div>
+                        <div class="col-12">
+                            <div class="form-check mt-1">
+                                <input class="form-check-input" type="checkbox" id="advLayout" @bind="useAdvancedLayout" />
+                                <label class="form-check-label" for="advLayout">Advanced layout optimizer</label>
+                            </div>
+                        </div>
+                    </div>
+                }
+            </section>
+        </div>
+
+        <div class="bp-input-actions">
+            <button class="btn btn-primary w-100" @onclick="Generate" disabled="@isGenerating">
+                @(isGenerating ? "Generating…" : "Generate SVG")
+            </button>
+            @if (errorMessage is not null)
+            {
+                <div class="alert alert-danger mt-2 mb-0 bp-error">@errorMessage</div>
+            }
+        </div>
+
+        <div class="bp-log">
+            @if (logLines.Count == 0)
+            {
+                <span class="bp-log-empty">Log output will appear here.</span>
+            }
+            else
+            {
+                @foreach (var line in logLines)
+                {
+                    <div class="bp-log-line @line.CssClass">@line.Text</div>
+                }
+            }
+        </div>
+    </div>
+
+    <div class="bp-output-panel" @ref="outputPanel">
+        @if (svgPages.Count > 0)
+        {
+            <div class="bp-output-header">
+                <h2 class="bp-section-title mb-0">
+                    Output &mdash; @svgPages.Count page@(svgPages.Count == 1 ? "" : "s")
+                </h2>
+            </div>
+            @for (int i = 0; i < svgPages.Count; i++)
+            {
+                var idx = i;
+                <div class="bp-svg-page">
+                    <div class="bp-svg-page-header">
+                        <span>Page @(i + 1)</span>
+                        <button class="btn btn-outline-primary btn-sm"
+                                @onclick="() => DownloadPage(idx)">
+                            Download SVG
+                        </button>
+                    </div>
+                    <div class="bp-svg-preview">
+                        @((MarkupString)svgPages[idx])
+                    </div>
+                </div>
+            }
+        }
+        else if (!isGenerating)
+        {
+            <div class="bp-empty-state">
+                <p>Enter a plan and click <strong>Generate SVG</strong> to see the output here.</p>
+            </div>
+        }
+    </div>
+</div>
+
+@code {
+    private string yamlInput =
+        "shapes:\n" +
+        "- id: \"sample-box\"\n" +
+        "  type: \"box\"\n" +
+        "  dimensions: [100.0, 100.0, 50.0]\n" +
+        "  location: [0.0, 0.0, 0.0]\n" +
+        "  origin: \"bottom-left-front\"\n" +
+        "  faces:\n" +
+        "    - name: \"top\"\n" +
+        "      type: \"closed\"\n";
+    private double sheetWidth = 400;
+    private double sheetHeight = 400;
+    private double thickness = 3.0;
+    private double kerf = 0.1;
+    private double fingerJointSize = 5.0;
+    private double spacing = 1.0;
+    private double margin = 5.0;
+    private int layoutIterations = 5;
+    private bool useAdvancedLayout = false;
+    private bool showAdvanced = false;
+
+    private string? errorMessage;
+    private bool isGenerating;
+    private bool hasGenerated;
+    private List<string> svgPages = new();
+    private List<LogLine> logLines = new();
+
+    private ElementReference outputPanel;
+    private readonly BoxPlanLib.BoxPlanLib _lib = new();
+
+    private record LogLine(string Text, string CssClass);
+
+    private void ToggleAdvanced() => showAdvanced = !showAdvanced;
+
+    private void AppendLog(string text)
+    {
+        var trimmed = text.TrimEnd();
+        if (string.IsNullOrWhiteSpace(trimmed)) return;
+        var css = trimmed.StartsWith("[warn]") ? "bp-log-warn"
+                : trimmed.StartsWith("[pipeline]") || trimmed.StartsWith("[layout]") ? "bp-log-dim"
+                : "bp-log-normal";
+        logLines.Add(new LogLine(trimmed, css));
+    }
+
+    private async Task LoadFile(InputFileChangeEventArgs e)
+    {
+        using var stream = e.File.OpenReadStream(maxAllowedSize: 1_000_000);
+        using var reader = new StreamReader(stream);
+        yamlInput = await reader.ReadToEndAsync();
+    }
+
+    private async Task Generate()
+    {
+        errorMessage = null;
+        svgPages = new();
+        logLines = new();
+        isGenerating = true;
+        hasGenerated = true;
+        StateHasChanged();
+        await Task.Delay(1);
+
+        var writer = new LineCallbackWriter(AppendLog);
+        var previousOut = Console.Out;
+        var previousError = Console.Error;
+        Console.SetOut(writer);
+        Console.SetError(writer);
+
+        try
+        {
+            var settings = new BoxPlanLib.BoxPlanSettings
+            {
+                SheetWidth = sheetWidth,
+                SheetHeight = sheetHeight,
+                MaterialThickness = thickness,
+                Kerf = kerf,
+                FingerJointSize = fingerJointSize,
+                Spacing = spacing,
+                Margin = margin,
+                LayoutSearchIterations = layoutIterations,
+                UseAdvancedLayoutOptimizer = useAdvancedLayout,
+                UseOrToolsSequenceOptimization = false,
+                LayoutRandomSeed = 1337,
+                EmbedRasterEngravings = true,
+                RasterEngravingAssetFolder = "assets",
+                FlexLineSpacing = 3.0,
+                FlexLineLengthFraction = 0.75,
+                FlexLengthCompensationFactor = 1.0,
+                ScrapValue = 0.5,
+                MinScrapSize = 50.0,
+                Debug = true,
+            };
+
+            var parseResult = _lib.ParsePlan(yamlInput, settings);
+            StateHasChanged();
+            await Task.Delay(1);
+
+            if (!parseResult.Success || parseResult.Value is null)
+            {
+                errorMessage = string.Join("\n", parseResult.Errors.Select(e => e.ToString()));
+                return;
+            }
+
+            var shapes = _lib.GetCuttableShapes(parseResult.Value, settings);
+            StateHasChanged();
+            await Task.Delay(1);
+
+            svgPages = _lib.GeneratePagedSVGPages(shapes, settings).ToList();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = ex.Message;
+        }
+        finally
+        {
+            Console.SetOut(previousOut);
+            Console.SetError(previousError);
+            isGenerating = false;
+            StateHasChanged();
+        }
+
+        await JS.InvokeVoidAsync("scrollSvgPreviewsToBottom");
+    }
+
+    private async Task DownloadPage(int pageIndex)
+    {
+        var svg = svgPages[pageIndex];
+        await JS.InvokeVoidAsync("downloadFile",
+            $"boxplan-page-{pageIndex + 1}.svg", "image/svg+xml", svg);
+    }
+
+    private sealed class LineCallbackWriter : System.IO.TextWriter
+    {
+        private readonly Action<string> _onLine;
+        private readonly System.Text.StringBuilder _buf = new();
+
+        public LineCallbackWriter(Action<string> onLine) => _onLine = onLine;
+
+        public override System.Text.Encoding Encoding => System.Text.Encoding.UTF8;
+
+        public override void Write(char value)
+        {
+            if (value == '\n')
+            {
+                _onLine(_buf.ToString());
+                _buf.Clear();
+            }
+            else if (value == '\r')
+            {
+                _buf.Clear();
+            }
+            else
+            {
+                _buf.Append(value);
+            }
+        }
+    }
+}

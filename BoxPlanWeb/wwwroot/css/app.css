@@ -1,0 +1,262 @@
+html, body {
+    height: 100%;
+    margin: 0;
+    font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+    background: #f8f9fa;
+    color: #212529;
+}
+
+/* ── Header ─────────────────────────────────────────── */
+
+.bp-header {
+    display: flex;
+    align-items: baseline;
+    gap: 0.75rem;
+    padding: 0.75rem 1.5rem;
+    background: #1a1a2e;
+    color: #fff;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.3);
+}
+
+.bp-logo {
+    font-size: 1.25rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    color: #e94560;
+}
+
+.bp-tagline {
+    font-size: 0.85rem;
+    color: #adb5bd;
+}
+
+/* ── Page shell ──────────────────────────────────────── */
+
+.bp-page {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    overflow: hidden;
+}
+
+.bp-main {
+    flex: 1;
+    overflow: hidden;
+    padding: 1rem 1.5rem;
+}
+
+/* ── Workspace (two-panel) ───────────────────────────── */
+
+.bp-workspace {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 1.25rem;
+    height: 100%;
+}
+
+.bp-workspace--split {
+    grid-template-columns: 380px 1fr;
+}
+
+/* ── Input panel ─────────────────────────────────────── */
+
+.bp-input-panel {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.bp-input-scroll {
+    flex: 0 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    padding-right: 0.25rem;
+}
+
+.bp-input-actions {
+    flex-shrink: 0;
+    padding-top: 1rem;
+}
+
+.bp-section {
+    background: #fff;
+    border: 1px solid #dee2e6;
+    border-radius: 6px;
+    padding: 1rem;
+}
+
+.bp-section-title {
+    font-size: 0.9rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: #6c757d;
+    margin: 0 0 0.75rem 0;
+}
+
+/* ── Log panel ───────────────────────────────────────── */
+
+.bp-log {
+    flex: 1;
+    min-height: 120px;
+    margin-top: 1rem;
+    overflow-y: auto;
+    background: #111827;
+    border: 1px solid #374151;
+    border-radius: 6px;
+    padding: 0.5rem 0.65rem;
+    font-family: 'Cascadia Code', 'Consolas', 'Courier New', monospace;
+    font-size: 0.72rem;
+    line-height: 1.5;
+}
+
+.bp-log-empty {
+    color: #4b5563;
+}
+
+.bp-log-line {
+    white-space: pre-wrap;
+    word-break: break-all;
+}
+
+.bp-log-normal { color: #d1d5db; }
+.bp-log-dim    { color: #6b7280; }
+.bp-log-warn   { color: #fbbf24; }
+
+.bp-yaml-input {
+    font-family: 'Cascadia Code', 'Consolas', 'Courier New', monospace;
+    font-size: 0.8rem;
+    resize: vertical;
+    min-height: 220px;
+    max-height: 400px;
+}
+
+.bp-error {
+    font-size: 0.85rem;
+    white-space: pre-wrap;
+}
+
+/* ── Output panel ────────────────────────────────────── */
+
+.bp-output-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    overflow-y: auto;
+    min-height: 0;
+}
+
+.bp-output-header {
+    display: flex;
+    align-items: center;
+}
+
+.bp-svg-page {
+    background: #fff;
+    border: 1px solid #dee2e6;
+    border-radius: 6px;
+    overflow: hidden;
+}
+
+.bp-svg-page-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.5rem 0.75rem;
+    background: #f8f9fa;
+    border-bottom: 1px solid #dee2e6;
+    font-size: 0.85rem;
+    font-weight: 600;
+}
+
+.bp-svg-preview {
+    padding: 0.75rem;
+    overflow: auto;
+    max-height: 90%;
+}
+
+.bp-svg-preview svg {
+    width: 100%;
+    height: auto;
+    display: block;
+}
+
+.bp-empty-state {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    color: #adb5bd;
+    font-size: 0.9rem;
+    text-align: center;
+}
+
+/* ── Blazor loading / error ──────────────────────────── */
+
+.loading-progress {
+    position: relative;
+    display: block;
+    width: 6rem;
+    height: 6rem;
+    margin: 25vh auto 1rem auto;
+}
+
+.loading-progress circle {
+    fill: none;
+    stroke: #e0e0e0;
+    stroke-width: 0.6rem;
+    transform-origin: 50% 50%;
+    transform: rotate(-90deg);
+}
+
+.loading-progress circle:last-child {
+    stroke: #e94560;
+    stroke-dasharray: calc(3.141 * var(--blazor-load-percentage, 0%) * 0.8), 500%;
+    transition: stroke-dasharray 0.05s ease-in-out;
+}
+
+.loading-progress-text {
+    position: absolute;
+    text-align: center;
+    font-weight: bold;
+    inset: calc(25vh + 3rem) 0 auto 0.2rem;
+}
+
+.loading-progress-text:after {
+    content: var(--blazor-load-percentage-text, "Loading");
+}
+
+#blazor-error-ui {
+    color-scheme: light only;
+    background: #fff3cd;
+    border-top: 1px solid #ffc107;
+    bottom: 0;
+    box-sizing: border-box;
+    display: none;
+    left: 0;
+    padding: 0.5rem 1.25rem;
+    position: fixed;
+    width: 100%;
+    z-index: 1000;
+    font-size: 0.875rem;
+}
+
+#blazor-error-ui .dismiss {
+    cursor: pointer;
+    position: absolute;
+    right: 0.75rem;
+    top: 0.4rem;
+}
+
+.blazor-error-boundary {
+    background: #b32121;
+    padding: 1rem 1rem 1rem 3.7rem;
+    color: white;
+}
+
+.blazor-error-boundary::after {
+    content: "An error has occurred.";
+}

@@ -1,0 +1,4 @@
+# Copy to terraform.tfvars and fill in values (never commit terraform.tfvars)
+subscription_id = "e9146d88-3a1a-4ce4-916e-4cd4f6649f0d"
+location        = "West Europe"
+environment     = "prod"
