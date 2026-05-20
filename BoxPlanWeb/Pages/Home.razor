@@ -174,7 +174,8 @@
         var css = trimmed.StartsWith("[warn]") ? "bp-log-warn"
                 : trimmed.StartsWith("[pipeline]") || trimmed.StartsWith("[layout]") ? "bp-log-dim"
                 : "bp-log-normal";
-        logLines.Add(new LogLine(trimmed, css));
+        var line = new LogLine(trimmed, css);
+        _ = InvokeAsync(() => { logLines.Add(line); StateHasChanged(); });
     }
 
     private async Task LoadFile(InputFileChangeEventArgs e)
@@ -192,67 +193,68 @@
         isGenerating = true;
         hasGenerated = true;
         StateHasChanged();
-        await Task.Delay(1);
 
         var writer = new LineCallbackWriter(AppendLog);
-        var previousOut = Console.Out;
-        var previousError = Console.Error;
-        Console.SetOut(writer);
-        Console.SetError(writer);
+        string? genError = null;
+        List<string> pages = new();
 
-        try
+        await Task.Run(() =>
         {
-            var settings = new BoxPlanLib.BoxPlanSettings
-            {
-                SheetWidth = sheetWidth,
-                SheetHeight = sheetHeight,
-                MaterialThickness = thickness,
-                Kerf = kerf,
-                FingerJointSize = fingerJointSize,
-                Spacing = spacing,
-                Margin = margin,
-                LayoutSearchIterations = layoutIterations,
-                UseAdvancedLayoutOptimizer = useAdvancedLayout,
-                UseOrToolsSequenceOptimization = false,
-                LayoutRandomSeed = 1337,
-                EmbedRasterEngravings = true,
-                RasterEngravingAssetFolder = "assets",
-                FlexLineSpacing = 3.0,
-                FlexLineLengthFraction = 0.75,
-                FlexLengthCompensationFactor = 1.0,
-                ScrapValue = 0.5,
-                MinScrapSize = 50.0,
-                Debug = true,
-            };
+            var previousOut = Console.Out;
+            var previousError = Console.Error;
+            Console.SetOut(writer);
+            Console.SetError(writer);
 
-            var parseResult = _lib.ParsePlan(yamlInput, settings);
-            StateHasChanged();
-            await Task.Delay(1);
-
-            if (!parseResult.Success || parseResult.Value is null)
+            try
             {
-                errorMessage = string.Join("\n", parseResult.Errors.Select(e => e.ToString()));
-                return;
+                var settings = new BoxPlanLib.BoxPlanSettings
+                {
+                    SheetWidth = sheetWidth,
+                    SheetHeight = sheetHeight,
+                    MaterialThickness = thickness,
+                    Kerf = kerf,
+                    FingerJointSize = fingerJointSize,
+                    Spacing = spacing,
+                    Margin = margin,
+                    LayoutSearchIterations = layoutIterations,
+                    UseAdvancedLayoutOptimizer = useAdvancedLayout,
+                    UseOrToolsSequenceOptimization = false,
+                    LayoutRandomSeed = 1337,
+                    EmbedRasterEngravings = true,
+                    RasterEngravingAssetFolder = "assets",
+                    FlexLineSpacing = 3.0,
+                    FlexLineLengthFraction = 0.75,
+                    FlexLengthCompensationFactor = 1.0,
+                    ScrapValue = 0.5,
+                    MinScrapSize = 50.0,
+                    Debug = true,
+                };
+
+                var parseResult = _lib.ParsePlan(yamlInput, settings);
+                if (!parseResult.Success || parseResult.Value is null)
+                {
+                    genError = string.Join("\n", parseResult.Errors.Select(e => e.ToString()));
+                    return;
+                }
+
+                var shapes = _lib.GetCuttableShapes(parseResult.Value, settings);
+                pages = _lib.GeneratePagedSVGPages(shapes, settings).ToList();
             }
+            catch (Exception ex)
+            {
+                genError = ex.Message;
+            }
+            finally
+            {
+                Console.SetOut(previousOut);
+                Console.SetError(previousError);
+            }
+        });
 
-            var shapes = _lib.GetCuttableShapes(parseResult.Value, settings);
-            StateHasChanged();
-            await Task.Delay(1);
-
-            svgPages = _lib.GeneratePagedSVGPages(shapes, settings).ToList();
-        }
-        catch (Exception ex)
-        {
-            errorMessage = ex.Message;
-        }
-        finally
-        {
-            Console.SetOut(previousOut);
-            Console.SetError(previousError);
-            isGenerating = false;
-            StateHasChanged();
-        }
-
+        errorMessage = genError;
+        svgPages = pages;
+        isGenerating = false;
+        StateHasChanged();
         await JS.InvokeVoidAsync("scrollSvgPreviewsToBottom");
     }
 
