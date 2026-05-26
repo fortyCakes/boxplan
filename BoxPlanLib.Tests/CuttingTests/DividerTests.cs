@@ -151,7 +151,30 @@ public class DividerTests
     }
 
     [Fact]
-    public void Facing_front_shrinks_x_divider_depth_by_material_thickness()
+    public void X_divider_depth_matches_box_side_panel_height()
+    {
+        var plan = ParseOk("""
+            shapes:
+              - id: "frame"
+                type: "box"
+                dimensions: [300.0, 200.0, 150.0]
+                faces:
+                  - name: "front"
+                    type: "open"
+                dividers:
+                  - split: { x: 3 }
+                    facing: "front"
+            """);
+
+        var pieces = new BoxPlanLib().GetCuttableShapes(plan, Settings());
+        var xDivider = pieces.First(p => p.Id.Contains("divider-x"));
+        var sidePanel = pieces.Single(p => p.Id == "frame.left");
+
+        Assert.Equal(sidePanel.BoundingBoxMax.X, xDivider.BoundingBoxMax.Y, 6);
+    }
+
+    [Fact]
+    public void Facing_front_x_divider_has_full_depth()
     {
         var plan = ParseOk("""
             shapes:
@@ -167,7 +190,7 @@ public class DividerTests
         var xDivider = pieces.First(p => p.Id.Contains("divider-x"));
 
         Assert.Equal(200, xDivider.BoundingBoxMax.X, 6);
-        Assert.Equal(147, xDivider.BoundingBoxMax.Y, 6);
+        Assert.Equal(150, xDivider.BoundingBoxMax.Y, 6);
         Assert.True(xDivider.Outline.Segments.Count > 4);
     }
 

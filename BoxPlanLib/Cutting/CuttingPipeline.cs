@@ -129,70 +129,20 @@ public sealed class CuttingPipeline
 
     private static (double U, double V) DividerPanelSize(Axis axis, Vec3 dims, FaceName? facing, double t)
     {
-        var (uExt, vExt) = axis switch
+        return axis switch
         {
             Axis.X => (dims.Y, dims.Z),
             Axis.Y => (dims.X, dims.Z),
             Axis.Z => (dims.X, dims.Y),
             _ => (0.0, 0.0),
         };
-        if (facing is { } f)
-        {
-            switch (axis, f)
-            {
-                case (Axis.X, FaceName.Front) or (Axis.X, FaceName.Back): vExt -= t; break;
-                case (Axis.X, FaceName.Top) or (Axis.X, FaceName.Bottom): uExt -= t; break;
-                case (Axis.Y, FaceName.Front) or (Axis.Y, FaceName.Back): vExt -= t; break;
-                case (Axis.Y, FaceName.Left) or (Axis.Y, FaceName.Right): uExt -= t; break;
-                case (Axis.Z, FaceName.Top) or (Axis.Z, FaceName.Bottom): vExt -= t; break;
-                case (Axis.Z, FaceName.Left) or (Axis.Z, FaceName.Right): uExt -= t; break;
-            }
-        }
-        return (uExt, vExt);
     }
 
-    private static (double Center, double Length) DividerSpan(
-        double fullLength,
-        FaceName? facingFace,
-        FaceName lowFace,
-        FaceName highFace,
-        double thickness)
+    private static (double Center, double Length) DividerSpan(double fullLength)
     {
-        if (facingFace == lowFace)
-        {
-            return ((fullLength - thickness) / 2.0, fullLength - thickness);
-        }
-
-        if (facingFace == highFace)
-        {
-            return ((fullLength + thickness) / 2.0, fullLength - thickness);
-        }
-
         return (fullLength / 2.0, fullLength);
     }
 
-    private static (double U, double V) DividerPanelStart(Axis axis, Vec3 dims, FaceName? facing, double t)
-    {
-        return axis switch
-        {
-            Axis.X =>
-                (DividerSpan(dims.Y, facing, FaceName.Bottom, FaceName.Top, t).Center
-                    - DividerSpan(dims.Y, facing, FaceName.Bottom, FaceName.Top, t).Length / 2.0,
-                 DividerSpan(dims.Z, facing, FaceName.Front, FaceName.Back, t).Center
-                    - DividerSpan(dims.Z, facing, FaceName.Front, FaceName.Back, t).Length / 2.0),
-            Axis.Y =>
-                (DividerSpan(dims.X, facing, FaceName.Left, FaceName.Right, t).Center
-                    - DividerSpan(dims.X, facing, FaceName.Left, FaceName.Right, t).Length / 2.0,
-                 DividerSpan(dims.Z, facing, FaceName.Front, FaceName.Back, t).Center
-                    - DividerSpan(dims.Z, facing, FaceName.Front, FaceName.Back, t).Length / 2.0),
-            Axis.Z =>
-                (DividerSpan(dims.X, facing, FaceName.Left, FaceName.Right, t).Center
-                    - DividerSpan(dims.X, facing, FaceName.Left, FaceName.Right, t).Length / 2.0,
-                 DividerSpan(dims.Y, facing, FaceName.Bottom, FaceName.Top, t).Center
-                    - DividerSpan(dims.Y, facing, FaceName.Bottom, FaceName.Top, t).Length / 2.0),
-            _ => (0.0, 0.0),
-        };
-    }
 
     private static DividerEdgeSpec[] BuildDividerEdges(Axis axis, FaceName? facing, IReadOnlySet<FaceName> openFaces)
     {
@@ -311,7 +261,7 @@ public sealed class CuttingPipeline
         double t)
     {
         var clips = new List<IReadOnlyList<Vec2>>();
-        var start = DividerPanelStart(dividerAxis, dims, facing, t);
+        var start = (U: 0.0, V: 0.0);
 
         foreach (var scoop in scoops)
         {
@@ -754,24 +704,24 @@ public sealed class CuttingPipeline
         switch (axis)
         {
             case Axis.X:
-                var xOnBottomTop = DividerSpan(dims.Z, facing, FaceName.Front, FaceName.Back, t);
-                var xOnFrontBack = DividerSpan(dims.Y, facing, FaceName.Bottom, FaceName.Top, t);
+                var xOnBottomTop = DividerSpan(dims.Z);
+                var xOnFrontBack = DividerSpan(dims.Y);
                 Add(FaceName.Bottom, pos, xOnBottomTop.Center, t, xOnBottomTop.Length, dividerOwnsPrimary: false);
                 Add(FaceName.Top,    pos, xOnBottomTop.Center, t, xOnBottomTop.Length, dividerOwnsPrimary: false);
                 Add(FaceName.Front,  pos, xOnFrontBack.Center, t, xOnFrontBack.Length, dividerOwnsPrimary: true);
                 Add(FaceName.Back,   pos, xOnFrontBack.Center, t, xOnFrontBack.Length, dividerOwnsPrimary: true);
                 break;
             case Axis.Y:
-                var yOnFrontBack = DividerSpan(dims.X, facing, FaceName.Left, FaceName.Right, t);
-                var yOnLeftRight = DividerSpan(dims.Z, facing, FaceName.Front, FaceName.Back, t);
+                var yOnFrontBack = DividerSpan(dims.X);
+                var yOnLeftRight = DividerSpan(dims.Z);
                 Add(FaceName.Front, yOnFrontBack.Center, pos, yOnFrontBack.Length, t, dividerOwnsPrimary: true);
                 Add(FaceName.Back,  yOnFrontBack.Center, pos, yOnFrontBack.Length, t, dividerOwnsPrimary: true);
                 Add(FaceName.Left,  yOnLeftRight.Center, pos, yOnLeftRight.Length, t, dividerOwnsPrimary: false);
                 Add(FaceName.Right, yOnLeftRight.Center, pos, yOnLeftRight.Length, t, dividerOwnsPrimary: false);
                 break;
             case Axis.Z:
-                var zOnBottomTop = DividerSpan(dims.X, facing, FaceName.Left, FaceName.Right, t);
-                var zOnLeftRight = DividerSpan(dims.Y, facing, FaceName.Bottom, FaceName.Top, t);
+                var zOnBottomTop = DividerSpan(dims.X);
+                var zOnLeftRight = DividerSpan(dims.Y);
                 Add(FaceName.Bottom, zOnBottomTop.Center, pos, zOnBottomTop.Length, t, dividerOwnsPrimary: true);
                 Add(FaceName.Top,    zOnBottomTop.Center, pos, zOnBottomTop.Length, t, dividerOwnsPrimary: true);
                 Add(FaceName.Left,   pos, zOnLeftRight.Center, t, zOnLeftRight.Length, dividerOwnsPrimary: false);
