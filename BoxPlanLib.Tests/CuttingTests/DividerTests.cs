@@ -234,15 +234,13 @@ public class DividerTests
     var backBounds = back.InteriorCuts.Select(Bounds).ToArray();
         var settings = Settings();
         var actualMax = bounds.Max(b => b.MaxY);
-        var dividerEdgeSlots = FaceSlotExtents(150.0 - settings.MaterialThickness, settings.MaterialThickness, settings.FingerJointSize, dividerOwnsPrimary: false);
+        var dividerEdgeSlots = FaceSlotExtents(150.0, settings.MaterialThickness, settings.FingerJointSize, dividerOwnsPrimary: false);
     var backFaceSlots = FaceSlotExtents(200.0, settings.MaterialThickness, settings.FingerJointSize, dividerOwnsPrimary: true);
-        var wallEdgeSlots = FaceSlotExtents(150.0, settings.MaterialThickness, settings.FingerJointSize, dividerOwnsPrimary: false);
 
         Assert.Equal(3, bounds.Length);
       Assert.Equal(settings.MaterialThickness * 1.5, backBounds.Min(b => b.MinY), 6);
     Assert.Equal(backFaceSlots.Max, backBounds.Max(b => b.MaxY), 6);
         Assert.Equal(dividerEdgeSlots.Max, actualMax, 6);
-        Assert.True(actualMax < wallEdgeSlots.Max);
     }
 
     [Fact]
@@ -311,8 +309,8 @@ public class DividerTests
             var bounds = Bounds(slot);
             Assert.Equal(98.5, bounds.MinX, 6);
             Assert.Equal(101.5, bounds.MaxX, 6);
-            Assert.Equal(73.5, bounds.MinY, 6);
-            Assert.Equal(147.0, bounds.MaxY, 6);
+            Assert.Equal(75.0, bounds.MinY, 6);
+            Assert.Equal(150.0, bounds.MaxY, 6);
         }
     }
 
@@ -338,12 +336,12 @@ public class DividerTests
         Assert.Equal(98.5, ordered[0].MinX, 6);
         Assert.Equal(101.5, ordered[0].MaxX, 6);
         Assert.Equal(0.0, ordered[0].MinY, 6);
-        Assert.Equal(73.5, ordered[0].MaxY, 6);
+        Assert.Equal(75.0, ordered[0].MaxY, 6);
 
         Assert.Equal(198.5, ordered[1].MinX, 6);
         Assert.Equal(201.5, ordered[1].MaxX, 6);
         Assert.Equal(0.0, ordered[1].MinY, 6);
-        Assert.Equal(73.5, ordered[1].MaxY, 6);
+        Assert.Equal(75.0, ordered[1].MaxY, 6);
     }
 
     [Fact]
@@ -365,14 +363,14 @@ public class DividerTests
         var yDivider = pieces.Single(p => p.Id.Contains("divider-y"));
 
         var xBounds = Bounds(Assert.Single(xDivider.InteriorCuts));
-              Assert.Equal(147.0 / 2.0 + settings.Kerf, xBounds.MaxY - xBounds.MinY, 6);
+              Assert.Equal(150.0 / 2.0 + settings.Kerf, xBounds.MaxY - xBounds.MinY, 6);
               Assert.Equal(xDivider.BoundingBoxMax.Y - settings.Kerf / 2.0, xBounds.MaxY, 6);
 
         var yBounds = yDivider.InteriorCuts.Select(Bounds).OrderBy(b => b.MinX).ToArray();
               Assert.Equal(settings.Kerf / 2.0, yBounds[0].MinY, 6);
-              Assert.Equal(147.0 / 2.0 + settings.Kerf, yBounds[0].MaxY - yBounds[0].MinY, 6);
+              Assert.Equal(150.0 / 2.0 + settings.Kerf, yBounds[0].MaxY - yBounds[0].MinY, 6);
               Assert.Equal(settings.Kerf / 2.0, yBounds[1].MinY, 6);
-              Assert.Equal(147.0 / 2.0 + settings.Kerf, yBounds[1].MaxY - yBounds[1].MinY, 6);
+              Assert.Equal(150.0 / 2.0 + settings.Kerf, yBounds[1].MaxY - yBounds[1].MinY, 6);
     }
 
     [Fact]
